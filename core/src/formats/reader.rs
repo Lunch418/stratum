@@ -66,6 +66,10 @@ impl<'a> Reader<'a> {
         Ok(u32::from_le_bytes([b[0], b[1], b[2], b[3]]))
     }
 
+    pub fn i32(&mut self) -> Result<i32> {
+        Ok(self.u32()? as i32)
+    }
+
     pub fn f64(&mut self) -> Result<f64> {
         let b = self.take(8)?;
         Ok(f64::from_le_bytes([b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7]]))

@@ -6,9 +6,11 @@ pub mod cls;
 pub mod cp1251;
 pub mod project;
 pub mod reader;
+pub mod vdr;
 
 pub use cls::{Child, Class, Link, Variable};
 pub use project::{Project, State};
+pub use vdr::Picture;
 pub use reader::{FormatError, Result};
 
 use std::path::{Path, PathBuf};

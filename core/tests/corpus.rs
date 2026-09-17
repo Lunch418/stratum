@@ -127,3 +127,50 @@ fn every_sample_project_runs() {
     assert!(count >= 40, "примеров найдено {count}");
     assert!(failures.is_empty(), "{failures:#?}");
 }
+
+/// Векторная графика: все иконки, рисунки и схемы имиджей корпуса плюс
+/// отдельные `.vdr`. Не разбираются только блоки с вложенным 3D.
+#[test]
+fn vector_graphics_of_the_corpus_parse() {
+    use stratum_core::formats::vdr;
+    let Some(root) = fixtures() else { return };
+    let mut files = Vec::new();
+    collect(&root, &mut files);
+    let (mut ok, mut failed) = (0, Vec::new());
+    let mut try_blob = |data: &[u8], what: String| match vdr::parse(data, &what) {
+        Ok(_) => ok += 1,
+        Err(e) => failed.push(e.to_string()),
+    };
+    for file in &files {
+        let data = std::fs::read(file).unwrap();
+        let Ok(c) = cls::parse(&data, &file.display().to_string()) else { continue };
+        for (tag, blob) in [("icon", &c.icon), ("image", &c.image), ("scheme", &c.scheme)] {
+            if let Some(b) = blob {
+                if b.windows(2).take(17).any(|w| w == b"2D") {
+                    try_blob(b, format!("{}:{tag}", c.name));
+                }
+            }
+        }
+    }
+    for entry in walk_ext(&root, "vdr") {
+        try_blob(&std::fs::read(&entry).unwrap(), entry.display().to_string());
+    }
+    assert!(ok >= 350, "разобрано {ok}, ошибки: {failed:#?}");
+    assert!(failed.len() <= 16, "{failed:#?}");
+}
+
+fn walk_ext(dir: &Path, ext: &str) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    fn go(dir: &Path, ext: &str, out: &mut Vec<PathBuf>) {
+        for entry in std::fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                go(&path, ext, out);
+            } else if path.extension().is_some_and(|e| e.eq_ignore_ascii_case(ext)) {
+                out.push(path);
+            }
+        }
+    }
+    go(dir, ext, &mut out);
+    out
+}
