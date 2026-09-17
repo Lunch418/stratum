@@ -441,6 +441,19 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
     Some(v)
 }
 
+/// Габариты объекта (для `GetActualSize2d`).
+pub fn object_size(gfx: &Gfx, args: &[Value]) -> Option<(f64, f64)> {
+    object(gfx, args).map(|o| (o.w, o.h))
+}
+
+/// Прямоугольник источника растра (для `GetBitmapSrcRect2d`).
+pub fn bitmap_src(gfx: &Gfx, args: &[Value]) -> Option<(f64, f64, f64, f64)> {
+    match &object(gfx, args)?.shape {
+        Shape::Bitmap { src, .. } => Some(*src),
+        _ => None,
+    }
+}
+
 fn window_space<'a>(gfx: &'a Gfx, name: &str) -> Option<&'a Space> {
     gfx.window_space(name).and_then(|h| gfx.space(h))
 }

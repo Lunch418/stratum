@@ -235,15 +235,33 @@ impl<'a> Interpreter<'a> {
                 for a in args {
                     values.push(self.eval_in(a, vars, phase)?);
                 }
-                match vars.call_special(name, &values) {
+                self.effects.outputs.clear();
+                let result = match vars.call_special(name, &values) {
                     Some(v) => v,
                     None => match builtins::call(name, &values, self.effects) {
                         Some(v) => v,
                         None => builtins::call_stub(name, self.effects),
                     },
+                };
+                // выходные аргументы пишутся в переменные, стоящие на их местах
+                let outputs = std::mem::take(&mut self.effects.outputs);
+                for (index, value) in outputs {
+                    if let Some(target) = args.get(index).and_then(var_name) {
+                        vars.set(target, value);
+                    }
                 }
+                result
             }
         })
+    }
+}
+
+/// Имя переменной в выражении-аргументе: `x` или `~x`.
+fn var_name(e: &Expr) -> Option<&str> {
+    match e {
+        Expr::Var(name) => Some(name),
+        Expr::Unary(UnOp::Old, inner) => var_name(inner),
+        _ => None,
     }
 }
 

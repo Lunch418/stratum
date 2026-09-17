@@ -23,6 +23,10 @@ pub struct Effects {
     pub stop_requested: bool,
     /// Окна и графические пространства модели.
     pub gfx: Gfx,
+    /// Выходные аргументы последнего вызова (`&FLOAT` в таблице компилятора):
+    /// номер аргумента и новое значение; интерпретатор записывает их в
+    /// переменные, переданные на этих позициях.
+    pub outputs: Vec<(usize, Value)>,
 }
 
 impl Effects {
@@ -165,7 +169,29 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
             num(0.0)
         }
         "gettickcount" => num(0.0),
+        // inc(x [, step]) / dec(x [, step]) меняют переменную-аргумент
+        "inc" | "dec" => {
+            let step = if args.len() > 1 { f(args, 1) } else { 1.0 };
+            let v = f(args, 0) + if lower == "inc" { step } else { -step };
+            fx.outputs.push((0, num(v)));
+            num(v)
+        }
 
+        // функции 2D с выходными аргументами
+        "getactualsize2d" => {
+            let (w, h) = crate::gfx::api::object_size(&fx.gfx, args).unwrap_or((0.0, 0.0));
+            fx.outputs.push((2, num(w)));
+            fx.outputs.push((3, num(h)));
+            boolean(true)
+        }
+        "getbitmapsrcrect2d" => {
+            let (x, y, w, h) = crate::gfx::api::bitmap_src(&fx.gfx, args).unwrap_or((0.0, 0.0, 0.0, 0.0));
+            fx.outputs.push((2, num(x)));
+            fx.outputs.push((3, num(y)));
+            fx.outputs.push((4, num(w)));
+            fx.outputs.push((5, num(h)));
+            boolean(true)
+        }
         _ => return crate::gfx::api::call(name, args, &mut fx.gfx),
     };
     let _ = format_number; // используется в Display значения
