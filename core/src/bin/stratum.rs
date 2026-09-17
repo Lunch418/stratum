@@ -1,0 +1,303 @@
+//! CLI ядра Stratum Modern.
+//!
+//!     stratum run PROJECT [--ticks N] [--dump] [--watch имидж.переменная]
+//!     stratum parse PATH...        разобрать тексты имиджей
+//!     stratum info PROJECT         состав проекта: имиджи, схема, связи
+//!     stratum check DIR            прогнать все .cls в дереве через парсеры
+
+use std::path::{Path, PathBuf};
+use std::process::ExitCode;
+
+use stratum_core::formats::{self, cls};
+use stratum_core::lang;
+use stratum_core::sim::Simulation;
+
+fn main() -> ExitCode {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let result = match args.first().map(String::as_str) {
+        Some("run") => cmd_run(&args[1..]),
+        Some("parse") => cmd_parse(&args[1..]),
+        Some("info") => cmd_info(&args[1..]),
+        Some("check") => cmd_check(&args[1..]),
+        Some("--help") | Some("-h") | None => {
+            usage();
+            Ok(())
+        }
+        Some(other) => Err(format!("неизвестная команда {other:?}; см. stratum --help")),
+    };
+    match result {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(message) => {
+            eprintln!("ошибка: {message}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn usage() {
+    println!(
+        "stratum — ядро Stratum Modern\n\n\
+         Команды:\n  \
+         run PROJECT [--ticks N] [--dump] [--watch ИМИДЖ.ПЕРЕМЕННАЯ] [--lib ПАПКА]\n      \
+         открыть проект (.spj или папку) и просчитать N тактов;\n      \
+         библиотеки: --lib, иначе $STRATUM_LIBRARY, иначе fixtures/ или Stratum в Wine\n  \
+         parse ФАЙЛ...\n      разобрать текст имиджа и показать дерево\n  \
+         info PROJECT\n      состав проекта: имиджи, экземпляры, связи\n  \
+         check КАТАЛОГ\n      прогнать все .cls каталога через парсеры форматов и языка"
+    );
+}
+
+struct RunOptions {
+    path: PathBuf,
+    ticks: u64,
+    dump: bool,
+    watch: Vec<String>,
+    libraries: Vec<PathBuf>,
+}
+
+fn parse_run_options(args: &[String]) -> Result<RunOptions, String> {
+    let mut opts = RunOptions {
+        path: PathBuf::new(),
+        ticks: 1,
+        dump: false,
+        watch: Vec::new(),
+        libraries: Vec::new(),
+    };
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--ticks" => {
+                i += 1;
+                opts.ticks = args
+                    .get(i)
+                    .ok_or("после --ticks нужно число")?
+                    .parse()
+                    .map_err(|_| "после --ticks нужно число")?;
+            }
+            "--dump" => opts.dump = true,
+            "--lib" => {
+                i += 1;
+                opts.libraries.push(PathBuf::from(args.get(i).ok_or("после --lib нужна папка")?));
+            }
+            "--watch" => {
+                i += 1;
+                opts.watch.push(args.get(i).ok_or("после --watch нужно имя переменной")?.clone());
+            }
+            other if other.starts_with("--") => return Err(format!("неизвестный ключ {other}")),
+            other => opts.path = PathBuf::from(other),
+        }
+        i += 1;
+    }
+    if opts.path.as_os_str().is_empty() {
+        return Err("не указан проект".into());
+    }
+    if opts.libraries.is_empty() {
+        opts.libraries = formats::default_library_dirs();
+    }
+    Ok(opts)
+}
+
+fn cmd_run(args: &[String]) -> Result<(), String> {
+    let opts = parse_run_options(args)?;
+    let loaded = formats::load_project(&opts.path, &opts.libraries)
+        .map_err(|e| format!("{}: {e}", opts.path.display()))?
+        .map_err(|e| e.to_string())?;
+
+    println!(
+        "проект {}: корневой имидж {}, имиджей {} (+{} из библиотек)",
+        opts.path.display(),
+        loaded.project.root,
+        loaded.own_classes,
+        loaded.classes.len() - loaded.own_classes
+    );
+
+    let mut sim = Simulation::build(&loaded).map_err(|e| e.to_string())?;
+    println!("экземпляров на схеме: {}", sim.instances().len());
+
+    // за чем следим: `имидж.переменная`
+    let watches: Vec<(usize, String)> = opts
+        .watch
+        .iter()
+        .map(|w| {
+            let (image, var) = w
+                .rsplit_once('.')
+                .ok_or_else(|| format!("{w:?}: нужно имя вида имидж.переменная"))?;
+            let index = sim
+                .find(image)
+                .ok_or_else(|| format!("{image:?}: такого имиджа нет в проекте"))?;
+            Ok((index, var.to_string()))
+        })
+        .collect::<Result<_, String>>()?;
+
+    for _ in 0..opts.ticks {
+        sim.step().map_err(|e| e.message)?;
+        if !watches.is_empty() {
+            let values: Vec<String> = watches
+                .iter()
+                .map(|(i, var)| match sim.value(*i, var) {
+                    Some(v) => format!("{}.{}={}", sim.instances()[*i].name, var, v),
+                    None => format!("{}.{}=—", sim.instances()[*i].name, var),
+                })
+                .collect();
+            println!("такт {:>6}  {}", sim.tick_number(), values.join("  "));
+        }
+        if sim.stopped {
+            println!("модель остановлена на такте {}", sim.tick_number());
+            break;
+        }
+    }
+
+    if opts.dump {
+        println!("\nзначения после такта {}:", sim.tick_number());
+        for (i, instance) in sim.instances().iter().enumerate() {
+            let vars: Vec<String> = instance
+                .var_names()
+                .iter()
+                .filter_map(|name| sim.value(i, name).map(|v| format!("{name}={v}")))
+                .collect();
+            if vars.is_empty() {
+                continue;
+            }
+            println!("  {} [{}]", instance.path, instance.class_name);
+            for chunk in vars.chunks(6) {
+                println!("      {}", chunk.join("  "));
+            }
+        }
+    }
+
+    if !sim.effects.log.is_empty() {
+        println!("\nLogMessage:");
+        for line in &sim.effects.log {
+            println!("  {line}");
+        }
+    }
+    if !sim.effects.missing.is_empty() {
+        println!("\nещё не реализованные функции (вызовов):");
+        let mut rows: Vec<_> = sim.effects.missing.iter().collect();
+        rows.sort_by(|a, b| b.1.cmp(a.1));
+        for (name, count) in rows.iter().take(20) {
+            println!("  {name:<28} {count}");
+        }
+    }
+    Ok(())
+}
+
+fn cmd_parse(args: &[String]) -> Result<(), String> {
+    if args.is_empty() {
+        return Err("не указан файл".into());
+    }
+    for arg in args {
+        let path = Path::new(arg);
+        let data = std::fs::read(path).map_err(|e| format!("{arg}: {e}"))?;
+        let text = if data.starts_with(b"SB") {
+            cls::parse(&data, arg).map_err(|e| e.to_string())?.text
+        } else {
+            String::from_utf8_lossy(&data).into_owned()
+        };
+        let model = lang::parse(&text).map_err(|e| format!("{arg}: {e}"))?;
+        println!("{arg}: операторов {}, объявлений {}", model.body.len(), model.declarations.len());
+        for stmt in &model.body {
+            println!("  {stmt:?}");
+        }
+    }
+    Ok(())
+}
+
+fn cmd_info(args: &[String]) -> Result<(), String> {
+    let path = PathBuf::from(args.first().ok_or("не указан проект")?);
+    let loaded = formats::load_project(&path, &formats::default_library_dirs())
+        .map_err(|e| format!("{}: {e}", path.display()))?
+        .map_err(|e| e.to_string())?;
+    println!("корневой имидж: {}", loaded.project.root);
+    for p in &loaded.project.properties {
+        println!("свойство {}: {:?}", p.key, p.value);
+    }
+    println!("\nимиджи проекта:");
+    for c in &loaded.classes[..loaded.own_classes] {
+        println!(
+            "  {:<28} переменных {:>3}, детей {:>3}, связей {:>3}, строк текста {:>4}",
+            c.name,
+            c.vars.len(),
+            c.children.len(),
+            c.links.len(),
+            c.text.lines().count()
+        );
+    }
+    let sim = Simulation::build(&loaded).map_err(|e| e.to_string())?;
+    println!("\nэкземпляры ({}):", sim.instances().len());
+    for instance in sim.instances() {
+        println!("  {} [{}]", instance.path, instance.class_name);
+    }
+    Ok(())
+}
+
+fn cmd_check(args: &[String]) -> Result<(), String> {
+    let dir = PathBuf::from(args.first().ok_or("не указан каталог")?);
+    let mut files = Vec::new();
+    collect(&dir, &mut files).map_err(|e| e.to_string())?;
+    files.sort();
+
+    let (mut read_ok, mut parsed_ok) = (0u32, 0u32);
+    let mut read_failed = Vec::new();
+    let mut parse_failed = Vec::new();
+    for file in &files {
+        let data = match std::fs::read(file) {
+            Ok(d) => d,
+            Err(e) => {
+                read_failed.push(format!("{}: {e}", file.display()));
+                continue;
+            }
+        };
+        if !data.starts_with(b"SB") {
+            continue;
+        }
+        match cls::parse(&data, &file.display().to_string()) {
+            Ok(c) => {
+                read_ok += 1;
+                if c.text.trim().is_empty() {
+                    parsed_ok += 1;
+                    continue;
+                }
+                match lang::parse(&c.text) {
+                    Ok(_) => parsed_ok += 1,
+                    Err(e) => parse_failed.push(format!("{} [{}]: {e}", file.display(), c.name)),
+                }
+            }
+            Err(e) => read_failed.push(e.to_string()),
+        }
+    }
+    println!("прочитано имиджей: {read_ok}, тексты разобраны: {parsed_ok}");
+    if !read_failed.is_empty() {
+        println!("\nне прочитаны ({}):", read_failed.len());
+        for e in read_failed.iter().take(20) {
+            println!("  {e}");
+        }
+    }
+    if !parse_failed.is_empty() {
+        println!("\nне разобран текст ({}):", parse_failed.len());
+        for e in parse_failed.iter().take(40) {
+            println!("  {e}");
+        }
+    }
+    if read_failed.is_empty() && parse_failed.is_empty() {
+        Ok(())
+    } else {
+        Err(format!(
+            "{} файлов не прочитано, {} текстов не разобрано",
+            read_failed.len(),
+            parse_failed.len()
+        ))
+    }
+}
+
+fn collect(dir: &Path, out: &mut Vec<PathBuf>) -> std::io::Result<()> {
+    for entry in std::fs::read_dir(dir)? {
+        let path = entry?.path();
+        if path.is_dir() {
+            collect(&path, out)?;
+        } else if path.extension().is_some_and(|e| e.eq_ignore_ascii_case("cls")) {
+            out.push(path);
+        }
+    }
+    Ok(())
+}

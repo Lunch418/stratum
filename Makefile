@@ -1,7 +1,7 @@
 STRATUM ?= $(HOME)/.wine32/drive_c/Program Files/Stratum
 HELPDECO ?= helpdeco
 
-.PHONY: all corpus help lang texts icons check clean
+.PHONY: all corpus help lang texts icons check core clean
 
 all: lang texts check
 
@@ -16,6 +16,7 @@ help:
 ## compiler tables -> docs/lang/{builtins,operators,constants,tdl}.json
 lang:
 	python3 tools/tpl2json.py fixtures/template docs/lang fixtures/library
+	python3 tools/gen_constants.py docs/lang/constants.json core/src/runtime/constants.rs
 	@test -f docs/help/functions.json && \
 	    python3 tools/merge_functions.py docs/lang/builtins.json docs/help/functions.json docs/lang || \
 	    echo "docs/help/functions.json missing - run 'make help' to add descriptions"
@@ -33,6 +34,10 @@ check:
 	python3 tools/cls_dump.py --scan fixtures
 	python3 tools/spj_dump.py --scan fixtures
 	python3 tools/check_corpus.py docs/corpus docs/lang
+
+## build the Rust core and run its tests on the corpus
+core:
+	cd core && cargo build --release && cargo test --release
 
 clean:
 	rm -rf docs/corpus docs/icons

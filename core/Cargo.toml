@@ -1,0 +1,15 @@
+[package]
+name = "stratum-core"
+version = "0.1.0"
+edition = "2021"
+description = "Ядро Stratum Modern: чтение форматов Stratum 2000, язык моделирования и симуляция"
+license = "MIT"
+
+[dependencies]
+
+[[bin]]
+name = "stratum"
+path = "src/bin/stratum.rs"
+
+[profile.release]
+opt-level = 3
