@@ -1,0 +1,1073 @@
+[
+ {
+  "name": "_epilog_",
+  "source": "COMPILER.TPL",
+  "args": [],
+  "ret": null,
+  "opcode": 0,
+  "section": "EPILOG"
+ },
+ {
+  "name": ";",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   0,
+   32767
+  ],
+  "args": [],
+  "ret": null,
+  "opcode": "$name",
+  "section": "OPERATORS"
+ },
+ {
+  "name": "#",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   0,
+   32767
+  ],
+  "args": [],
+  "ret": null,
+  "opcode": "$name",
+  "section": "OPERATORS"
+ },
+ {
+  "name": "(",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   0,
+   32767
+  ],
+  "args": [],
+  "ret": null,
+  "opcode": "$name",
+  "section": "OPERATORS"
+ },
+ {
+  "name": "~",
+  "source": "COMPILER.TPL",
+  "args": [],
+  "ret": null,
+  "opcode": "$name",
+  "section": "OPERATORS"
+ },
+ {
+  "name": ",",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   1
+  ],
+  "args": [],
+  "ret": null,
+  "opcode": "$name",
+  "section": "OPERATORS"
+ },
+ {
+  "name": ")",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   1
+  ],
+  "args": [],
+  "ret": null,
+  "opcode": "$name",
+  "section": "OPERATORS"
+ },
+ {
+  "name": "]",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   1
+  ],
+  "args": [],
+  "ret": null,
+  "opcode": "$name",
+  "section": "OPERATORS"
+ },
+ {
+  "name": "=",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   1
+  ],
+  "args": [
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   }
+  ],
+  "ret": null,
+  "opcode": 19,
+  "section": "OPERATORS"
+ },
+ {
+  "name": ":=",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   1
+  ],
+  "args": [
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   }
+  ],
+  "ret": null,
+  "opcode": 11,
+  "opcode_extra": [
+   "$index"
+  ],
+  "section": "OPERATORS"
+ },
+ {
+  "name": ":=_old",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   1
+  ],
+  "args": [
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   }
+  ],
+  "ret": null,
+  "opcode": 10,
+  "opcode_extra": [
+   "$index"
+  ],
+  "section": "OPERATORS"
+ },
+ {
+  "name": ":=",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   1
+  ],
+  "args": [
+   {
+    "type": "STRING",
+    "byref": false
+   },
+   {
+    "type": "STRING",
+    "byref": false
+   }
+  ],
+  "ret": null,
+  "opcode": 123,
+  "opcode_extra": [
+   "$index"
+  ],
+  "section": "OPERATORS"
+ },
+ {
+  "name": ":=_old",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   1
+  ],
+  "args": [
+   {
+    "type": "STRING",
+    "byref": false
+   },
+   {
+    "type": "STRING",
+    "byref": false
+   }
+  ],
+  "ret": null,
+  "opcode": 157,
+  "opcode_extra": [
+   "$index"
+  ],
+  "section": "OPERATORS"
+ },
+ {
+  "name": ":=",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   1
+  ],
+  "args": [
+   {
+    "type": "COLORREF",
+    "byref": false
+   },
+   {
+    "type": "COLORREF",
+    "byref": false
+   }
+  ],
+  "ret": null,
+  "opcode": 13,
+  "opcode_extra": [
+   "$index"
+  ],
+  "section": "OPERATORS"
+ },
+ {
+  "name": ":=_old",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   1
+  ],
+  "args": [
+   {
+    "type": "COLORREF",
+    "byref": false
+   },
+   {
+    "type": "COLORREF",
+    "byref": false
+   }
+  ],
+  "ret": null,
+  "opcode": 12,
+  "opcode_extra": [
+   "$index"
+  ],
+  "section": "OPERATORS"
+ },
+ {
+  "name": ":=",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   1
+  ],
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "HANDLE",
+    "byref": false
+   }
+  ],
+  "ret": null,
+  "opcode": 13,
+  "opcode_extra": [
+   "$index"
+  ],
+  "section": "OPERATORS"
+ },
+ {
+  "name": ":=_old",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   1
+  ],
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "HANDLE",
+    "byref": false
+   }
+  ],
+  "ret": null,
+  "opcode": 12,
+  "opcode_extra": [
+   "$index"
+  ],
+  "section": "OPERATORS"
+ },
+ {
+  "name": ":=",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   1
+  ],
+  "args": [
+   {
+    "type": "INTEGER",
+    "byref": false
+   },
+   {
+    "type": "INTEGER",
+    "byref": false
+   }
+  ],
+  "ret": null,
+  "opcode": 13,
+  "opcode_extra": [
+   "$index"
+  ],
+  "section": "OPERATORS"
+ },
+ {
+  "name": ":=_old",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   1
+  ],
+  "args": [
+   {
+    "type": "INTEGER",
+    "byref": false
+   },
+   {
+    "type": "INTEGER",
+    "byref": false
+   }
+  ],
+  "ret": null,
+  "opcode": 12,
+  "opcode_extra": [
+   "$index"
+  ],
+  "section": "OPERATORS"
+ },
+ {
+  "name": "==",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   7
+  ],
+  "args": [
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 54,
+  "section": "OPERATORS"
+ },
+ {
+  "name": "!=",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   7
+  ],
+  "args": [
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 55,
+  "section": "OPERATORS"
+ },
+ {
+  "name": ">",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   8
+  ],
+  "args": [
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 56,
+  "section": "OPERATORS"
+ },
+ {
+  "name": ">=",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   8
+  ],
+  "args": [
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 57,
+  "section": "OPERATORS"
+ },
+ {
+  "name": "<",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   8
+  ],
+  "args": [
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 58,
+  "section": "OPERATORS"
+ },
+ {
+  "name": "<=",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   8
+  ],
+  "args": [
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 59,
+  "section": "OPERATORS"
+ },
+ {
+  "name": "==",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   7
+  ],
+  "args": [
+   {
+    "type": "STRING",
+    "byref": false
+   },
+   {
+    "type": "STRING",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 144,
+  "section": "OPERATORS"
+ },
+ {
+  "name": "!=",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   7
+  ],
+  "args": [
+   {
+    "type": "STRING",
+    "byref": false
+   },
+   {
+    "type": "STRING",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 145,
+  "section": "OPERATORS"
+ },
+ {
+  "name": ">",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   8
+  ],
+  "args": [
+   {
+    "type": "STRING",
+    "byref": false
+   },
+   {
+    "type": "STRING",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 146,
+  "section": "OPERATORS"
+ },
+ {
+  "name": ">=",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   8
+  ],
+  "args": [
+   {
+    "type": "STRING",
+    "byref": false
+   },
+   {
+    "type": "STRING",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 147,
+  "section": "OPERATORS"
+ },
+ {
+  "name": "<",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   8
+  ],
+  "args": [
+   {
+    "type": "STRING",
+    "byref": false
+   },
+   {
+    "type": "STRING",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 148,
+  "section": "OPERATORS"
+ },
+ {
+  "name": "<=",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   8
+  ],
+  "args": [
+   {
+    "type": "STRING",
+    "byref": false
+   },
+   {
+    "type": "STRING",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 149,
+  "section": "OPERATORS"
+ },
+ {
+  "name": "==",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   7
+  ],
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "HANDLE",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 82,
+  "section": "OPERATORS"
+ },
+ {
+  "name": "==",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   7
+  ],
+  "args": [
+   {
+    "type": "COLORREF",
+    "byref": false
+   },
+   {
+    "type": "COLORREF",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 82,
+  "section": "OPERATORS"
+ },
+ {
+  "name": "==",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   7
+  ],
+  "args": [
+   {
+    "type": "INTEGER",
+    "byref": false
+   },
+   {
+    "type": "INTEGER",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 82,
+  "section": "OPERATORS"
+ },
+ {
+  "name": "!=",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   7
+  ],
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "HANDLE",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 83,
+  "section": "OPERATORS"
+ },
+ {
+  "name": "!=",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   7
+  ],
+  "args": [
+   {
+    "type": "COLORREF",
+    "byref": false
+   },
+   {
+    "type": "COLORREF",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 83,
+  "section": "OPERATORS"
+ },
+ {
+  "name": "&",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   6
+  ],
+  "args": [
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 105,
+  "section": "OPERATORS"
+ },
+ {
+  "name": "|",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   5
+  ],
+  "args": [
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 106,
+  "section": "OPERATORS"
+ },
+ {
+  "name": "&&",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   4
+  ],
+  "args": [
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 43,
+  "section": "OPERATORS"
+ },
+ {
+  "name": "||",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   3
+  ],
+  "args": [
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 44,
+  "section": "OPERATORS"
+ },
+ {
+  "name": "<<",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   4
+  ],
+  "args": [
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 116,
+  "section": "OPERATORS"
+ },
+ {
+  "name": ">>",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   3
+  ],
+  "args": [
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 117,
+  "section": "OPERATORS"
+ },
+ {
+  "name": "&&",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   4
+  ],
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "HANDLE",
+    "byref": false
+   }
+  ],
+  "ret": "HANDLE",
+  "opcode": 85,
+  "section": "OPERATORS"
+ },
+ {
+  "name": "||",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   3
+  ],
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "HANDLE",
+    "byref": false
+   }
+  ],
+  "ret": "HANDLE",
+  "opcode": 86,
+  "section": "OPERATORS"
+ },
+ {
+  "name": "un_minus",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   30
+  ],
+  "args": [
+   {
+    "type": "FLOAT",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 113,
+  "section": "OPERATORS"
+ },
+ {
+  "name": "!",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   30
+  ],
+  "args": [
+   {
+    "type": "FLOAT",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 45,
+  "section": "OPERATORS"
+ },
+ {
+  "name": "++",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   30
+  ],
+  "args": [
+   {
+    "type": "FLOAT",
+    "byref": false
+   }
+  ],
+  "ret": null,
+  "opcode": 800,
+  "opcode_extra": [
+   "$index"
+  ],
+  "section": "OPERATORS"
+ },
+ {
+  "name": "+",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   10,
+   10
+  ],
+  "args": [
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 18,
+  "section": "OPERATORS"
+ },
+ {
+  "name": "+",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   10,
+   10
+  ],
+  "args": [
+   {
+    "type": "STRING",
+    "byref": false
+   },
+   {
+    "type": "STRING",
+    "byref": false
+   }
+  ],
+  "ret": "STRING",
+  "opcode": 124,
+  "section": "OPERATORS"
+ },
+ {
+  "name": "+",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   10,
+   10
+  ],
+  "args": [
+   {
+    "type": "STRING",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   }
+  ],
+  "ret": "STRING",
+  "opcode": 770,
+  "section": "OPERATORS"
+ },
+ {
+  "name": "+",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   10,
+   10
+  ],
+  "args": [
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "STRING",
+    "byref": false
+   }
+  ],
+  "ret": "STRING",
+  "opcode": 771,
+  "section": "OPERATORS"
+ },
+ {
+  "name": "-",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   10,
+   10
+  ],
+  "args": [
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 19,
+  "section": "OPERATORS"
+ },
+ {
+  "name": "*",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   20
+  ],
+  "args": [
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 21,
+  "section": "OPERATORS"
+ },
+ {
+  "name": "/",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   20
+  ],
+  "args": [
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 20,
+  "section": "OPERATORS"
+ },
+ {
+  "name": "%",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   20
+  ],
+  "args": [
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 22,
+  "section": "OPERATORS"
+ },
+ {
+  "name": "^",
+  "source": "COMPILER.TPL",
+  "precedence": [
+   25
+  ],
+  "args": [
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 32,
+  "section": "OPERATORS"
+ }
+]

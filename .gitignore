@@ -1,0 +1,9 @@
+# Nothing from the original Stratum is redistributed: the corpus and
+# everything derived from it is rebuilt locally with `make`.
+/fixtures/
+/docs/help/
+/docs/corpus/
+/docs/icons/
+
+__pycache__/
+*.pyc

@@ -1,0 +1,2072 @@
+[
+ {
+  "name": "pi",
+  "value": 3.1415926536,
+  "group": "PI"
+ },
+ {
+  "name": "WORD8",
+  "value": 0,
+  "group": "Streams"
+ },
+ {
+  "name": "INT8",
+  "value": 1,
+  "group": "Streams"
+ },
+ {
+  "name": "WORD16",
+  "value": 2,
+  "group": "Streams"
+ },
+ {
+  "name": "INT16",
+  "value": 3,
+  "group": "Streams"
+ },
+ {
+  "name": "WORD32",
+  "value": 4,
+  "group": "Streams"
+ },
+ {
+  "name": "INT32",
+  "value": 5,
+  "group": "Streams"
+ },
+ {
+  "name": "FLOAT32",
+  "value": 6,
+  "group": "Streams"
+ },
+ {
+  "name": "FLOAT40",
+  "value": 7,
+  "group": "Streams"
+ },
+ {
+  "name": "FLOAT64",
+  "value": 8,
+  "group": "Streams"
+ },
+ {
+  "name": "FLOAT80",
+  "value": 9,
+  "group": "Streams"
+ },
+ {
+  "name": "PEN2D",
+  "value": 1,
+  "group": "Инструменты"
+ },
+ {
+  "name": "BRUSH2D",
+  "value": 2,
+  "group": "Инструменты"
+ },
+ {
+  "name": "DIB2D",
+  "value": 3,
+  "group": "Инструменты"
+ },
+ {
+  "name": "DOUBLEDIB2D",
+  "value": 4,
+  "group": "Инструменты"
+ },
+ {
+  "name": "FONT2D",
+  "value": 5,
+  "group": "Инструменты"
+ },
+ {
+  "name": "STRING2D",
+  "value": 6,
+  "group": "Инструменты"
+ },
+ {
+  "name": "TEXT2D",
+  "value": 7,
+  "group": "Инструменты"
+ },
+ {
+  "name": "SPACE3D",
+  "value": 8,
+  "group": "Инструменты"
+ },
+ {
+  "name": "TEXTURE3D",
+  "value": 9,
+  "group": "Инструменты"
+ },
+ {
+  "name": "WM_DESTROY",
+  "value": 2,
+  "group": "Windows messages"
+ },
+ {
+  "name": "WM_MOVE",
+  "value": 3,
+  "group": "Windows messages"
+ },
+ {
+  "name": "WM_SIZE",
+  "value": 5,
+  "group": "Windows messages"
+ },
+ {
+  "name": "WM_CLOSE",
+  "value": 16,
+  "group": "Windows messages"
+ },
+ {
+  "name": "WM_GETMINMAXINFO",
+  "value": 36,
+  "group": "Windows messages"
+ },
+ {
+  "name": "WM_COMMAND",
+  "value": 273,
+  "group": "Windows messages"
+ },
+ {
+  "name": "WM_MOUSEMOVE",
+  "value": 512,
+  "group": "Windows messages"
+ },
+ {
+  "name": "WM_LBUTTONDOWN",
+  "value": 513,
+  "group": "Windows messages"
+ },
+ {
+  "name": "WM_LBUTTONUP",
+  "value": 514,
+  "group": "Windows messages"
+ },
+ {
+  "name": "WM_LBUTTONDBLCLK",
+  "value": 515,
+  "group": "Windows messages"
+ },
+ {
+  "name": "WM_RBUTTONDOWN",
+  "value": 516,
+  "group": "Windows messages"
+ },
+ {
+  "name": "WM_RBUTTONUP",
+  "value": 517,
+  "group": "Windows messages"
+ },
+ {
+  "name": "WM_RBUTTONDBLCLK",
+  "value": 518,
+  "group": "Windows messages"
+ },
+ {
+  "name": "WM_MBUTTONDOWN",
+  "value": 519,
+  "group": "Windows messages"
+ },
+ {
+  "name": "WM_MBUTTONUP",
+  "value": 520,
+  "group": "Windows messages"
+ },
+ {
+  "name": "WM_MBUTTONDBLCLK",
+  "value": 521,
+  "group": "Windows messages"
+ },
+ {
+  "name": "WM_ALLMOUSEMESSAGE",
+  "value": 1536,
+  "group": "Windows messages"
+ },
+ {
+  "name": "WM_ALLKEYMESSAGE",
+  "value": 1537,
+  "group": "Windows messages"
+ },
+ {
+  "name": "WM_KEYDOWN",
+  "value": 256,
+  "group": "Windows messages"
+ },
+ {
+  "name": "WM_KEYUP",
+  "value": 257,
+  "group": "Windows messages"
+ },
+ {
+  "name": "WM_CANCLOSE",
+  "value": 1538,
+  "group": "Windows messages"
+ },
+ {
+  "name": "WM_SPACEDONE",
+  "value": 1539,
+  "group": "Windows messages"
+ },
+ {
+  "name": "WM_SPACEINIT",
+  "value": 1540,
+  "group": "Windows messages"
+ },
+ {
+  "name": "WM_CONTROLNOTIFY",
+  "value": 1544,
+  "group": "Windows messages"
+ },
+ {
+  "name": "WM_HYPERJUMP",
+  "value": 1546,
+  "group": "Windows messages"
+ },
+ {
+  "name": "SIZE_RESTORED",
+  "value": 0,
+  "group": "Windows messages"
+ },
+ {
+  "name": "SIZE_MINIMIZED",
+  "value": 1,
+  "group": "Windows messages"
+ },
+ {
+  "name": "SIZE_MAXIMIZED",
+  "value": 2,
+  "group": "Windows messages"
+ },
+ {
+  "name": "SIZE_MAXSHOW",
+  "value": 3,
+  "group": "Windows messages"
+ },
+ {
+  "name": "SIZE_MAXHIDE",
+  "value": 4,
+  "group": "Windows messages"
+ },
+ {
+  "name": "otGROUP2D",
+  "value": 3,
+  "group": "Windows messages"
+ },
+ {
+  "name": "otRGROUP2D",
+  "value": 4,
+  "group": "Windows messages"
+ },
+ {
+  "name": "otGROUP3D",
+  "value": 5,
+  "group": "Windows messages"
+ },
+ {
+  "name": "otOBJECT3D",
+  "value": 10,
+  "group": "Windows messages"
+ },
+ {
+  "name": "otLINE_2D",
+  "value": 20,
+  "group": "Windows messages"
+ },
+ {
+  "name": "otBITMAP_2D",
+  "value": 21,
+  "group": "Windows messages"
+ },
+ {
+  "name": "otDOUBLEBITMAP_2D",
+  "value": 22,
+  "group": "Windows messages"
+ },
+ {
+  "name": "otTEXT_2D",
+  "value": 23,
+  "group": "Windows messages"
+ },
+ {
+  "name": "otVIEW3D_2D",
+  "value": 24,
+  "group": "Windows messages"
+ },
+ {
+  "name": "otEDITFRAME",
+  "value": 50,
+  "group": "Windows messages"
+ },
+ {
+  "name": "otROTATECENTER",
+  "value": 51,
+  "group": "Windows messages"
+ },
+ {
+  "name": "otFRAME3D",
+  "value": 52,
+  "group": "Windows messages"
+ },
+ {
+  "name": "otAXIS3D",
+  "value": 53,
+  "group": "Windows messages"
+ },
+ {
+  "name": "otPEN2D",
+  "value": 101,
+  "group": "Tool types. By GetToolType"
+ },
+ {
+  "name": "otBRUSH2D",
+  "value": 102,
+  "group": "Tool types. By GetToolType"
+ },
+ {
+  "name": "otDIB2D",
+  "value": 103,
+  "group": "Tool types. By GetToolType"
+ },
+ {
+  "name": "otDOUBLEDIB2D",
+  "value": 104,
+  "group": "Tool types. By GetToolType"
+ },
+ {
+  "name": "otFONT2D",
+  "value": 105,
+  "group": "Tool types. By GetToolType"
+ },
+ {
+  "name": "otSTRING2D",
+  "value": 106,
+  "group": "Tool types. By GetToolType"
+ },
+ {
+  "name": "otTEXT2D",
+  "value": 107,
+  "group": "Tool types. By GetToolType"
+ },
+ {
+  "name": "otREFTODIB2D",
+  "value": 110,
+  "group": "Tool types. By GetToolType"
+ },
+ {
+  "name": "otREFTODOUBLEDIB2D",
+  "value": 111,
+  "group": "Tool types. By GetToolType"
+ },
+ {
+  "name": "ATTRSET",
+  "value": 1,
+  "group": "Tool types. By GetToolType"
+ },
+ {
+  "name": "ATTRRESET",
+  "value": 2,
+  "group": "Tool types. By GetToolType"
+ },
+ {
+  "name": "ATTRPUT",
+  "value": 3,
+  "group": "Tool types. By GetToolType"
+ },
+ {
+  "name": "PFC_MOVEOBJECT",
+  "value": 32768,
+  "group": "Paste from Clipboard"
+ },
+ {
+  "name": "PFC_SETCURRENT",
+  "value": 16384,
+  "group": "Paste from Clipboard"
+ },
+ {
+  "name": "PFC_SETFRAME",
+  "value": 8192,
+  "group": "Paste from Clipboard"
+ },
+ {
+  "name": "PFC_PENS",
+  "value": 1,
+  "group": "Paste from Clipboard"
+ },
+ {
+  "name": "PFC_BRUHS",
+  "value": 2,
+  "group": "Paste from Clipboard"
+ },
+ {
+  "name": "PFC_DIBS",
+  "value": 4,
+  "group": "Paste from Clipboard"
+ },
+ {
+  "name": "PFC_DDIBS",
+  "value": 8,
+  "group": "Paste from Clipboard"
+ },
+ {
+  "name": "PFC_STRINGS",
+  "value": 16,
+  "group": "Paste from Clipboard"
+ },
+ {
+  "name": "PFC_FONTS",
+  "value": 32,
+  "group": "Paste from Clipboard"
+ },
+ {
+  "name": "PFC_TEXTS",
+  "value": 64,
+  "group": "Paste from Clipboard"
+ },
+ {
+  "name": "PFC_3D",
+  "value": 128,
+  "group": "Paste from Clipboard"
+ },
+ {
+  "name": "PFC_ALL",
+  "value": 255,
+  "group": "Paste from Clipboard"
+ },
+ {
+  "name": "OID_RESERVED",
+  "value": 32000,
+  "group": "------------- resereved objects HANDLE`s -----------"
+ },
+ {
+  "name": "OID_RCENTER",
+  "value": 32001,
+  "group": "------------- resereved objects HANDLE`s -----------"
+ },
+ {
+  "name": "OID_FRAME2d1",
+  "value": 32002,
+  "group": "------------- resereved objects HANDLE`s -----------"
+ },
+ {
+  "name": "OID_FRAME2d2",
+  "value": 32003,
+  "group": "------------- resereved objects HANDLE`s -----------"
+ },
+ {
+  "name": "OID_FRAME2d3",
+  "value": 32004,
+  "group": "------------- resereved objects HANDLE`s -----------"
+ },
+ {
+  "name": "OID_FRAME2d4",
+  "value": 32005,
+  "group": "------------- resereved objects HANDLE`s -----------"
+ },
+ {
+  "name": "OID_FRAME2d5",
+  "value": 32006,
+  "group": "------------- resereved objects HANDLE`s -----------"
+ },
+ {
+  "name": "OID_FRAME2d6",
+  "value": 32007,
+  "group": "------------- resereved objects HANDLE`s -----------"
+ },
+ {
+  "name": "OID_FRAME2d7",
+  "value": 32008,
+  "group": "------------- resereved objects HANDLE`s -----------"
+ },
+ {
+  "name": "OID_FRAME2d8",
+  "value": 32009,
+  "group": "------------- resereved objects HANDLE`s -----------"
+ },
+ {
+  "name": "OID_FRAME2d",
+  "value": 32010,
+  "group": "------------- resereved objects HANDLE`s -----------"
+ },
+ {
+  "name": "OID_AXIS3d",
+  "value": 32100,
+  "group": "------------- 3d -----------------------"
+ },
+ {
+  "name": "OID_FRAME3d1",
+  "value": 32102,
+  "group": "------------- 3d -----------------------"
+ },
+ {
+  "name": "OID_FRAME3d2",
+  "value": 32103,
+  "group": "------------- 3d -----------------------"
+ },
+ {
+  "name": "OID_FRAME3d3",
+  "value": 32104,
+  "group": "------------- 3d -----------------------"
+ },
+ {
+  "name": "OID_FRAME3d4",
+  "value": 32105,
+  "group": "------------- 3d -----------------------"
+ },
+ {
+  "name": "OID_FRAME3d5",
+  "value": 32106,
+  "group": "------------- 3d -----------------------"
+ },
+ {
+  "name": "OID_FRAME3d6",
+  "value": 32107,
+  "group": "------------- 3d -----------------------"
+ },
+ {
+  "name": "OID_FRAME3d7",
+  "value": 32108,
+  "group": "------------- 3d -----------------------"
+ },
+ {
+  "name": "OID_FRAME3d8",
+  "value": 32109,
+  "group": "------------- 3d -----------------------"
+ },
+ {
+  "name": "OID_FRAME3d",
+  "value": 32110,
+  "group": "------------- 3d -----------------------"
+ },
+ {
+  "name": "MB_OK",
+  "value": 0,
+  "group": "MESSAGEBOX constants"
+ },
+ {
+  "name": "MB_OKCANCEL",
+  "value": 1,
+  "group": "MESSAGEBOX constants"
+ },
+ {
+  "name": "MB_ABORTRETRYIGNORE",
+  "value": 2,
+  "group": "MESSAGEBOX constants"
+ },
+ {
+  "name": "MB_YESNOCANCEL",
+  "value": 3,
+  "group": "MESSAGEBOX constants"
+ },
+ {
+  "name": "MB_YESNO",
+  "value": 4,
+  "group": "MESSAGEBOX constants"
+ },
+ {
+  "name": "MB_RETRYCANCEL",
+  "value": 5,
+  "group": "MESSAGEBOX constants"
+ },
+ {
+  "name": "MB_TYPEMASK",
+  "value": 15,
+  "group": "MESSAGEBOX constants"
+ },
+ {
+  "name": "MB_ICONHAND",
+  "value": 16,
+  "group": "MESSAGEBOX constants"
+ },
+ {
+  "name": "MB_ICONQUESTION",
+  "value": 32,
+  "group": "MESSAGEBOX constants"
+ },
+ {
+  "name": "MB_ICONEXCLAMATION",
+  "value": 48,
+  "group": "MESSAGEBOX constants"
+ },
+ {
+  "name": "MB_ICONASTERISK",
+  "value": 64,
+  "group": "MESSAGEBOX constants"
+ },
+ {
+  "name": "MB_ICONMASK",
+  "value": 240,
+  "group": "MESSAGEBOX constants"
+ },
+ {
+  "name": "MB_ICONINFORMATION",
+  "value": 64,
+  "group": "MESSAGEBOX constants"
+ },
+ {
+  "name": "MB_ICONSTOP",
+  "value": 16,
+  "group": "MESSAGEBOX constants"
+ },
+ {
+  "name": "MB_DEFBUTTON1",
+  "value": 0,
+  "group": "MESSAGEBOX constants"
+ },
+ {
+  "name": "MB_DEFBUTTON2",
+  "value": 256,
+  "group": "MESSAGEBOX constants"
+ },
+ {
+  "name": "MB_DEFBUTTON3",
+  "value": 512,
+  "group": "MESSAGEBOX constants"
+ },
+ {
+  "name": "MB_DEFMASK",
+  "value": 3840,
+  "group": "MESSAGEBOX constants"
+ },
+ {
+  "name": "MB_APPLMODAL",
+  "value": 0,
+  "group": "MESSAGEBOX constants"
+ },
+ {
+  "name": "MB_SYSTEMMODAL",
+  "value": 4096,
+  "group": "MESSAGEBOX constants"
+ },
+ {
+  "name": "MB_TASKMODAL",
+  "value": 8192,
+  "group": "MESSAGEBOX constants"
+ },
+ {
+  "name": "MB_NOFOCUS",
+  "value": 32768,
+  "group": "MESSAGEBOX constants"
+ },
+ {
+  "name": "SW_HIDE",
+  "value": 0,
+  "group": "MESSAGEBOX constants"
+ },
+ {
+  "name": "SW_SHOWNORMAL",
+  "value": 1,
+  "group": "MESSAGEBOX constants"
+ },
+ {
+  "name": "SW_NORMAL",
+  "value": 1,
+  "group": "MESSAGEBOX constants"
+ },
+ {
+  "name": "SW_SHOWMINIMIZED",
+  "value": 2,
+  "group": "MESSAGEBOX constants"
+ },
+ {
+  "name": "SW_SHOWMAXIMIZED",
+  "value": 3,
+  "group": "MESSAGEBOX constants"
+ },
+ {
+  "name": "SW_MAXIMIZE",
+  "value": 3,
+  "group": "MESSAGEBOX constants"
+ },
+ {
+  "name": "SW_SHOWNOACTIVATE",
+  "value": 4,
+  "group": "MESSAGEBOX constants"
+ },
+ {
+  "name": "SW_SHOW",
+  "value": 5,
+  "group": "MESSAGEBOX constants"
+ },
+ {
+  "name": "SW_MINIMIZE",
+  "value": 6,
+  "group": "MESSAGEBOX constants"
+ },
+ {
+  "name": "SW_SHOWMINNOACTIVE",
+  "value": 7,
+  "group": "MESSAGEBOX constants"
+ },
+ {
+  "name": "SW_SHOWNA",
+  "value": 8,
+  "group": "MESSAGEBOX constants"
+ },
+ {
+  "name": "SW_RESTORE",
+  "value": 9,
+  "group": "MESSAGEBOX constants"
+ },
+ {
+  "name": "MCIERR_INVALID_DEVICE_ID",
+  "value": 257,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_UNRECOGNIZED_KEYWORD",
+  "value": 259,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_UNRECOGNIZED_COMMAND",
+  "value": 261,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_HARDWARE",
+  "value": 262,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_INVALID_DEVICE_NAME",
+  "value": 263,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_OUT_OF_MEMORY",
+  "value": 264,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_DEVICE_OPEN",
+  "value": 265,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_CANNOT_LOAD_DRIVER",
+  "value": 266,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_MISSING_COMMAND_STRING",
+  "value": 267,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_PARAM_OVERFLOW",
+  "value": 268,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_MISSING_STRING_ARGUMENT",
+  "value": 269,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_BAD_INTEGER",
+  "value": 270,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_PARSER_INTERNAL",
+  "value": 271,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_DRIVER_INTERNAL",
+  "value": 272,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_MISSING_PARAMETER",
+  "value": 273,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_UNSUPPORTED_FUNCTION",
+  "value": 274,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_FILE_NOT_FOUND",
+  "value": 275,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_DEVICE_NOT_READY",
+  "value": 276,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_INTERNAL",
+  "value": 277,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_DRIVER",
+  "value": 278,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_CANNOT_USE_ALL",
+  "value": 279,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_MULTIPLE",
+  "value": 280,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_EXTENSION_NOT_FOUND",
+  "value": 281,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_OUTOFRANGE",
+  "value": 282,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_FLAGS_NOT_COMPATIBLE",
+  "value": 284,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_FILE_NOT_SAVED",
+  "value": 286,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_DEVICE_TYPE_REQUIRED",
+  "value": 287,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_DEVICE_LOCKED",
+  "value": 288,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_DUPLICATE_ALIAS",
+  "value": 289,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_BAD_CONSTANT",
+  "value": 290,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_MUST_USE_SHAREABLE",
+  "value": 291,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_MISSING_DEVICE_NAME",
+  "value": 292,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_BAD_TIME_FORMAT",
+  "value": 293,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_NO_CLOSING_QUOTE",
+  "value": 294,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_DUPLICATE_FLAGS",
+  "value": 295,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_INVALID_FILE",
+  "value": 296,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_NULL_PARAMETER_BLOCK",
+  "value": 297,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_UNNAMED_RESOURCE",
+  "value": 298,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_NEW_REQUIRES_ALIAS",
+  "value": 299,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_NOTIFY_ON_AUTO_OPEN",
+  "value": 300,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_NO_ELEMENT_ALLOWED",
+  "value": 301,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_NONAPPLICABLE_FUNCTION",
+  "value": 302,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_ILLEGAL_FOR_AUTO_OPEN",
+  "value": 303,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_FILENAME_REQUIRED",
+  "value": 304,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_EXTRA_CHARACTERS",
+  "value": 305,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_DEVICE_NOT_INSTALLED",
+  "value": 306,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_GET_CD",
+  "value": 307,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_SET_CD",
+  "value": 308,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_SET_DRIVE",
+  "value": 309,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_DEVICE_LENGTH",
+  "value": 310,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_DEVICE_ORD_LENGTH",
+  "value": 311,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_NO_INTEGER",
+  "value": 312,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_WAVE_OUTPUTSINUSE",
+  "value": 320,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_WAVE_SETOUTPUTINUSE",
+  "value": 321,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_WAVE_INPUTSINUSE",
+  "value": 322,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_WAVE_SETINPUTINUSE",
+  "value": 323,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_WAVE_OUTPUTUNSPECIFIED",
+  "value": 324,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_WAVE_INPUTUNSPECIFIED",
+  "value": 325,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_WAVE_OUTPUTSUNSUITABLE",
+  "value": 326,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_WAVE_SETOUTPUTUNSUITABLE",
+  "value": 327,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_WAVE_INPUTSUNSUITABLE",
+  "value": 328,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_WAVE_SETINPUTUNSUITABLE",
+  "value": 329,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_SEQ_DIV_INCOMPATIBLE",
+  "value": 336,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_SEQ_PORT_INUSE",
+  "value": 337,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_SEQ_PORT_NONEXISTENT",
+  "value": 338,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_SEQ_PORT_MAPNODEVICE",
+  "value": 339,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_SEQ_PORT_MISCERROR",
+  "value": 340,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_SEQ_TIMER",
+  "value": 341,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_SEQ_PORTUNSPECIFIED",
+  "value": 342,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_SEQ_NOMIDIPRESENT",
+  "value": 343,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_NO_WINDOW",
+  "value": 346,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_CREATEWINDOW",
+  "value": 347,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_FILE_READ",
+  "value": 348,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "MCIERR_FILE_WRITE",
+  "value": 349,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "WS_VISIBLE",
+  "value": 268435456,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "WS_DISABLED",
+  "value": 134217728,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "WS_CAPTION",
+  "value": 12582912,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "WS_BORDER",
+  "value": 8388608,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "WS_DLGFRAME",
+  "value": 4194304,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "WS_VSCROLL",
+  "value": 2097152,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "WS_HSCROLL",
+  "value": 1048576,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "WS_SYSMENU",
+  "value": 524288,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "WS_THICKFRAME",
+  "value": 262144,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "WS_MINIMIZEBOX",
+  "value": 131072,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "WS_MAXIMIZEBOX",
+  "value": 65536,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "WS_GROUP",
+  "value": 131072,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "WS_TABSTOP",
+  "value": 65536,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "WS_OVERLAPPED",
+  "value": 0,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "WS_POPUP",
+  "value": 2147483648,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "WS_CHILD",
+  "value": 1073741824,
+  "group": "MCI Error codes"
+ },
+ {
+  "name": "IDX_PRIMARY",
+  "value": 1,
+  "group": "Database constants (index). by AK"
+ },
+ {
+  "name": "IDX_UNIQUE",
+  "value": 2,
+  "group": "Database constants (index). by AK"
+ },
+ {
+  "name": "IDX_DESCENDING",
+  "value": 4,
+  "group": "Database constants (index). by AK"
+ },
+ {
+  "name": "IDX_MAINTAINED",
+  "value": 8,
+  "group": "Database constants (index). by AK"
+ },
+ {
+  "name": "IDX_SUBSET",
+  "value": 16,
+  "group": "Database constants (index). by AK"
+ },
+ {
+  "name": "IDX_EXPR",
+  "value": 32,
+  "group": "Database constants (index). by AK"
+ },
+ {
+  "name": "IDX_IDXOOD",
+  "value": 64,
+  "group": "Database constants (index). by AK"
+ },
+ {
+  "name": "IDX_CASEINSENS",
+  "value": 128,
+  "group": "Database constants (index). by AK"
+ },
+ {
+  "name": "fldDBCHAR",
+  "value": 513,
+  "group": "Database constants (Field types). by AK"
+ },
+ {
+  "name": "fldDBNUM",
+  "value": 514,
+  "group": "Database constants (Field types). by AK"
+ },
+ {
+  "name": "fldDBMEMO",
+  "value": 515,
+  "group": "Database constants (Field types). by AK"
+ },
+ {
+  "name": "fldDBBOOL",
+  "value": 516,
+  "group": "Database constants (Field types). by AK"
+ },
+ {
+  "name": "fldDBDATE",
+  "value": 517,
+  "group": "Database constants (Field types). by AK"
+ },
+ {
+  "name": "fldDBFLOAT",
+  "value": 518,
+  "group": "Database constants (Field types). by AK"
+ },
+ {
+  "name": "fldDBLOCK",
+  "value": 519,
+  "group": "Database constants (Field types). by AK"
+ },
+ {
+  "name": "fldDBOLEBLOB",
+  "value": 520,
+  "group": "Database constants (Field types). by AK"
+ },
+ {
+  "name": "fldDBBINARY",
+  "value": 521,
+  "group": "Database constants (Field types). by AK"
+ },
+ {
+  "name": "fldDBBYTES",
+  "value": 522,
+  "group": "Database constants (Field types). by AK"
+ },
+ {
+  "name": "BS_SOLID",
+  "value": 0,
+  "group": "Стили кисти"
+ },
+ {
+  "name": "BS_NULL",
+  "value": 1,
+  "group": "Стили кисти"
+ },
+ {
+  "name": "BS_HATCHED",
+  "value": 2,
+  "group": "Стили кисти"
+ },
+ {
+  "name": "BS_PATTERN",
+  "value": 3,
+  "group": "Стили кисти"
+ },
+ {
+  "name": "BS_GRADIENT_LINEAR",
+  "value": 10,
+  "group": "Стили кисти"
+ },
+ {
+  "name": "HS_HORIZONTAL",
+  "value": 0,
+  "group": "Стили штриховки"
+ },
+ {
+  "name": "HS_VERTICAL",
+  "value": 1,
+  "group": "Стили штриховки"
+ },
+ {
+  "name": "HS_FDIAGONAL",
+  "value": 2,
+  "group": "Стили штриховки"
+ },
+ {
+  "name": "HS_BDIAGONAL",
+  "value": 3,
+  "group": "Стили штриховки"
+ },
+ {
+  "name": "HS_CROSS",
+  "value": 4,
+  "group": "Стили штриховки"
+ },
+ {
+  "name": "HS_DIAGCROSS",
+  "value": 5,
+  "group": "Стили штриховки"
+ },
+ {
+  "name": "PS_SOLID",
+  "value": 0,
+  "group": "Типы линий"
+ },
+ {
+  "name": "PS_DASH",
+  "value": 1,
+  "group": "Типы линий"
+ },
+ {
+  "name": "PS_DOT",
+  "value": 2,
+  "group": "Типы линий"
+ },
+ {
+  "name": "PS_DASHDOT",
+  "value": 3,
+  "group": "Типы линий"
+ },
+ {
+  "name": "PS_DASHDOTDOT",
+  "value": 4,
+  "group": "Типы линий"
+ },
+ {
+  "name": "PS_NULL",
+  "value": 5,
+  "group": "Типы линий"
+ },
+ {
+  "name": "PS_INSIDEFRAME",
+  "value": 6,
+  "group": "Типы линий"
+ },
+ {
+  "name": "R2_BLACK",
+  "value": 1,
+  "group": "Стили логических операций"
+ },
+ {
+  "name": "R2_NOTMERGEPEN",
+  "value": 2,
+  "group": "Стили логических операций"
+ },
+ {
+  "name": "R2_MASKNOTPEN",
+  "value": 3,
+  "group": "Стили логических операций"
+ },
+ {
+  "name": "R2_NOTCOPYPEN",
+  "value": 4,
+  "group": "Стили логических операций"
+ },
+ {
+  "name": "R2_MASKPENNOT",
+  "value": 5,
+  "group": "Стили логических операций"
+ },
+ {
+  "name": "R2_NOT",
+  "value": 6,
+  "group": "Стили логических операций"
+ },
+ {
+  "name": "R2_XORPEN",
+  "value": 7,
+  "group": "Стили логических операций"
+ },
+ {
+  "name": "R2_NOTMASKPEN",
+  "value": 8,
+  "group": "Стили логических операций"
+ },
+ {
+  "name": "R2_MASKPEN",
+  "value": 9,
+  "group": "Стили логических операций"
+ },
+ {
+  "name": "R2_NOTXORPEN",
+  "value": 10,
+  "group": "Стили логических операций"
+ },
+ {
+  "name": "R2_NOP",
+  "value": 11,
+  "group": "Стили логических операций"
+ },
+ {
+  "name": "R2_MERGENOTPEN",
+  "value": 12,
+  "group": "Стили логических операций"
+ },
+ {
+  "name": "R2_COPYPEN",
+  "value": 13,
+  "group": "Стили логических операций"
+ },
+ {
+  "name": "R2_MERGEPENNOT",
+  "value": 14,
+  "group": "Стили логических операций"
+ },
+ {
+  "name": "R2_MERGEPEN",
+  "value": 15,
+  "group": "Стили логических операций"
+ },
+ {
+  "name": "R2_WHITE",
+  "value": 16,
+  "group": "Стили логических операций"
+ },
+ {
+  "name": "FILE_ATTRIBUTE_ARCHIVE",
+  "value": 32,
+  "group": "флаги для функции GetFileList"
+ },
+ {
+  "name": "FILE_ATTRIBUTE_COMPRESSED",
+  "value": 2048,
+  "group": "флаги для функции GetFileList"
+ },
+ {
+  "name": "FILE_ATTRIBUTE_DIRECTORY",
+  "value": 16,
+  "group": "флаги для функции GetFileList"
+ },
+ {
+  "name": "FILE_ATTRIBUTE_HIDDEN",
+  "value": 2,
+  "group": "флаги для функции GetFileList"
+ },
+ {
+  "name": "FILE_ATTRIBUTE_NORMAL",
+  "value": 128,
+  "group": "флаги для функции GetFileList"
+ },
+ {
+  "name": "FILE_ATTRIBUTE_OFFLINE",
+  "value": 4096,
+  "group": "флаги для функции GetFileList"
+ },
+ {
+  "name": "FILE_ATTRIBUTE_READONLY",
+  "value": 1,
+  "group": "флаги для функции GetFileList"
+ },
+ {
+  "name": "FILE_ATTRIBUTE_SYSTEM",
+  "value": 4,
+  "group": "флаги для функции GetFileList"
+ },
+ {
+  "name": "FILE_ATTRIBUTE_TEMPORARY",
+  "value": 256,
+  "group": "флаги для функции GetFileList"
+ },
+ {
+  "name": "VF_LOCAL",
+  "value": 2,
+  "group": "флаги переменных класса"
+ },
+ {
+  "name": "VF_EQVAR",
+  "value": 256,
+  "group": "флаги переменных класса"
+ },
+ {
+  "name": "VF_ARGUMENT",
+  "value": 512,
+  "group": "флаги переменных класса"
+ },
+ {
+  "name": "VF_RETURN",
+  "value": 1024,
+  "group": "флаги переменных класса"
+ },
+ {
+  "name": "CUR_ARROW",
+  "value": 0,
+  "group": "Стандартные курсоры мыши"
+ },
+ {
+  "name": "CUR_CROSS",
+  "value": 1,
+  "group": "Стандартные курсоры мыши"
+ },
+ {
+  "name": "CUR_TEXT",
+  "value": 2,
+  "group": "Стандартные курсоры мыши"
+ },
+ {
+  "name": "CUR_NO",
+  "value": 3,
+  "group": "Стандартные курсоры мыши"
+ },
+ {
+  "name": "CUR_SIZE",
+  "value": 4,
+  "group": "Стандартные курсоры мыши"
+ },
+ {
+  "name": "CUR_SIZENESW",
+  "value": 5,
+  "group": "Стандартные курсоры мыши"
+ },
+ {
+  "name": "CUR_SIZENS",
+  "value": 6,
+  "group": "Стандартные курсоры мыши"
+ },
+ {
+  "name": "CUR_SIZENWSE",
+  "value": 7,
+  "group": "Стандартные курсоры мыши"
+ },
+ {
+  "name": "CUR_SIZEWE",
+  "value": 8,
+  "group": "Стандартные курсоры мыши"
+ },
+ {
+  "name": "CUR_UPARROW",
+  "value": 9,
+  "group": "Стандартные курсоры мыши"
+ },
+ {
+  "name": "CUR_WAIT",
+  "value": 10,
+  "group": "Стандартные курсоры мыши"
+ },
+ {
+  "name": "CUR_LINK",
+  "value": 11,
+  "group": "Стандартные курсоры мыши"
+ },
+ {
+  "name": "CUR_HELP",
+  "value": 12,
+  "group": "Стандартные курсоры мыши"
+ },
+ {
+  "name": "SHADOWTYPE_STENCIL_MODULATIVE",
+  "value": 18,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "SHADOWTYPE_STENCIL_ADDITIVE",
+  "value": 17,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "SHADOWTYPE_TEXTURE_MODULATIVE",
+  "value": 34,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "SHADOWTYPE_TEXTURE_ADDITIVE",
+  "value": 33,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "FOG_NONE",
+  "value": 0,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "FOG_EXP",
+  "value": 1,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "FOG_EXP2",
+  "value": 2,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "FOG_LINEAR",
+  "value": 3,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "TEX_TYPE_1D",
+  "value": 1,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "TEX_TYPE_2D",
+  "value": 2,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "TEX_TYPE_3D",
+  "value": 3,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "TEX_TYPE_CUBE_MAP",
+  "value": 4,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "SBF_ONE",
+  "value": 0,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "SBF_ZERO",
+  "value": 1,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "SBF_DEST_COLOUR",
+  "value": 2,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "SBF_SOURCE_COLOUR",
+  "value": 3,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "SBF_ONE_MINUS_DEST_COLOUR",
+  "value": 4,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "SBF_ONE_MINUS_SOURCE_COLOUR",
+  "value": 5,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "SBF_DEST_ALPHA",
+  "value": 6,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "SBF_SOURCE_ALPHA",
+  "value": 7,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "SBF_ONE_MINUS_DEST_ALPHA",
+  "value": 8,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "SBF_ONE_MINUS_SOURCE_ALPHA",
+  "value": 9,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "CMPF_ALWAYS_FAIL",
+  "value": 0,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "CMPF_ALWAYS_PASS",
+  "value": 1,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "CMPF_LESS",
+  "value": 2,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "CMPF_LESS_EQUAL",
+  "value": 3,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "CMPF_EQUAL",
+  "value": 4,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "CMPF_NOT_EQUAL",
+  "value": 5,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "CMPF_GREATER_EQUAL",
+  "value": 6,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "CMPF_GREATER",
+  "value": 7,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "CULL_NONE",
+  "value": 1,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "CULL_CLOCKWISE",
+  "value": 2,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "CULL_ANTICLOCKWISE",
+  "value": 3,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "SO_FLAT",
+  "value": 0,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "SO_GOURAUD",
+  "value": 1,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "SO_PHONG",
+  "value": 2,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "PM_POINTS",
+  "value": 1,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "PM_WIREFRAME",
+  "value": 2,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "PM_SOLID",
+  "value": 3,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "LT_POINT",
+  "value": 0,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "LT_DIRECTIONAL",
+  "value": 1,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "LT_SPOTLIGHT",
+  "value": 2,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "PT_ORTHOGRAPHIC",
+  "value": 0,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "PT_PERSPECTIVE",
+  "value": 1,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "OT_POINT_LIST",
+  "value": 1,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "OT_LINE_LIST",
+  "value": 2,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "OT_LINE_STRIP",
+  "value": 3,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "OT_TRIANGLE_LIST",
+  "value": 4,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "OT_TRIANGLE_STRIP",
+  "value": 5,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "OT_TRIANGLE_FAN",
+  "value": 6,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "BBT_POINT",
+  "value": 0,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "BBT_ORIENTED_COMMON",
+  "value": 1,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "BBT_ORIENTED_SELF",
+  "value": 2,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "BBT_PERPENDICULAR_COMMON",
+  "value": 3,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "BBT_PERPENDICULAR_SELF",
+  "value": 4,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "GMM_RELATIVE",
+  "value": 0,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "GMM_PIXELS",
+  "value": 1,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "GMM_RELATIVE_ASPECT_ADJUSTED",
+  "value": 2,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "GHA_LEFT",
+  "value": 0,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "GHA_CENTER",
+  "value": 1,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "GHA_RIGHT",
+  "value": 2,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "GVA_TOP",
+  "value": 0,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "GVA_CENTER",
+  "value": 1,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "GVA_BOTTOM",
+  "value": 2,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "MTHA_LEFT",
+  "value": 0,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "MTHA_CENTER",
+  "value": 1,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "MTVA_BELOW",
+  "value": 0,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "MTVA_ABOVE",
+  "value": 1,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "MTVA_CENTER",
+  "value": 2,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "PT_BOOL",
+  "value": 0,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "PT_REAL",
+  "value": 1,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "PT_INT",
+  "value": 2,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "PT_UNSIGNED_INT",
+  "value": 3,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "PT_SHORT",
+  "value": 4,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "PT_UNSIGNED_SHORT",
+  "value": 5,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "PT_LONG",
+  "value": 6,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "PT_UNSIGNED_LONG",
+  "value": 7,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "PT_STRING",
+  "value": 8,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "PT_VECTOR3",
+  "value": 9,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "PT_MATRIX3",
+  "value": 10,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "PT_MATRIX4",
+  "value": 11,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "PT_QUATERNION",
+  "value": 12,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "PT_COLOURVALUE",
+  "value": 13,
+  "group": "Ogre Wrapper"
+ },
+ {
+  "name": "NUI_SP_HIP_CENTER",
+  "value": 0,
+  "group": "NUI"
+ },
+ {
+  "name": "NUI_SP_SPINE",
+  "value": 1,
+  "group": "NUI"
+ },
+ {
+  "name": "NUI_SP_SHOULDER_CENTER",
+  "value": 2,
+  "group": "NUI"
+ },
+ {
+  "name": "NUI_SP_HEAD",
+  "value": 3,
+  "group": "NUI"
+ },
+ {
+  "name": "NUI_SP_SHOULDER_LEFT",
+  "value": 4,
+  "group": "NUI"
+ },
+ {
+  "name": "NUI_SP_ELBOW_LEFT",
+  "value": 5,
+  "group": "NUI"
+ },
+ {
+  "name": "NUI_SP_WRIST_LEFT",
+  "value": 6,
+  "group": "NUI"
+ },
+ {
+  "name": "NUI_SP_HAND_LEFT",
+  "value": 7,
+  "group": "NUI"
+ },
+ {
+  "name": "NUI_SP_SHOULDER_RIGHT",
+  "value": 8,
+  "group": "NUI"
+ },
+ {
+  "name": "NUI_SP_ELBOW_RIGHT",
+  "value": 9,
+  "group": "NUI"
+ },
+ {
+  "name": "NUI_SP_WRIST_RIGHT",
+  "value": 10,
+  "group": "NUI"
+ },
+ {
+  "name": "NUI_SP_HAND_RIGHT",
+  "value": 11,
+  "group": "NUI"
+ },
+ {
+  "name": "NUI_SP_HIP_LEFT",
+  "value": 12,
+  "group": "NUI"
+ },
+ {
+  "name": "NUI_SP_KNEE_LEFT",
+  "value": 13,
+  "group": "NUI"
+ },
+ {
+  "name": "NUI_SP_ANKLE_LEFT",
+  "value": 14,
+  "group": "NUI"
+ },
+ {
+  "name": "NUI_SP_FOOT_LEFT",
+  "value": 15,
+  "group": "NUI"
+ },
+ {
+  "name": "NUI_SP_HIP_RIGHT",
+  "value": 16,
+  "group": "NUI"
+ },
+ {
+  "name": "NUI_SP_KNEE_RIGHT",
+  "value": 17,
+  "group": "NUI"
+ },
+ {
+  "name": "NUI_SP_ANKLE_RIGHT",
+  "value": 18,
+  "group": "NUI"
+ },
+ {
+  "name": "NUI_SP_FOOT_RIGHT",
+  "value": 19,
+  "group": "NUI"
+ },
+ {
+  "name": "NUI_SP_COUNT",
+  "value": 20,
+  "group": "NUI"
+ }
+]

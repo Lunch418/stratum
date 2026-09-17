@@ -1,0 +1,767 @@
+[
+ {
+  "name": "MakeCylinder3d",
+  "source": "3DTOOLS.TDL",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "HANDLE",
+    "byref": false,
+    "ctype": "WORD16"
+   },
+   {
+    "type": "COLORREF",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false,
+    "ctype": "WORD16"
+   },
+   {
+    "type": "FLOAT",
+    "byref": false,
+    "ctype": "WORD16"
+   }
+  ],
+  "ret": "HANDLE",
+  "ret_ctype": "WORD16",
+  "dll": "sc3d__16.dll"
+ },
+ {
+  "name": "MakeTube3d",
+  "source": "3DTOOLS.TDL",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "HANDLE",
+    "byref": false,
+    "ctype": "WORD16"
+   },
+   {
+    "type": "COLORREF",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false,
+    "ctype": "WORD16"
+   },
+   {
+    "type": "FLOAT",
+    "byref": false,
+    "ctype": "WORD16"
+   }
+  ],
+  "ret": "HANDLE",
+  "ret_ctype": "WORD16",
+  "dll": "sc3d__16.dll"
+ },
+ {
+  "name": "MakeSphere3d",
+  "source": "3DTOOLS.TDL",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "HANDLE",
+    "byref": false,
+    "ctype": "WORD16"
+   },
+   {
+    "type": "COLORREF",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false,
+    "ctype": "WORD16"
+   },
+   {
+    "type": "FLOAT",
+    "byref": false,
+    "ctype": "WORD16"
+   }
+  ],
+  "ret": "HANDLE",
+  "ret_ctype": "WORD16",
+  "dll": "sc3d__16.dll"
+ },
+ {
+  "name": "MakeBar3d",
+  "source": "3DTOOLS.TDL",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "COLORREF",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   }
+  ],
+  "ret": "HANDLE",
+  "ret_ctype": "WORD16",
+  "dll": "sc3d__16.dll"
+ },
+ {
+  "name": "MakeTore3d",
+  "source": "3DTOOLS.TDL",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "HANDLE",
+    "byref": false,
+    "ctype": "WORD16"
+   },
+   {
+    "type": "COLORREF",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false,
+    "ctype": "WORD16"
+   },
+   {
+    "type": "FLOAT",
+    "byref": false,
+    "ctype": "WORD16"
+   }
+  ],
+  "ret": "HANDLE",
+  "ret_ctype": "WORD16",
+  "dll": "sc3d__16.dll",
+  "aliases": [
+   "MakeToreEx3d"
+  ]
+ },
+ {
+  "name": "MakeGrid3d",
+  "source": "3DTOOLS.TDL",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false,
+    "ctype": "INT16"
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false,
+    "ctype": "INT16"
+   },
+   {
+    "type": "COLORREF",
+    "byref": false
+   }
+  ],
+  "ret": "HANDLE",
+  "ret_ctype": "WORD16",
+  "dll": "sc3d__16.dll"
+ },
+ {
+  "name": "CreateCamera3dEx",
+  "source": "3DTOOLS.TDL",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "STRING",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false,
+    "ctype": "INT32"
+   },
+   {
+    "type": "FLOAT",
+    "byref": false,
+    "ctype": "INT32"
+   },
+   {
+    "type": "COLORREF",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   }
+  ],
+  "ret": "HANDLE",
+  "ret_ctype": "WORD16",
+  "dll": "sc3d__16.dll"
+ },
+ {
+  "name": "MakeCylinder3d",
+  "source": "3DTOOLS.TDL",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "HANDLE",
+    "byref": false,
+    "ctype": "WORD16"
+   },
+   {
+    "type": "COLORREF",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false,
+    "ctype": "WORD16"
+   },
+   {
+    "type": "FLOAT",
+    "byref": false,
+    "ctype": "WORD16"
+   }
+  ],
+  "ret": "HANDLE",
+  "ret_ctype": "WORD16",
+  "dll": "sc3d__32.dll"
+ },
+ {
+  "name": "MakeTube3d",
+  "source": "3DTOOLS.TDL",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "HANDLE",
+    "byref": false,
+    "ctype": "WORD16"
+   },
+   {
+    "type": "COLORREF",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false,
+    "ctype": "WORD16"
+   },
+   {
+    "type": "FLOAT",
+    "byref": false,
+    "ctype": "WORD16"
+   }
+  ],
+  "ret": "HANDLE",
+  "ret_ctype": "WORD16",
+  "dll": "sc3d__32.dll"
+ },
+ {
+  "name": "MakeSphere3d",
+  "source": "3DTOOLS.TDL",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "HANDLE",
+    "byref": false,
+    "ctype": "WORD16"
+   },
+   {
+    "type": "COLORREF",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false,
+    "ctype": "WORD16"
+   },
+   {
+    "type": "FLOAT",
+    "byref": false,
+    "ctype": "WORD16"
+   }
+  ],
+  "ret": "HANDLE",
+  "ret_ctype": "WORD16",
+  "dll": "sc3d__32.dll"
+ },
+ {
+  "name": "MakeBar3d",
+  "source": "3DTOOLS.TDL",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "COLORREF",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   }
+  ],
+  "ret": "HANDLE",
+  "ret_ctype": "WORD16",
+  "dll": "sc3d__32.dll"
+ },
+ {
+  "name": "MakeTore3d",
+  "source": "3DTOOLS.TDL",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "HANDLE",
+    "byref": false,
+    "ctype": "WORD16"
+   },
+   {
+    "type": "COLORREF",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false,
+    "ctype": "WORD16"
+   },
+   {
+    "type": "FLOAT",
+    "byref": false,
+    "ctype": "WORD16"
+   }
+  ],
+  "ret": "HANDLE",
+  "ret_ctype": "WORD16",
+  "dll": "sc3d__32.dll",
+  "aliases": [
+   "MakeToreEx3d"
+  ]
+ },
+ {
+  "name": "MakeGrid3d",
+  "source": "3DTOOLS.TDL",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false,
+    "ctype": "INT32"
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false,
+    "ctype": "INT32"
+   },
+   {
+    "type": "COLORREF",
+    "byref": false
+   }
+  ],
+  "ret": "HANDLE",
+  "ret_ctype": "WORD16",
+  "dll": "sc3d__32.dll"
+ },
+ {
+  "name": "CreateCamera3dEx",
+  "source": "3DTOOLS.TDL",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "STRING",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false,
+    "ctype": "INT32"
+   },
+   {
+    "type": "FLOAT",
+    "byref": false,
+    "ctype": "INT32"
+   },
+   {
+    "type": "COLORREF",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   }
+  ],
+  "ret": "HANDLE",
+  "ret_ctype": "WORD16",
+  "dll": "sc3d__32.dll"
+ },
+ {
+  "name": "OLECreateObject",
+  "source": "OLE2.tdl",
+  "args": [
+   {
+    "type": "STRING",
+    "byref": false
+   }
+  ],
+  "ret": "HANDLE",
+  "ret_ctype": "WORD32",
+  "dll": "ole2sc32.dll"
+ },
+ {
+  "name": "OLEDeleteObject",
+  "source": "OLE2.tdl",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false,
+    "ctype": "WORD32"
+   }
+  ],
+  "ret": "FLOAT",
+  "ret_ctype": "WORD32",
+  "dll": "ole2sc32.dll"
+ },
+ {
+  "name": "OLESetVarR8",
+  "source": "OLE2.tdl",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false,
+    "ctype": "WORD32"
+   },
+   {
+    "type": "STRING",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   }
+  ],
+  "ret": null,
+  "dll": "ole2sc32.dll"
+ },
+ {
+  "name": "OLEGetVarR8",
+  "source": "OLE2.tdl",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false,
+    "ctype": "WORD32"
+   },
+   {
+    "type": "STRING",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "dll": "ole2sc32.dll"
+ },
+ {
+  "name": "OLESetVarSTR",
+  "source": "OLE2.tdl",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false,
+    "ctype": "WORD32"
+   },
+   {
+    "type": "STRING",
+    "byref": false
+   },
+   {
+    "type": "STRING",
+    "byref": false
+   }
+  ],
+  "ret": null,
+  "dll": "ole2sc32.dll"
+ },
+ {
+  "name": "OLEGetVarSTR",
+  "source": "OLE2.tdl",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false,
+    "ctype": "WORD32"
+   },
+   {
+    "type": "STRING",
+    "byref": false
+   }
+  ],
+  "ret": "STRING",
+  "dll": "ole2sc32.dll"
+ },
+ {
+  "name": "RegisterNetObject",
+  "source": "NETWORK.TDL",
+  "args": [
+   {
+    "type": "STRING",
+    "byref": false
+   },
+   {
+    "type": "STRING",
+    "byref": false
+   },
+   {
+    "type": "STRING",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false,
+    "ctype": "WORD32"
+   },
+   {
+    "type": "FLOAT",
+    "byref": false,
+    "ctype": "WORD32"
+   }
+  ],
+  "ret": "FLOAT",
+  "ret_ctype": "WORD32",
+  "dll": "sc_net32.dll"
+ },
+ {
+  "name": "UnRegisterNetObject",
+  "source": "NETWORK.TDL",
+  "args": [
+   {
+    "type": "STRING",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "ret_ctype": "WORD32",
+  "dll": "sc_net32.dll"
+ },
+ {
+  "name": "URLLoadFile",
+  "source": "url.tdl",
+  "args": [
+   {
+    "type": "STRING",
+    "byref": false
+   },
+   {
+    "type": "STRING",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false,
+    "ctype": "WORD32"
+   }
+  ],
+  "ret": "FLOAT",
+  "ret_ctype": "WORD32",
+  "dll": "inet32.dll"
+ }
+]
