@@ -28,6 +28,10 @@ pub trait Vars {
     fn set(&mut self, name: &str, value: Value);
     /// Значение именованной константы языка.
     fn constant(&self, name: &str) -> Option<Value>;
+    /// Функции, зависящие от текущего имиджа (`GetClassName`, `GetVarF`…).
+    fn call_special(&mut self, _name: &str, _args: &[Value]) -> Option<Value> {
+        None
+    }
 }
 
 #[derive(Debug)]
@@ -231,9 +235,12 @@ impl<'a> Interpreter<'a> {
                 for a in args {
                     values.push(self.eval_in(a, vars, phase)?);
                 }
-                match builtins::call(name, &values, self.effects) {
+                match vars.call_special(name, &values) {
                     Some(v) => v,
-                    None => builtins::call_stub(name, self.effects),
+                    None => match builtins::call(name, &values, self.effects) {
+                        Some(v) => v,
+                        None => builtins::call_stub(name, self.effects),
+                    },
                 }
             }
         })

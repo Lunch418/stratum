@@ -74,6 +74,8 @@ pub struct Link {
 #[derive(Debug, Clone, Default)]
 pub struct Class {
     pub name: String,
+    /// Откуда прочитан файл; пусто для имиджей, созданных в памяти.
+    pub source: String,
     pub version: u32,
     pub description: String,
     pub vars: Vec<Variable>,
@@ -115,7 +117,7 @@ pub fn parse(data: &[u8], path: &str) -> Result<Class> {
     let version = r.u32()?;
     let body_end = r.u32()? as usize;
     let _index_size = r.u32()?;
-    let mut cls = Class { version, name: r.string()?, ..Default::default() };
+    let mut cls = Class { version, name: r.string()?, source: path.to_string(), ..Default::default() };
 
     let index_at = body_end + INDEX_BASE;
     while r.pos < index_at {

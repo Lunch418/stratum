@@ -49,6 +49,9 @@ class R:
     def u16(self):
         self.need(2); v = struct.unpack_from("<H", self.b, self.o)[0]; self.o += 2; return v
 
+    def i16(self):
+        self.need(2); v = struct.unpack_from("<h", self.b, self.o)[0]; self.o += 2; return v
+
     def u32(self):
         self.need(4); v = struct.unpack_from("<I", self.b, self.o)[0]; self.o += 4; return v
 
@@ -112,10 +115,10 @@ def parse(data, path=""):
             if cid is not None and 1000 <= cid <= 1030:
                 doc["chunks"].append(read_chunk(r, cid, v3))
                 continue
-            if not v3 and doc["tools_at"] and r.o <= doc["tools_at"] + 2:
-                # 2.x: the objects end two bytes before `tools_at`; then a
-                # u16 and the tool chunks
-                r.o = doc["tools_at"] + 4
+            if not v3 and doc["tools_at"] and r.o <= start + doc["tools_at"] + 2:
+                # 2.x: the objects end two bytes before `tools_at` (counted
+                # from the 2D signature); then a u16 and the tool chunks
+                r.o = start + doc["tools_at"] + 4
                 continue
             break
     except VdrError as e:
@@ -254,14 +257,17 @@ def read_tool(r, t, item, v3, end):
         item["hatch"] = r.u16()
         item["rop"] = r.u16()
         item["dib"] = r.u16()
-    elif t == 105:                        # font: LOGFONT-like
-        item["height"] = r.i32()
-        item["width"] = r.i32()
-        item["weight"] = r.i32()
-        item["attrs"] = r.bytes(6).hex()
-        face = r.bytes(30)
+    elif t == 105:                        # font: 16-bit LOGFONT
+        item["height"] = r.i16()
+        item["width"] = r.i16()
+        item["escapement"] = r.i16()
+        item["orientation"] = r.i16()
+        item["weight"] = r.i16()
+        item["attrs"] = r.bytes(8).hex()
+        face = r.bytes(32)
         item["face"] = face.split(b"\0")[0].decode("cp1251", "replace")
-        item["extra"] = r.bytes(10 if v3 else 2).hex()
+        if v3:
+            item["extra"] = r.bytes(8).hex()
     elif t == 106:                        # string
         item["text"] = r.s()
     elif t == 107:                        # text = list of (font, string, colors)
@@ -272,8 +278,6 @@ def read_tool(r, t, item, v3, end):
         item["bmp_size"] = read_bmp(r, item, "bmp")
         if t == 104:
             item["mask_size"] = read_bmp(r, item, "mask")
-        if not v3:
-            item["extra"] = r.bytes(8).hex()
     elif t == 34:                         # page settings (chunk 1022)
         item["raw"] = r.bytes(34).hex()
     else:

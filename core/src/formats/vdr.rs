@@ -137,14 +137,9 @@ pub struct Dib {
     pub file: Option<String>,
 }
 
+/// Идентификаторы чанков. Инструменты (1004–1010) различаются по типу записи,
+/// поэтому здесь только те, что нужны разбору структуры.
 mod chunk {
-    pub const PENS: u16 = 1004;
-    pub const BRUSHES: u16 = 1005;
-    pub const DIBS: u16 = 1006;
-    pub const DOUBLE_DIBS: u16 = 1007;
-    pub const FONTS: u16 = 1008;
-    pub const STRINGS: u16 = 1009;
-    pub const TEXTS: u16 = 1010;
     pub const TEXT_PARTS: u16 = 1011;
     pub const OBJECTS: u16 = 1020;
     pub const ZORDER: u16 = 1021;
@@ -181,7 +176,8 @@ pub fn parse(data: &[u8], path: &str) -> Result<Picture> {
         None
     } else {
         r.u32()?;
-        Some(r.u32()? as usize)
+        // смещение считается от сигнатуры, а не от начала блока
+        Some(start + r.u32()? as usize)
     };
     pic.origin = (num(&mut r, &ctx)?, num(&mut r, &ctx)?);
     pic.scale = (num(&mut r, &ctx)?, num(&mut r, &ctx)?);
@@ -378,21 +374,28 @@ fn read_tool(r: &mut Reader, ctx: &Ctx, kind: u16, handle: u16, pic: &mut Pictur
             dib: r.u16()?,
         }),
         105 => {
-            let height = r.i32()?;
-            let width = r.i32()?;
-            let weight = r.i32()?;
-            let attrs = r.bytes(6)?;
-            let face_bytes = r.bytes(30)?;
-            let face_end = face_bytes.iter().position(|&b| b == 0).unwrap_or(30);
+            // 16-битный LOGFONT: height, width, escapement, orientation,
+            // weight, italic, underline, strikeout, charset, outprec,
+            // clipprec, quality, pitch, face[32]
+            let height = r.i16()? as i32;
+            let width = r.i16()? as i32;
+            let _escapement = r.i16()?;
+            let _orientation = r.i16()?;
+            let weight = r.i16()? as i32;
+            let attrs = r.bytes(8)?;
+            let face_bytes = r.bytes(32)?;
+            let face_end = face_bytes.iter().position(|&b| b == 0).unwrap_or(32);
             let face = super::cp1251::decode(&face_bytes[..face_end]);
-            r.bytes(if ctx.sized { 10 } else { 2 })?;
+            if ctx.sized {
+                r.bytes(8)?;
+            }
             pic.fonts.push(Font {
                 handle,
                 height,
                 width,
                 weight,
-                italic: attrs.first().copied().unwrap_or(0) != 0,
-                underline: attrs.get(1).copied().unwrap_or(0) != 0,
+                italic: attrs[0] != 0,
+                underline: attrs[1] != 0,
                 face,
             });
         }
@@ -422,9 +425,6 @@ fn read_tool(r: &mut Reader, ctx: &Ctx, kind: u16, handle: u16, pic: &mut Pictur
         103 | 104 => {
             let bmp = read_bmp(r)?;
             let mask = if kind == 104 { read_bmp(r)? } else { Vec::new() };
-            if !ctx.sized {
-                r.bytes(8)?;
-            }
             pic.dibs.push(Dib { handle, bmp, mask, file: None });
         }
         other => return r.err(format!("инструмент типа {other} не разобран")),

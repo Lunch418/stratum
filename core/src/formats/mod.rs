@@ -25,6 +25,8 @@ pub struct LoadedProject {
     /// Сколько первых элементов `classes` принадлежат самому проекту.
     pub own_classes: usize,
     pub state: Option<State>,
+    /// Папки библиотек, из которых подключены имиджи.
+    pub library_dirs: Vec<PathBuf>,
 }
 
 impl LoadedProject {
@@ -67,7 +69,12 @@ pub fn load_project(
         Err(e) => return Ok(Err(e)),
     };
 
-    let mut loaded = LoadedProject { dir: dir.clone(), project, ..Default::default() };
+    let mut loaded = LoadedProject {
+        dir: dir.clone(),
+        project,
+        library_dirs: libraries.to_vec(),
+        ..Default::default()
+    };
     if let Err(e) = load_classes(&dir, &mut loaded.classes)? {
         return Ok(Err(e));
     }

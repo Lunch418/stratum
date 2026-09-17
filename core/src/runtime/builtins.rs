@@ -7,6 +7,7 @@
 //! видно, чего модели не хватает (см. [`Effects::missing`]).
 
 use super::value::{format_number, Value};
+use crate::gfx::Gfx;
 use std::collections::BTreeMap;
 
 /// Побочные эффекты текста модели, которые ядро пока только записывает.
@@ -20,6 +21,8 @@ pub struct Effects {
     pub exit_requested: bool,
     /// `Stop`/`Quit` — остановить всю модель.
     pub stop_requested: bool,
+    /// Окна и графические пространства модели.
+    pub gfx: Gfx,
 }
 
 impl Effects {
@@ -163,7 +166,7 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
         }
         "gettickcount" => num(0.0),
 
-        _ => return None,
+        _ => return crate::gfx::api::call(name, args, &mut fx.gfx),
     };
     let _ = format_number; // используется в Display значения
     Some(v)
@@ -228,8 +231,8 @@ mod tests {
     #[test]
     fn unknown_function_is_counted() {
         let mut fx = Effects::default();
-        assert!(call("SetObjectOrg2d", &[], &mut fx).is_none());
-        call_stub("SetObjectOrg2d", &mut fx);
-        assert_eq!(fx.missing["setobjectorg2d"], 1);
+        assert!(call("RegisterObject", &[], &mut fx).is_none());
+        call_stub("RegisterObject", &mut fx);
+        assert_eq!(fx.missing["registerobject"], 1);
     }
 }

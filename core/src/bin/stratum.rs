@@ -19,6 +19,7 @@ fn main() -> ExitCode {
         Some("parse") => cmd_parse(&args[1..]),
         Some("info") => cmd_info(&args[1..]),
         Some("check") => cmd_check(&args[1..]),
+        Some("render") => cmd_render(&args[1..]),
         Some("--help") | Some("-h") | None => {
             usage();
             Ok(())
@@ -43,7 +44,9 @@ fn usage() {
          библиотеки: --lib, иначе $STRATUM_LIBRARY, иначе fixtures/ или Stratum в Wine\n  \
          parse ФАЙЛ...\n      разобрать текст имиджа и показать дерево\n  \
          info PROJECT\n      состав проекта: имиджи, экземпляры, связи\n  \
-         check КАТАЛОГ\n      прогнать все .cls каталога через парсеры форматов и языка"
+         check КАТАЛОГ\n      прогнать все .cls каталога через парсеры форматов и языка\n  \
+         render PROJECT [--ticks N] [--out ПАПКА] [--lib ПАПКА]\n      \
+         просчитать N тактов и записать окна модели в SVG"
     );
 }
 
@@ -53,6 +56,7 @@ struct RunOptions {
     dump: bool,
     watch: Vec<String>,
     libraries: Vec<PathBuf>,
+    out: PathBuf,
 }
 
 fn parse_run_options(args: &[String]) -> Result<RunOptions, String> {
@@ -62,6 +66,7 @@ fn parse_run_options(args: &[String]) -> Result<RunOptions, String> {
         dump: false,
         watch: Vec::new(),
         libraries: Vec::new(),
+        out: PathBuf::from("."),
     };
     let mut i = 0;
     while i < args.len() {
@@ -75,6 +80,10 @@ fn parse_run_options(args: &[String]) -> Result<RunOptions, String> {
                     .map_err(|_| "после --ticks нужно число")?;
             }
             "--dump" => opts.dump = true,
+            "--out" => {
+                i += 1;
+                opts.out = PathBuf::from(args.get(i).ok_or("после --out нужна папка")?);
+            }
             "--lib" => {
                 i += 1;
                 opts.libraries.push(PathBuf::from(args.get(i).ok_or("после --lib нужна папка")?));
@@ -180,6 +189,82 @@ fn cmd_run(args: &[String]) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+fn cmd_render(args: &[String]) -> Result<(), String> {
+    let opts = parse_run_options(args)?;
+    let loaded = formats::load_project(&opts.path, &opts.libraries)
+        .map_err(|e| format!("{}: {e}", opts.path.display()))?
+        .map_err(|e| e.to_string())?;
+    let mut sim = Simulation::build(&loaded).map_err(|e| e.to_string())?;
+    sim.run(opts.ticks).map_err(|e| e.message)?;
+    std::fs::create_dir_all(&opts.out).map_err(|e| format!("{}: {e}", opts.out.display()))?;
+    let gfx = &sim.effects.gfx;
+    if gfx.window_order.is_empty() {
+        println!("модель не открыла ни одного окна за {} тактов", sim.tick_number());
+    }
+    for name in &gfx.window_order {
+        let Some(space) = gfx.window_space(name).and_then(|h| gfx.space(h)) else { continue };
+        let file = opts.out.join(format!("{}.svg", safe_name(name)));
+        std::fs::write(&file, stratum_core::gfx::svg::render(space))
+            .map_err(|e| format!("{}: {e}", file.display()))?;
+        if opts.dump {
+            for h in &space.zorder {
+                dump_object(space, *h, 0);
+            }
+            let mut pens: Vec<_> = space.pens.iter().collect();
+            pens.sort_by_key(|(h, _)| **h);
+            for (h, p) in pens {
+                println!("pen #{h}: color={:06x} style={} width={} rop={}", p.color, p.style, p.width, p.rop);
+            }
+            let mut dibs: Vec<_> = space.dibs.iter().collect();
+            dibs.sort_by_key(|(h, _)| **h);
+            for (h, d) in dibs {
+                println!("dib #{h}: file={:?} bmp={} байт {}×{}", d.file, d.bmp.len(), d.width, d.height);
+            }
+        }
+        println!(
+            "{}: окно «{}» — объектов {}, {}×{} → {}",
+            sim.tick_number(),
+            name,
+            space.objects.len(),
+            space.client.0,
+            space.client.1,
+            file.display()
+        );
+    }
+    if !sim.effects.missing.is_empty() {
+        let mut rows: Vec<_> = sim.effects.missing.iter().collect();
+        rows.sort_by(|a, b| b.1.cmp(a.1));
+        println!("не реализовано: {}", rows.iter().map(|(n, c)| format!("{n}×{c}")).collect::<Vec<_>>().join(", "));
+    }
+    Ok(())
+}
+
+fn dump_object(space: &stratum_core::gfx::Space, h: stratum_core::gfx::Handle, depth: usize) {
+    use stratum_core::gfx::Shape;
+    let Some(o) = space.objects.get(&h) else { return };
+    let kind = match &o.shape {
+        Shape::Polyline { pen, brush, points } => format!("линия pen={pen} brush={brush} точек={}", points.len()),
+        Shape::Bitmap { dib, src, .. } => format!("растр dib={dib} src={:?} есть={}", src, space.dibs.get(dib).map(|d| !d.bmp.is_empty()).unwrap_or(false)),
+        Shape::Text { text } => format!("текст {text}"),
+        Shape::Control { class, .. } => format!("контрол {class}"),
+        Shape::Group { children } => format!("группа из {}", children.len()),
+        Shape::Unknown => "?".into(),
+    };
+    println!(
+        "{}#{} {:?} {} ({:.0},{:.0}) {:.0}×{:.0}{}",
+        "  ".repeat(depth), h, o.name, kind, o.x, o.y, o.w, o.h, if o.visible { "" } else { " скрыт" }
+    );
+    if let Shape::Group { children } = &o.shape {
+        for c in children {
+            dump_object(space, *c, depth + 1);
+        }
+    }
+}
+
+fn safe_name(name: &str) -> String {
+    name.chars().map(|c| if c.is_alphanumeric() || c == '_' || c == '-' { c } else { '_' }).collect()
 }
 
 fn cmd_parse(args: &[String]) -> Result<(), String> {

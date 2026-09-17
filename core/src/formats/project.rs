@@ -129,9 +129,9 @@ pub struct State {
 #[derive(Debug, Clone)]
 pub struct StateImage {
     pub class_name: String,
-    /// handle экземпляра, к которому относится запись.
     pub reference: u32,
-    pub flags: u16,
+    /// handle экземпляра на схеме (как в секции детей `.cls`).
+    pub handle: u16,
     pub vars: Vec<(String, String)>,
 }
 
@@ -154,7 +154,7 @@ pub fn parse_state(data: &[u8], path: &str) -> Result<State> {
     // список заканчивается двухбайтовым терминатором
     while r.pos + 6 <= r.data.len() {
         let reference = r.u32()?;
-        let flags = r.u16()?;
+        let handle = r.u16()?;
         let class_name = r.string()?;
         let _stamp = r.u32()?;
         let count = r.u16()?;
@@ -162,7 +162,7 @@ pub fn parse_state(data: &[u8], path: &str) -> Result<State> {
         for _ in 0..count {
             vars.push((r.string()?, r.string()?));
         }
-        state.images.push(StateImage { class_name, reference, flags, vars });
+        state.images.push(StateImage { class_name, reference, handle, vars });
     }
     Ok(state)
 }

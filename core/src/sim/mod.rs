@@ -52,6 +52,8 @@ pub struct Instance {
     /// Путь от корня: `Root.планета`.
     pub path: String,
     pub parent: Option<usize>,
+    /// handle экземпляра на схеме родителя (0 у корня).
+    pub handle: u16,
     class: usize,
     /// Имя переменной в нижнем регистре → номер ячейки.
     vars: HashMap<String, usize>,
@@ -67,6 +69,9 @@ impl Instance {
 
 pub struct Simulation {
     classes: Vec<CompiledClass>,
+    /// Папка файла каждого имиджа (имя в нижнем регистре) — для
+    /// `GetClassDirectory`.
+    class_dirs: HashMap<String, String>,
     instances: Vec<Instance>,
     /// Текущие значения всех ячеек.
     cells: Vec<Value>,
@@ -132,6 +137,7 @@ impl Simulation {
 
         let mut sim = Simulation {
             classes,
+            class_dirs: HashMap::new(),
             instances: Vec::new(),
             cells: Vec::new(),
             old: Vec::new(),
@@ -142,9 +148,31 @@ impl Simulation {
             stopped: false,
         };
 
+        // рисунки имиджей нужны окнам модели (OpenSchemeWindow)
+        sim.effects.gfx.project_dir = project.dir.clone();
+        sim.effects.gfx.library_dirs = project.library_dirs.clone();
+        for cls in &project.classes {
+            if let Some(blob) = &cls.image {
+                if let Ok(pic) = crate::formats::vdr::parse(blob, &cls.name) {
+                    sim.effects.gfx.pictures.insert(cls.name.to_lowercase(), pic);
+                }
+            }
+        }
+        sim.class_dirs = project
+            .classes
+            .iter()
+            .map(|c| {
+                let dir = std::path::Path::new(&c.source)
+                    .parent()
+                    .map(|p| p.display().to_string())
+                    .unwrap_or_default();
+                (c.name.to_lowercase(), dir)
+            })
+            .collect();
+
         // ячейки объединяются по связям; пока строим дерево, копим пары
         let mut merges: Vec<(usize, usize)> = Vec::new();
-        let root_index = sim.add_instance(project, root, &root.name, None, "")?;
+        let root_index = sim.add_instance(project, root, &root.name, None, "", 0)?;
         sim.expand(project, root, root_index, &mut merges)?;
         sim.apply_links(&merges);
         sim.order = (0..sim.instances.len()).collect();
@@ -164,6 +192,7 @@ impl Simulation {
         name: &str,
         parent: Option<usize>,
         parent_path: &str,
+        handle: u16,
     ) -> Result<usize, BuildError> {
         let class = self
             .class_index(&cls.name)
@@ -182,6 +211,7 @@ impl Simulation {
             class_name: cls.name.clone(),
             path,
             parent,
+            handle,
             class,
             vars: HashMap::new(),
             order: Vec::new(),
@@ -239,8 +269,14 @@ impl Simulation {
                 }
             })?;
             let name = Class::instance_name(child).to_string();
-            let index =
-                self.add_instance(project, child_class, &name, Some(parent_index), &parent_path)?;
+            let index = self.add_instance(
+                project,
+                child_class,
+                &name,
+                Some(parent_index),
+                &parent_path,
+                child.handle,
+            )?;
             by_handle.insert(child.handle, index);
             self.expand(project, child_class, index, merges)?;
         }
@@ -301,10 +337,14 @@ impl Simulation {
     fn apply_state(&mut self, project: &LoadedProject) {
         let Some(state) = &project.state else { return };
         for image in &state.images {
+            // запись адресует экземпляр по handle на схеме; корень — по имени
             let Some(index) = self
                 .instances
                 .iter()
-                .position(|i| i.class_name.eq_ignore_ascii_case(&image.class_name))
+                .position(|i| {
+                    i.class_name.eq_ignore_ascii_case(&image.class_name)
+                        && (i.handle == image.handle || i.parent.is_none())
+                })
             else {
                 continue;
             };
@@ -404,5 +444,67 @@ impl Vars for Frame<'_> {
 
     fn constant(&self, name: &str) -> Option<Value> {
         constants::lookup(name).map(Value::Float)
+    }
+
+    fn call_special(&mut self, name: &str, args: &[Value]) -> Option<Value> {
+        let arg = |i: usize| args.get(i).map(|v| v.as_string()).unwrap_or_default();
+        let lower = name.to_ascii_lowercase();
+        Some(match lower.as_str() {
+            // GetClassName("") — имя своего класса, ".." — родителя
+            "getclassname" => {
+                let target = self.resolve(&arg(0))?;
+                Value::Str(self.sim.instances[target].class_name.clone())
+            }
+            "getclassdirectory" => {
+                let class = arg(0);
+                let dir = self.sim.class_dirs.get(&class.to_lowercase()).cloned().unwrap_or_default();
+                Value::Str(dir)
+            }
+            // дескриптор экземпляра на схеме родителя
+            "gethobject" => Value::Handle(self.instance as f64),
+            "gethobjectbyname" => match self.sim.find(&arg(0)) {
+                Some(i) => Value::Handle(i as f64),
+                None => Value::Handle(0.0),
+            },
+            "getvarf" | "getvars" | "getvarh" | "getvarc" => {
+                let target = self.resolve(&arg(0))?;
+                let var = arg(1).to_ascii_lowercase();
+                let cell = self.sim.instances[target].vars.get(&var).copied();
+                match (lower.as_str(), cell) {
+                    (_, None) => Value::Float(0.0),
+                    ("getvars", Some(c)) => Value::Str(self.sim.cells[c].as_string()),
+                    ("getvarh", Some(c)) => Value::Handle(self.sim.cells[c].as_float()),
+                    (_, Some(c)) => Value::Float(self.sim.cells[c].as_float()),
+                }
+            }
+            "setvar" => {
+                let target = self.resolve(&arg(0))?;
+                let var = arg(1).to_ascii_lowercase();
+                let value = args.get(2).cloned().unwrap_or(Value::Float(0.0));
+                match self.sim.instances[target].vars.get(&var).copied() {
+                    Some(c) => {
+                        self.sim.cells[c] = value.cast_to(self.sim.types[c]);
+                        Value::Float(1.0)
+                    }
+                    None => Value::Float(0.0),
+                }
+            }
+            _ => return None,
+        })
+    }
+}
+
+impl Frame<'_> {
+    /// Экземпляр по пути: "" — сам, ".." — родитель, иначе имя класса или
+    /// экземпляра на схеме.
+    fn resolve(&self, path: &str) -> Option<usize> {
+        let path = path.trim();
+        if path.is_empty() {
+            return Some(self.instance);
+        }
+        if path == ".." {
+            return self.sim.instances[self.instance].parent;
+        }
+        self.sim.find(path)
     }
 }
