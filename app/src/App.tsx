@@ -15,6 +15,28 @@ export default function App() {
   const s = useStore();
   const frame = s.frame;
   const [dialog, setDialog] = useState<'saveAs' | 'export' | null>(null);
+  const [layout, setLayout] = useState(() => {
+    try { return { left: 260, right: 300, bottom: 160, ...JSON.parse(localStorage.getItem('layout') ?? '{}') }; }
+    catch { return { left: 260, right: 300, bottom: 160 }; }
+  });
+  const [dragging, setDragging] = useState<'left' | 'right' | 'bottom' | null>(null);
+  useEffect(() => { try { localStorage.setItem('layout', JSON.stringify(layout)); } catch { /* приватный режим */ } }, [layout]);
+  useEffect(() => {
+    if (!dragging) return;
+    const ws = document.querySelector('.workspace') as HTMLElement | null;
+    const onMove = (e: MouseEvent) => {
+      if (!ws) return;
+      const r = ws.getBoundingClientRect();
+      setLayout(l => dragging === 'left' ? { ...l, left: Math.max(160, Math.min(r.width - l.right - 300, e.clientX - r.left)) }
+        : dragging === 'right' ? { ...l, right: Math.max(200, Math.min(r.width - l.left - 300, r.right - e.clientX)) }
+        : { ...l, bottom: Math.max(80, Math.min(r.height - 160, r.bottom - e.clientY)) });
+    };
+    const onUp = () => setDragging(null);
+    window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp);
+    document.body.style.cursor = dragging === 'bottom' ? 'row-resize' : 'col-resize';
+    document.body.style.userSelect = 'none';
+    return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); document.body.style.cursor = ''; document.body.style.userSelect = ''; };
+  }, [dragging]);
 
   // Сохранить: проект в родном формате уже на диске — в его же папку,
   // проект Stratum 2000 — спросить новую папку (исходник не трогаем)
@@ -136,7 +158,10 @@ export default function App() {
           onClose={() => setDialog(null)}
           onSubmit={dir => { setDialog(null); api.exportProject(dir).then(r => { s.showToast('Экспортировано'); s.say({ level: 'info', where: 'проект', text: `экспорт: ${r.classes} имиджей → ${r.dir}` }); }).catch(e => s.say({ level: 'error', where: 'экспорт', text: String(e) })); }} />
       )}
-      <div className="workspace">
+      <div className="workspace" style={{ '--left-w': layout.left + 'px', '--right-w': layout.right + 'px', '--bottom-h': layout.bottom + 'px' } as React.CSSProperties}>
+        <div className={`splitter v${dragging === 'left' ? ' active' : ''}`} style={{ left: layout.left }} onMouseDown={() => setDragging('left')} onDoubleClick={() => setLayout(l => ({ ...l, left: 260 }))} />
+        <div className={`splitter v${dragging === 'right' ? ' active' : ''}`} style={{ right: layout.right, marginLeft: 0, marginRight: -3 }} onMouseDown={() => setDragging('right')} onDoubleClick={() => setLayout(l => ({ ...l, right: 300 }))} />
+        <div className={`splitter h${dragging === 'bottom' ? ' active' : ''}`} style={{ bottom: layout.bottom }} onMouseDown={() => setDragging('bottom')} onDoubleClick={() => setLayout(l => ({ ...l, bottom: 160 }))} />
         <aside className="left"><Hierarchy /></aside>
         <section className="center">
           <div className="tabs">
