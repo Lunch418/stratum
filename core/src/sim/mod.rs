@@ -135,6 +135,8 @@ pub struct Simulation {
     pub stopped: bool,
     /// Время текста каждого экземпляра за последний такт, наносекунды.
     pub profile: Vec<u64>,
+    /// Отложенные присваивания `::=` (экземпляр, переменная, значение).
+    deferred: Vec<(usize, String, Value)>,
 }
 
 impl Simulation {
@@ -204,6 +206,7 @@ impl Simulation {
             tick: 0,
             stopped: false,
             profile: Vec::new(),
+            deferred: Vec::new(),
         };
 
         // рисунки имиджей нужны окнам модели (OpenSchemeWindow)
@@ -456,6 +459,13 @@ impl Simulation {
                 self.profile.resize(self.instances.len(), 0);
             }
             self.profile[index] = started.elapsed().as_nanos() as u64;
+        }
+        // отложенные присваивания — после всех текстов такта
+        let deferred = std::mem::take(&mut self.deferred);
+        for (instance, name, value) in deferred {
+            if instance < self.instances.len() {
+                self.set_var(instance, &name, value);
+            }
         }
         self.tick += 1;
         self.effects.gfx.flush_dibs();
@@ -791,6 +801,14 @@ impl Vars for Frame<'_> {
     fn get_old(&self, name: &str) -> Option<Value> {
         let cell = *self.sim.instances[self.instance].vars.get(&name.to_ascii_lowercase())?;
         Some(self.sim.old[cell].clone())
+    }
+
+    fn set_deferred(&mut self, name: &str, value: Value) {
+        if self.immediate {
+            self.set(name, value);
+        } else {
+            self.sim.deferred.push((self.instance, name.to_string(), value));
+        }
     }
 
     fn set(&mut self, name: &str, value: Value) {

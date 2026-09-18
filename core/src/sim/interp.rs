@@ -26,6 +26,10 @@ pub trait Vars {
     fn get_old(&self, name: &str) -> Option<Value>;
     /// Записывает значение, создавая переменную при необходимости.
     fn set(&mut self, name: &str, value: Value);
+    /// `::=` — запись откладывается до конца такта.
+    fn set_deferred(&mut self, name: &str, value: Value) {
+        self.set(name, value);
+    }
     /// Значение именованной константы языка.
     fn constant(&self, name: &str) -> Option<Value>;
     /// Функции, зависящие от текущего имиджа (`GetClassName`, `GetVarF`…).
@@ -118,14 +122,20 @@ impl Interpreter {
                     }
                 }
             }
-            // ::= выполняется в конце такта; до появления очереди отложенных
-            // присваиваний трактуем как обычное
-            Stmt::Assign { target, value } | Stmt::AssignDeferred { target, value } => {
+            Stmt::Assign { target, value } => {
                 let v = self.eval(value, vars)?;
                 if vars.effects().exit_requested {
                     return Ok(Flow::Exit);
                 }
                 vars.set(target, v);
+            }
+            // ::= выполняется в конце такта
+            Stmt::AssignDeferred { target, value } => {
+                let v = self.eval(value, vars)?;
+                if vars.effects().exit_requested {
+                    return Ok(Flow::Exit);
+                }
+                vars.set_deferred(target, v);
             }
             Stmt::Expr(e) => {
                 self.eval(e, vars)?;
