@@ -155,6 +155,12 @@ export function CodeEditor() {
   const onMount: OnMount = (editor, monaco) => {
     editorRef.current = editor; monacoRef.current = monaco;
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => void save());
+    // F1 — справка по слову под курсором
+    editor.addCommand(monaco.KeyCode.F1, () => {
+      const pos = editor.getPosition();
+      const word = pos && editor.getModel()?.getWordAtPosition(pos)?.word;
+      if (word) useStore.getState().setHelpTopic(word);
+    });
   };
 
   if (!klass) return <div className="muted" style={{ padding: 16 }}>Выберите имидж в иерархии.</div>;

@@ -10,6 +10,7 @@ import { Messages } from './components/Messages';
 import { PathDialog } from './components/PathDialog';
 import { Graphs } from './components/Graphs';
 import { Debug } from './components/Debug';
+import { Help } from './components/Help';
 import { Palette, type Command } from './components/Palette';
 
 export default function App() {
@@ -97,6 +98,15 @@ export default function App() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [s.project?.native]);
+
+  // автосохранение: проект в родном формате пишется сам через 30 с после правки
+  useEffect(() => {
+    const id = setInterval(() => {
+      const st = useStore.getState();
+      if (st.unsaved && st.project?.native) st.saveProject().catch(() => {});
+    }, 30000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     const guard = (e: BeforeUnloadEvent) => { if (useStore.getState().unsaved) e.preventDefault(); };
@@ -194,7 +204,10 @@ export default function App() {
             {s.tab === 'model' && <ModelView />}
           </div>
         </section>
-        <aside className="right"><Inspector /></aside>
+        <aside className="right">
+          <div className="right-top"><Inspector /></div>
+          <div className="right-bottom"><Help /></div>
+        </aside>
         <section className="bottom">
           <div className="tabs small-tabs">
             <button className={s.bottomTab === 'messages' ? 'active' : ''} onClick={() => s.setBottomTab('messages')}>Сообщения</button>

@@ -105,6 +105,7 @@ export const api = {
   breakpointToggle: (id: number) => fetch(`/api/breakpoint/toggle?id=${id}`, { method: 'POST' }),
   eval: (index: number, expr: string) => get<{ ok: boolean; value?: string; error?: string }>(`/api/eval/${index}?expr=${encodeURIComponent(expr)}`),
   profile: () => get<{ tick: number; total: number; items: { index: number; path: string; class: string; ns: number }[] }>('/api/profile'),
+  helpSearch: (q: string) => get<string[]>(`/api/help?q=${encodeURIComponent(q)}`),
   undo: () => fetch('/api/undo', { method: 'POST' }).then(r => r.json() as Promise<{ ok: boolean; canUndo: boolean; canRedo: boolean }>),
   redo: () => fetch('/api/redo', { method: 'POST' }).then(r => r.json() as Promise<{ ok: boolean; canUndo: boolean; canRedo: boolean }>),
   setValue: (index: number, name: string, value: string) =>

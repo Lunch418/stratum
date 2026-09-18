@@ -34,6 +34,8 @@ interface State {
   setPaletteOpen: (v: boolean) => void;
   traceCount: number;
   setTraceCount: (n: number) => void;
+  helpTopic: string | null;
+  setHelpTopic: (t: string | null) => void;
   unsaved: boolean;
   markUnsaved: () => void;
   /// перечитать проект с сервера, сохранив выбор и путь по схемам
@@ -75,6 +77,8 @@ export const useStore = create<State>((set, get) => ({
   setPaletteOpen: paletteOpen => set({ paletteOpen }),
   traceCount: 0,
   setTraceCount: traceCount => set({ traceCount }),
+  helpTopic: null,
+  setHelpTopic: helpTopic => set({ helpTopic }),
   markUnsaved: () => set(s => ({ unsaved: true, project: s.project ? { ...s.project, canUndo: true, canRedo: false } : s.project })),
   reload: async () => {
     const project = await api.project();

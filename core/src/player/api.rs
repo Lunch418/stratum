@@ -587,6 +587,34 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
                 .collect();
             json(format!("{{\"tick\":{},\"total\":{total},\"items\":[{}]}}", s.sim.tick_number(), items.join(",")))
         }
+        // справка: docs/help/topics/*.md (собирается локально из SC3.HLP)
+        ("GET", ["help"]) => {
+            let q = super::param(query, "q").map(super::url_decode).unwrap_or_default().to_lowercase();
+            let Some(dir) = help_dir() else { return json("[]".into()) };
+            let mut names: Vec<String> = std::fs::read_dir(dir)
+                .map(|rd| rd.filter_map(|e| e.ok()).filter_map(|e| e.path().file_stem().map(|s| s.to_string_lossy().to_string())).collect())
+                .unwrap_or_default();
+            names.retain(|n| q.is_empty() || n.to_lowercase().contains(&q));
+            names.sort_by_key(|n| (!n.to_lowercase().starts_with(&q), n.to_lowercase()));
+            names.truncate(50);
+            json(format!("[{}]", names.iter().map(|n| json_string(n)).collect::<Vec<_>>().join(",")))
+        }
+        ("GET", ["help", topic]) => {
+            let topic = super::url_decode(topic);
+            let Some(dir) = help_dir() else { return error("404 Not Found", "справка не собрана: make help") };
+            let found = std::fs::read_dir(&dir).ok().and_then(|rd| {
+                rd.filter_map(|e| e.ok().map(|e| e.path()))
+                    .find(|p| p.file_stem().is_some_and(|s| s.to_string_lossy().eq_ignore_ascii_case(&topic)))
+            });
+            match found.and_then(|p| std::fs::read_to_string(&p).ok().map(|t| (p, t))) {
+                Some((p, text)) => json(format!(
+                    "{{\"topic\":{},\"markdown\":{}}}",
+                    json_string(&p.file_stem().unwrap().to_string_lossy()),
+                    json_string(&text)
+                )),
+                None => error("404 Not Found", "нет такой темы"),
+            }
+        }
         ("POST", ["undo"]) | ("POST", ["redo"]) => {
             let mut s = shared.lock().unwrap();
             let done = if parts[0] == "undo" { s.undo() } else { s.redo() };
@@ -667,6 +695,20 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
         }
         _ => error("404 Not Found", "нет такого метода"),
     }
+}
+
+/// Папка с темами справки: рядом с репозиторием или с исполняемым файлом.
+fn help_dir() -> Option<std::path::PathBuf> {
+    let mut candidates: Vec<std::path::PathBuf> = ["docs/help/topics", "../docs/help/topics", "../../docs/help/topics", "../../../docs/help/topics"]
+        .iter()
+        .map(std::path::PathBuf::from)
+        .collect();
+    if let Ok(exe) = std::env::current_exe() {
+        for up in exe.ancestors().take(6) {
+            candidates.push(up.join("docs/help/topics"));
+        }
+    }
+    candidates.into_iter().find(|p| p.is_dir())
 }
 
 fn bounds_json(sp: &Space) -> String {
