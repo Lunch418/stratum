@@ -733,6 +733,47 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
             };
             json(format!("{{\"ok\":{done}}}"))
         }
+        // граф зависимостей схемы имиджа: узлы — переменные экземпляров,
+        // дуги — связи и присваивания в текстах
+        ("GET", ["graph", name]) => {
+            let name = super::url_decode(name);
+            let s = shared.lock().unwrap();
+            let Some(cls) = s.project.classes.iter().find(|c| c.name.eq_ignore_ascii_case(&name)) else {
+                return error("404 Not Found", "нет такого имиджа");
+            };
+            let mut nodes: Vec<String> = Vec::new();
+            let mut edges: Vec<String> = Vec::new();
+            let mut node = |inst: &str, var: &str| -> String { let id = format!("{inst}.{}", var.to_ascii_lowercase()); if !nodes.contains(&id) { nodes.push(id.clone()); } id };
+            // сам имидж — узел «0»
+            let mut members: Vec<(u16, String, String)> = vec![(0, "self".into(), cls.name.clone())];
+            for ch in &cls.children {
+                members.push((ch.handle, format!("#{}", ch.handle), ch.class_name.clone()));
+            }
+            let labels: Vec<String> = members.iter().map(|(h, id, c)| {
+                let inst_name = cls.children.iter().find(|x| x.handle == *h).map(|x| if x.name.is_empty() { c.clone() } else { x.name.clone() }).unwrap_or(c.clone());
+                format!("{{\"id\":{},\"label\":{},\"class\":{}}}", json_string(id), json_string(&inst_name), json_string(c))
+            }).collect();
+            for (h, id, class_name) in &members {
+                let _ = h;
+                let Some(model) = s.models.get(&class_name.to_lowercase()) else { continue };
+                for (a, b) in lang::dependencies(model) {
+                    let from = node(id, &a);
+                    let to = node(id, &b);
+                    edges.push(format!("{{\"from\":{},\"to\":{},\"kind\":\"text\"}}", json_string(&from), json_string(&to)));
+                }
+            }
+            for l in &cls.links {
+                let src = if l.source == 0 { "self".to_string() } else { format!("#{}", l.source) };
+                let dst = if l.target == 0 { "self".to_string() } else { format!("#{}", l.target) };
+                for (a, b) in &l.vars {
+                    let from = node(&src, a);
+                    let to = node(&dst, b);
+                    edges.push(format!("{{\"from\":{},\"to\":{},\"kind\":\"link\"}}", json_string(&from), json_string(&to)));
+                }
+            }
+            let nodes_json: Vec<String> = nodes.iter().map(|n| json_string(n)).collect();
+            json(format!("{{\"instances\":[{}],\"nodes\":[{}],\"edges\":[{}]}}", labels.join(","), nodes_json.join(","), edges.join(",")))
+        }
         ("POST", ["undo"]) | ("POST", ["redo"]) => {
             let mut s = shared.lock().unwrap();
             let done = if parts[0] == "undo" { s.undo() } else { s.redo() };

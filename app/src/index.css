@@ -229,6 +229,13 @@ button.attention { border-color: var(--state-pause); }
 .prop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; }
 .prop-grid .prop > span:first-child { min-width: 52px; }
 
+.graph-view { position: relative; width: 100%; height: 100%; background: var(--bg-canvas); overflow: hidden; }
+.graph-view svg { display: block; }
+.graph-view .label { font-size: 11px; fill: var(--text-primary); font-family: var(--font-mono); pointer-events: none; }
+.graph-view .toolbar { position: absolute; right: 10px; top: 10px; display: flex; gap: 6px; z-index: 2; }
+.legend-floating { position: absolute; left: 10px; bottom: 8px; display: flex; flex-wrap: wrap; gap: 10px; font-size: 11px; color: var(--text-muted); }
+.legend-floating .swatch { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
+
 /* тосты */
 .toast { position: fixed; left: 50%; bottom: 36px; transform: translateX(-50%); background: var(--text-primary); color: var(--bg-surface); padding: 6px 14px; border-radius: var(--radius); font-size: 12px; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
 
