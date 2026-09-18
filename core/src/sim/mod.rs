@@ -7,10 +7,11 @@
 //! Такт: в начале снимается буфер «старых» значений (его читает `~`), затем
 //! тексты имиджей исполняются в порядке вычисления.
 
+pub mod equations;
 pub mod interp;
 
 use crate::formats::{Class, LoadedProject};
-use crate::lang::{self, ast::{Model, Stmt}};
+use crate::lang::{self, ast::{Expr, Model, Stmt}};
 use crate::runtime::builtins::Effects;
 use crate::runtime::constants;
 use crate::runtime::value::{Value, ValueType};
@@ -46,6 +47,8 @@ struct CompiledClass {
     body: std::sync::Arc<Vec<Stmt>>,
     /// Ошибка разбора текста; мешает только если имидж попал на схему.
     parse_error: Option<lang::ParseError>,
+    /// Уравнения и неизвестные текста — для решателя.
+    equations: equations::ClassEquations,
 }
 
 /// Экземпляр имиджа на схеме.
@@ -183,7 +186,8 @@ impl Simulation {
                 Err(e) => (Model::default(), Some(e)),
             };
             let body = std::sync::Arc::new(model.body.clone());
-            classes.push(CompiledClass { name: cls.name.clone(), model, body, parse_error });
+            let equations = equations::collect(&model.body);
+            classes.push(CompiledClass { name: cls.name.clone(), model, body, parse_error, equations });
         }
 
         let root = project
@@ -440,6 +444,7 @@ impl Simulation {
     /// подсхемой — они работают только по сообщениям.
     pub fn step(&mut self) -> Result<(), RuntimeError> {
         self.old.clone_from(&self.cells);
+        self.solve_equations()?;
         let order = self.order.clone();
         let mut disabled_roots: Vec<usize> = Vec::new();
         for index in order {
@@ -517,6 +522,82 @@ impl Simulation {
         result
     }
 
+    /// Уравнения всех экземпляров решаются как одна система относительно
+    /// неизвестных (`? x, y`); значения ложатся в ячейки до текстов такта.
+    fn solve_equations(&mut self) -> Result<(), RuntimeError> {
+        // (экземпляр, левая, правая)
+        let mut eqs: Vec<(usize, Expr, Expr)> = Vec::new();
+        let mut cells: Vec<usize> = Vec::new();
+        for i in 0..self.instances.len() {
+            if self.is_disabled(i) {
+                continue;
+            }
+            let class = self.instances[i].class;
+            if self.classes[class].equations.equations.is_empty() {
+                continue;
+            }
+            let ce = self.classes[class].equations.clone();
+            for (l, r) in ce.equations {
+                eqs.push((i, l, r));
+            }
+            for u in &ce.unknowns {
+                if let Some(&c) = self.instances[i].vars.get(u) {
+                    if !cells.contains(&c) {
+                        cells.push(c);
+                    }
+                }
+            }
+        }
+        if eqs.is_empty() || cells.is_empty() {
+            return Ok(());
+        }
+        let residuals = |sim: &mut Simulation| -> Result<Vec<f64>, RuntimeError> {
+            let mut out = Vec::with_capacity(eqs.len());
+            for (i, l, r) in &eqs {
+                let immediate = sim.classes[sim.instances[*i].class].model.is_function;
+                let mut frame = Frame { sim, instance: *i, immediate };
+                let mut interp = Interpreter::new();
+                let a = interp.eval(l, &mut frame)?.as_float();
+                let b = interp.eval(r, &mut frame)?.as_float();
+                out.push(a - b);
+            }
+            Ok(out)
+        };
+        for _ in 0..8 {
+            let r0 = residuals(self)?;
+            if r0.iter().all(|r| r.abs() < 1e-9) {
+                break;
+            }
+            let mut jac = vec![vec![0.0; cells.len()]; eqs.len()];
+            for (k, &cell) in cells.iter().enumerate() {
+                let x = self.cells[cell].as_float();
+                let h = 1e-6 * x.abs().max(1.0);
+                self.cells[cell] = Value::Float(x + h);
+                self.old[cell] = Value::Float(x + h);
+                let r1 = residuals(self)?;
+                self.cells[cell] = Value::Float(x);
+                self.old[cell] = Value::Float(x);
+                for (row, (a, b)) in r1.iter().zip(&r0).enumerate() {
+                    jac[row][k] = (a - b) / h;
+                }
+            }
+            let Some(dx) = equations::solve_step(&jac, &r0) else { break };
+            let mut moved = false;
+            for (k, &cell) in cells.iter().enumerate() {
+                if dx[k].is_finite() && dx[k] != 0.0 {
+                    let v = self.cells[cell].as_float() + dx[k];
+                    self.cells[cell] = Value::Float(v);
+                    self.old[cell] = Value::Float(v);
+                    moved = true;
+                }
+            }
+            if !moved {
+                break;
+            }
+        }
+        Ok(())
+    }
+
     /// Живое редактирование: новый текст имиджа подменяется в работающей
     /// модели. Переменные, появившиеся в тексте, получают ячейки у всех
     /// экземпляров; прочее состояние (значения, связи, графика) сохраняется.
@@ -524,6 +605,7 @@ impl Simulation {
         let Some(class) = self.class_index(class_name) else { return false };
         let body = std::sync::Arc::new(model.body.clone());
         let declarations = model.declarations.clone();
+        self.classes[class].equations = equations::collect(&model.body);
         self.classes[class].model = model;
         self.classes[class].body = body;
         self.classes[class].parse_error = None;
