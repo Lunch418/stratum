@@ -34,6 +34,7 @@ check:
 	python3 tools/cls_dump.py --scan fixtures
 	python3 tools/spj_dump.py --scan fixtures
 	python3 tools/check_corpus.py docs/corpus docs/lang
+	python3 tools/check_functions.py
 
 ## build the Rust core and run its tests on the corpus
 core:
