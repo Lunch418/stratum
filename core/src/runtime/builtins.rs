@@ -147,6 +147,7 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
             char::from_u32(f(args, 0) as u32).map(String::from).unwrap_or_default(),
         ),
         "ascii" => num(s(args, 0).chars().next().map(|c| c as u32 as f64).unwrap_or(0.0)),
+        "rgbf" => Value::Color(f(args, 0)),
         "rgb" => Value::Color(
             ((f(args, 0) as u32 & 0xFF)
                 | ((f(args, 1) as u32 & 0xFF) << 8)

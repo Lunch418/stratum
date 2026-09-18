@@ -44,6 +44,7 @@ cargo build --release
 ./target/release/stratum check ../fixtures          # все .cls через оба парсера
 ./target/release/stratum render ../fixtures/PROJECTS/samples/PINBALL_ --ticks 50 --out /tmp/pinball
 ./target/release/stratum play ../fixtures/user/solar_system     # плеер: http://127.0.0.1:8765/
+./target/release/stratum play                                    # IDE без проекта: диалог «Открыть»
 ./target/release/stratum convert ../fixtures/user/solar_system ~/solar   # импорт в project.json
 ./target/release/stratum convert ~/solar /tmp/solar-2000 --to stratum2000  # экспорт обратно
 cargo test --release                                 # юнит-тесты + корпус
@@ -93,6 +94,7 @@ cd ../core && ./target/release/stratum play ../fixtures/user/solar_system
 ```sh
 cd app && npm run build
 cd src-tauri && cargo build --release
+./target/release/stratum-modern                      # диалог «Открыть проект»
 ./target/release/stratum-modern ../../fixtures/user/solar_system
 ```
 

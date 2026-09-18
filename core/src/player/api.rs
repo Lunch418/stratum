@@ -143,9 +143,10 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
                 .map(|(i, c)| class_json(c, i >= p.own_classes, s.models.get(&c.name.to_lowercase())))
                 .collect();
             json(format!(
-                "{{\"root\":{},\"dir\":{},\"native\":{},\"unsaved\":{},\"canUndo\":{},\"canRedo\":{},\"classes\":[{}]}}",
+                "{{\"root\":{},\"dir\":{},\"empty\":{},\"native\":{},\"unsaved\":{},\"canUndo\":{},\"canRedo\":{},\"classes\":[{}]}}",
                 json_string(&p.project.root),
                 json_string(&p.dir.display().to_string()),
+                s.empty,
                 crate::formats::native::is_native(&p.dir),
                 s.unsaved,
                 !s.history.is_empty(),
@@ -614,6 +615,55 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
                 )),
                 None => error("404 Not Found", "нет такой темы"),
             }
+        }
+        // открыть проект: path — папка, .spj или project.json
+        ("POST", ["open"]) => {
+            let Some(path) = super::param(query, "path").map(super::url_decode).filter(|p| !p.trim().is_empty()) else {
+                return error("400 Bad Request", "нужен путь path");
+            };
+            let mut s = shared.lock().unwrap();
+            match s.open(std::path::PathBuf::from(path.trim())) {
+                Ok(()) => json(format!("{{\"ok\":true,\"dir\":{}}}", json_string(&s.project.dir.display().to_string()))),
+                Err(e) => error("400 Bad Request", &e),
+            }
+        }
+        ("POST", ["new"]) => {
+            let mut s = shared.lock().unwrap();
+            match s.open(std::path::PathBuf::new()) {
+                Ok(()) => json("{\"ok\":true}".into()),
+                Err(e) => error("500 Internal Server Error", &e),
+            }
+        }
+        // обзор папок для диалога открытия: подпапки и файлы проектов
+        ("GET", ["browse"]) => {
+            let dir = super::param(query, "dir").map(super::url_decode).filter(|d| !d.is_empty())
+                .map(std::path::PathBuf::from)
+                .unwrap_or_else(|| std::env::var_os("HOME").map(std::path::PathBuf::from).unwrap_or_else(|| std::path::PathBuf::from("/")));
+            let dir = std::fs::canonicalize(&dir).unwrap_or(dir);
+            let Ok(rd) = std::fs::read_dir(&dir) else { return error("404 Not Found", "нет такой папки") };
+            let mut entries: Vec<(String, String, &str)> = Vec::new();
+            for e in rd.filter_map(|e| e.ok()) {
+                let p = e.path();
+                let name = e.file_name().to_string_lossy().to_string();
+                if name.starts_with('.') {
+                    continue;
+                }
+                if p.is_dir() {
+                    let is_project = p.join("project.json").is_file()
+                        || std::fs::read_dir(&p).map(|r| r.filter_map(|x| x.ok()).any(|x| x.path().extension().is_some_and(|x| x.eq_ignore_ascii_case("spj")))).unwrap_or(false);
+                    entries.push((name, p.display().to_string(), if is_project { "project" } else { "dir" }));
+                } else if p.extension().is_some_and(|x| x.eq_ignore_ascii_case("spj")) || name == "project.json" {
+                    entries.push((name, p.display().to_string(), "file"));
+                }
+            }
+            entries.sort_by(|a, b| (a.2 == "file").cmp(&(b.2 == "file")).then(a.0.to_lowercase().cmp(&b.0.to_lowercase())));
+            let items: Vec<String> = entries.iter().map(|(n, p, k)| format!("{{\"name\":{},\"path\":{},\"kind\":{}}}", json_string(n), json_string(p), json_string(k))).collect();
+            json(format!(
+                "{{\"dir\":{},\"parent\":{},\"entries\":[{}]}}",
+                json_string(&dir.display().to_string()),
+                dir.parent().map(|p| json_string(&p.display().to_string())).unwrap_or("null".into()),
+                items.join(",")
+            ))
         }
         ("POST", ["undo"]) | ("POST", ["redo"]) => {
             let mut s = shared.lock().unwrap();

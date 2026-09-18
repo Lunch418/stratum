@@ -20,11 +20,8 @@ fn static_dir() -> Option<PathBuf> {
 }
 
 fn main() {
-    let project = std::env::args().nth(1).map(PathBuf::from);
-    let Some(project) = project else {
-        eprintln!("использование: stratum-modern ПАПКА_ПРОЕКТА");
-        std::process::exit(2);
-    };
+    // без аргумента открывается пустая IDE с диалогом «Открыть проект»
+    let project = std::env::args().nth(1).map(PathBuf::from).unwrap_or_default();
     let (tx, rx) = mpsc::channel::<Result<u16, String>>();
     let libraries = stratum_core::formats::default_library_dirs();
     let dist = static_dir();

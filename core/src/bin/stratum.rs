@@ -150,7 +150,7 @@ fn parse_run_options(args: &[String]) -> Result<RunOptions, String> {
         }
         i += 1;
     }
-    if opts.path.as_os_str().is_empty() {
+    if opts.path.as_os_str().is_empty() && !args.iter().any(|a| a.is_empty()) {
         return Err("не указан проект".into());
     }
     if opts.libraries.is_empty() {
@@ -318,7 +318,12 @@ fn dump_object(space: &stratum_core::gfx::Space, h: stratum_core::gfx::Handle, d
 }
 
 fn cmd_play(args: &[String]) -> Result<(), String> {
-    let opts = parse_run_options(args)?;
+    // `play` без проекта открывает пустую IDE с диалогом «Открыть»
+    let opts = match parse_run_options(args) {
+        Ok(o) => o,
+        Err(e) if e == "не указан проект" => parse_run_options(&[args.to_vec(), vec!["".into()]].concat())?,
+        Err(e) => return Err(e),
+    };
     // если рядом есть сборка IDE (app/dist), отдаётся она
     let exe_dir = std::env::current_exe().ok().and_then(|p| p.parent().map(|d| d.to_path_buf()));
     let static_dir = ["app/dist", "../app/dist", "../../app/dist", "../../../app/dist"]

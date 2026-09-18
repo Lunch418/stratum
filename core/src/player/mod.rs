@@ -7,7 +7,7 @@
 
 pub mod api;
 
-use crate::formats::{Class, self, LoadedProject};
+use crate::formats::{self, Class, LoadedProject};
 use crate::gfx::svg;
 use crate::lang;
 use crate::sim::{wm, Simulation};
@@ -67,6 +67,10 @@ pub struct Halt {
 pub const HISTORY_LEN: usize = 60;
 
 pub struct Shared {
+    /// Папки библиотек — для повторного открытия проектов.
+    pub libraries: Vec<PathBuf>,
+    /// Проект не открыт (пустая заготовка).
+    pub empty: bool,
     pub sim: Simulation,
     /// Снимки перед каждым тактом — для шага назад.
     pub past: VecDeque<Simulation>,
@@ -94,6 +98,31 @@ pub struct Shared {
 }
 
 impl Shared {
+    /// Открывает другой проект на месте текущего.
+    pub fn open(&mut self, path: PathBuf) -> Result<(), String> {
+        let project = load(&path, &self.libraries)?;
+        let sim = Simulation::build(&project).map_err(|e| e.to_string())?;
+        self.models = project
+            .classes
+            .iter()
+            .filter_map(|c| lang::parse(&c.text).ok().map(|m| (c.name.to_lowercase(), m)))
+            .collect();
+        self.empty = path.as_os_str().is_empty();
+        self.project = project;
+        self.sim = sim;
+        self.running = false;
+        self.error = None;
+        self.halt = None;
+        self.past.clear();
+        self.history.clear();
+        self.future.clear();
+        self.traces.clear();
+        self.breakpoints.clear();
+        self.dirty = false;
+        self.unsaved = false;
+        Ok(())
+    }
+
     /// Один такт с историей, обработкой ошибки и точками останова.
     pub fn advance(&mut self) {
         self.past.push_back(self.sim.clone());
@@ -248,9 +277,25 @@ pub struct Options {
 }
 
 fn load(project: &PathBuf, libraries: &[PathBuf]) -> Result<LoadedProject, String> {
+    if project.as_os_str().is_empty() {
+        return Ok(empty_project());
+    }
     formats::load_project(project, libraries)
         .map_err(|e| format!("{}: {e}", project.display()))?
         .map_err(|e| e.to_string())
+}
+
+/// Пустой проект — IDE без открытого файла: один корневой имидж без текста.
+fn empty_project() -> LoadedProject {
+    let root = Class { name: "Main".into(), version: 0x3003, ..Default::default() };
+    LoadedProject {
+        dir: PathBuf::new(),
+        project: formats::Project { root: "Main".into(), ..Default::default() },
+        classes: vec![root],
+        own_classes: 1,
+        state: None,
+        library_dirs: Vec::new(),
+    }
 }
 
 /// Запускает плеер и не возвращается, пока сервер жив.
@@ -269,6 +314,8 @@ pub fn serve_with(opts: Options, on_ready: impl FnOnce(u16)) -> Result<(), Strin
         .filter_map(|c| lang::parse(&c.text).ok().map(|m| (c.name.to_lowercase(), m)))
         .collect();
     let shared = Arc::new(Mutex::new(Shared {
+        libraries: opts.libraries.clone(),
+        empty: opts.project.as_os_str().is_empty(),
         sim,
         past: VecDeque::new(),
         breakpoints: Vec::new(),

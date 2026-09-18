@@ -10,7 +10,7 @@ export interface ClassInfo {
   declared: { name: string; type: string }[]; text: string; children: Child[]; links: Link[];
   hasIcon: boolean; hasScheme: boolean; hasImage: boolean; source: string;
 }
-export interface Project { root: string; dir: string; native: boolean; unsaved: boolean; canUndo: boolean; canRedo: boolean; classes: ClassInfo[] }
+export interface Project { root: string; dir: string; empty: boolean; native: boolean; unsaved: boolean; canUndo: boolean; canRedo: boolean; classes: ClassInfo[] }
 export interface Instance { index: number; path: string; name: string; class: string; parent: number | null; handle: number }
 export interface Halt { kind: 'error' | 'breakpoint'; message: string; instance: number | null; path: string; class: string; line: number }
 export interface Breakpoint { id: number; index: number | null; path: string; class: string; expr: string; enabled: boolean }
@@ -107,6 +107,14 @@ export const api = {
   eval: (index: number, expr: string) => get<{ ok: boolean; value?: string; error?: string }>(`/api/eval/${index}?expr=${encodeURIComponent(expr)}`),
   profile: () => get<{ tick: number; total: number; items: { index: number; path: string; class: string; ns: number }[] }>('/api/profile'),
   helpSearch: (q: string) => get<string[]>(`/api/help?q=${encodeURIComponent(q)}`),
+  browse: (dir: string) => get<{ dir: string; parent: string | null; entries: { name: string; path: string; kind: 'dir' | 'project' | 'file' }[] }>(`/api/browse?dir=${encodeURIComponent(dir)}`),
+  open: async (path: string) => {
+    const r = await fetch(`/api/open?path=${encodeURIComponent(path)}`, { method: 'POST' });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error ?? r.statusText);
+    return j as { ok: boolean; dir: string };
+  },
+  newProject: async () => { await fetch('/api/new', { method: 'POST' }); },
   undo: () => fetch('/api/undo', { method: 'POST' }).then(r => r.json() as Promise<{ ok: boolean; canUndo: boolean; canRedo: boolean }>),
   redo: () => fetch('/api/redo', { method: 'POST' }).then(r => r.json() as Promise<{ ok: boolean; canUndo: boolean; canRedo: boolean }>),
   setValue: (index: number, name: string, value: string) =>

@@ -34,6 +34,7 @@ interface State {
   setPaletteOpen: (v: boolean) => void;
   traceCount: number;
   setTraceCount: (n: number) => void;
+  openProject: (path: string) => Promise<void>;
   helpTopic: string | null;
   setHelpTopic: (t: string | null) => void;
   unsaved: boolean;
@@ -77,6 +78,13 @@ export const useStore = create<State>((set, get) => ({
   setPaletteOpen: paletteOpen => set({ paletteOpen }),
   traceCount: 0,
   setTraceCount: traceCount => set({ traceCount }),
+  openProject: async path => {
+    await api.open(path);
+    const project = await api.project();
+    set({ project, schemePath: [project.root], selectedClass: project.root, selectedInstance: null, unsaved: false, messages: [] });
+    await get().refreshInstances();
+    get().showToast('Проект открыт');
+  },
   helpTopic: null,
   setHelpTopic: helpTopic => set({ helpTopic }),
   markUnsaved: () => set(s => ({ unsaved: true, project: s.project ? { ...s.project, canUndo: true, canRedo: false } : s.project })),

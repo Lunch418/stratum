@@ -11,12 +11,14 @@ import { PathDialog } from './components/PathDialog';
 import { Graphs } from './components/Graphs';
 import { Debug } from './components/Debug';
 import { Help } from './components/Help';
+import { OpenDialog } from './components/OpenDialog';
 import { Palette, type Command } from './components/Palette';
 
 export default function App() {
   const s = useStore();
   const frame = s.frame;
-  const [dialog, setDialog] = useState<'saveAs' | 'export' | null>(null);
+  const [dialog, setDialog] = useState<'saveAs' | 'export' | 'open' | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [layout, setLayout] = useState<{ left: number; right: number; bottom: number }>(() => {
     const def = { left: 260, right: 300, bottom: 160 };
     try { return { ...def, ...JSON.parse(localStorage.getItem('layout') ?? '{}') as Partial<typeof def> }; }
@@ -55,6 +57,7 @@ export default function App() {
       const [tab, name] = location.hash.slice(1).split('/');
       if (tab === 'code' || tab === 'model' || tab === 'scheme') s.setTab(tab);
       if (name) s.select(decodeURIComponent(name));
+      if (useStore.getState().project?.empty) setDialog('open');
     }).catch(e => s.say({ level: 'error', where: 'ядро', text: String(e) }));
   }, []);
   useEffect(() => { document.documentElement.dataset.theme = s.theme; }, [s.theme]);
@@ -122,6 +125,8 @@ export default function App() {
     { id: 'back', title: 'Такт назад', hint: 'Shift+F10', group: 'модель', run: () => api.event('type=back') },
     { id: 'bottom-debug', title: 'Панель: Отладка', group: 'вид', run: () => s.setBottomTab('debug') },
     { id: 'reset', title: 'Сброс', hint: 'Shift+F5', group: 'модель', run: () => api.event('type=reset').then(() => s.refreshInstances()) },
+    { id: 'open', title: 'Открыть проект…', hint: 'Ctrl+O', group: 'проект', run: () => setDialog('open') },
+    { id: 'newproj', title: 'Новый проект', group: 'проект', run: async () => { await api.newProject(); await s.load(); } },
     { id: 'save', title: 'Сохранить проект', hint: 'Ctrl+S', group: 'проект', run: save },
     { id: 'saveas', title: 'Сохранить проект как…', group: 'проект', run: () => setDialog('saveAs') },
     { id: 'export', title: 'Экспорт в Stratum 2000…', group: 'проект', run: () => setDialog('export') },
@@ -156,11 +161,21 @@ export default function App() {
         <button className="ghost" onClick={s.undo} disabled={!s.project?.canUndo} title="Ctrl+Z">Отменить</button>
         <button className="ghost" onClick={s.redo} disabled={!s.project?.canRedo} title="Ctrl+Shift+Z">Повторить</button>
         <button onClick={save} title="Ctrl+S — сохранить проект в текстовом формате" className={s.unsaved ? 'attention' : ''}>Сохранить{s.unsaved ? ' •' : ''}</button>
-        <button className="ghost" onClick={() => setDialog('saveAs')} title="Сохранить копию проекта в другую папку">Сохранить как…</button>
-        <button className="ghost" onClick={() => setDialog('export')} title="Записать project.spj и .cls для Stratum 2000">Экспорт…</button>
+        <div className="menu-host">
+          <button className="ghost" onClick={() => setMenuOpen(o => !o)}>Проект ▾</button>
+          {menuOpen && (
+            <div className="context menu" onMouseLeave={() => setMenuOpen(false)}>
+              <button onClick={() => { setMenuOpen(false); setDialog('open'); }}>Открыть… <span className="muted">Ctrl+O</span></button>
+              <button onClick={async () => { setMenuOpen(false); await api.newProject(); await s.load(); }}>Новый проект</button>
+              <button onClick={() => { setMenuOpen(false); setDialog('saveAs'); }}>Сохранить как…</button>
+              <button onClick={() => { setMenuOpen(false); setDialog('export'); }}>Экспорт в Stratum 2000…</button>
+            </div>
+          )}
+        </div>
         <button className="ghost" onClick={() => s.setPaletteOpen(true)} title="Ctrl+Shift+P">Команды</button>
         <button className="ghost" onClick={s.toggleTheme} title="Тема">{s.theme === 'light' ? 'Тёмная' : 'Светлая'}</button>
       </header>
+      {dialog === 'open' && <OpenDialog required={!!s.project?.empty} onClose={() => setDialog(null)} />}
       {s.paletteOpen && <Palette commands={commands} onClose={() => s.setPaletteOpen(false)} />}
       {dialog === 'saveAs' && s.project && (
         <PathDialog title="Сохранить проект как" action="Сохранить" initial={s.project.native ? s.project.dir : s.project.dir.replace(/[\\/]+$/, '') + '-modern'}
