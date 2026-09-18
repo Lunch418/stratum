@@ -478,7 +478,9 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
         "getobjectsize2dx" | "getactualwidth2d" => num(object(gfx, args).map(|o| o.w).unwrap_or(0.0)),
         "getobjectsize2dy" | "getactualheight2d" => num(object(gfx, args).map(|o| o.h).unwrap_or(0.0)),
         "getschemeobject" | "framegetpos2d" => num(0.0),
-        "audiosetvolume" | "audiosettone" | "beginwritevideo2d" | "endwritevideo2d" => ok(true),
+        "audiosetvolume" | "audiosettone" | "beginwritevideo2d" | "endwritevideo2d" | "writevideoframe2d" | "closevideo" | "videocompressdialog" | "saverectarea2d" => ok(true),
+        // сенсор Kinect и сетевые объекты: устройств нет
+        "nui_init" | "nui_initinstance" | "nui_createinstance" | "nui_getdevicecount" | "registernetobject" | "initanalyzer" => num(0.0),
         "getobjectalpha2d" => num(object(gfx, args).map(|o| o.alpha as f64).unwrap_or(255.0)),
         "getdibpixel2d" | "getddibpixel2d" => {
             let (x, y) = (f(args, 2) as i64, f(args, 3) as i64);
