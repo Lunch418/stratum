@@ -12,7 +12,7 @@ use crate::gfx::Gfx;
 use std::collections::BTreeMap;
 
 /// Побочные эффекты текста модели, которые ядро пока только записывает.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Effects {
     /// Сообщения `LogMessage`.
     pub log: Vec<String>,

@@ -27,6 +27,7 @@ enum Event {
     Pause,
     Step,
     Reset,
+    Back,
     Speed(u32),
     Mouse { window: String, msg: u32, x: f64, y: f64, keys: u32 },
     Key { msg: u32, vk: u32 },
@@ -44,8 +45,35 @@ pub struct Trace {
 
 pub const TRACE_LEN: usize = 2000;
 
+/// Условная точка останова: выражение на языке Stratum в контексте
+/// экземпляра (`index`) или всех экземпляров имиджа (`class`).
+pub struct Breakpoint {
+    pub id: u32,
+    pub index: Option<usize>,
+    pub class: Option<String>,
+    pub expr: String,
+    pub enabled: bool,
+}
+
+/// Где остановилась модель по точке останова или ошибке.
+#[derive(Clone)]
+pub struct Halt {
+    pub kind: &'static str,
+    pub message: String,
+    pub instance: Option<usize>,
+    pub line: u32,
+}
+
+pub const HISTORY_LEN: usize = 60;
+
 pub struct Shared {
     pub sim: Simulation,
+    /// Снимки перед каждым тактом — для шага назад.
+    pub past: VecDeque<Simulation>,
+    pub breakpoints: Vec<Breakpoint>,
+    pub next_breakpoint: u32,
+    /// Последняя остановка: ошибка или точка останова.
+    pub halt: Option<Halt>,
     pub traces: Vec<Trace>,
     pub next_trace: u32,
     pub running: bool,
@@ -66,6 +94,74 @@ pub struct Shared {
 }
 
 impl Shared {
+    /// Один такт с историей, обработкой ошибки и точками останова.
+    pub fn advance(&mut self) {
+        self.past.push_back(self.sim.clone());
+        if self.past.len() > HISTORY_LEN {
+            self.past.pop_front();
+        }
+        if let Err(e) = self.sim.step() {
+            self.running = false;
+            self.error = Some(describe_error(&self.sim, &e));
+            self.halt = Some(Halt { kind: "error", message: e.message.clone(), instance: e.instance, line: e.line });
+        }
+        self.sample_traces();
+        self.check_breakpoints();
+    }
+
+    pub fn step_back(&mut self) -> bool {
+        let Some(prev) = self.past.pop_back() else { return false };
+        self.sim = prev;
+        self.running = false;
+        self.error = None;
+        self.halt = None;
+        let tick = self.sim.tick_number();
+        for t in &mut self.traces {
+            while t.points.back().is_some_and(|p| p.0 >= tick) {
+                t.points.pop_back();
+            }
+        }
+        true
+    }
+
+    fn check_breakpoints(&mut self) {
+        if self.breakpoints.is_empty() || self.error.is_some() {
+            return;
+        }
+        let n = self.sim.instances().len();
+        let bps: Vec<(u32, Option<usize>, Option<String>, String)> = self
+            .breakpoints
+            .iter()
+            .filter(|b| b.enabled)
+            .map(|b| (b.id, b.index, b.class.clone(), b.expr.clone()))
+            .collect();
+        for (id, index, class, expr) in bps {
+            let targets: Vec<usize> = match (index, class) {
+                (Some(i), _) if i < n => vec![i],
+                (_, Some(c)) => (0..n).filter(|&i| self.sim.instances()[i].class_name.eq_ignore_ascii_case(&c)).collect(),
+                _ => Vec::new(),
+            };
+            for i in targets {
+                match self.sim.eval_in(i, &expr) {
+                    Ok(v) if v.as_float() != 0.0 => {
+                        self.running = false;
+                        let path = self.sim.instances()[i].path.clone();
+                        self.halt = Some(Halt { kind: "breakpoint", message: format!("точка останова #{id}: {expr} — {path}"), instance: Some(i), line: 0 });
+                        self.sim.effects.log.push(format!("остановлено: {expr} в {path} (такт {})", self.sim.tick_number()));
+                        return;
+                    }
+                    Ok(_) => {}
+                    Err(e) => {
+                        self.sim.effects.log.push(format!("точка останова #{id}: {e}"));
+                        if let Some(b) = self.breakpoints.iter_mut().find(|b| b.id == id) {
+                            b.enabled = false;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     /// После каждого такта дописывает значения наблюдаемых переменных.
     pub fn sample_traces(&mut self) {
         let tick = self.sim.tick_number();
@@ -174,6 +270,10 @@ pub fn serve_with(opts: Options, on_ready: impl FnOnce(u16)) -> Result<(), Strin
         .collect();
     let shared = Arc::new(Mutex::new(Shared {
         sim,
+        past: VecDeque::new(),
+        breakpoints: Vec::new(),
+        next_breakpoint: 1,
+        halt: None,
         traces: Vec::new(),
         next_trace: 1,
         running: false,
@@ -199,11 +299,7 @@ pub fn serve_with(opts: Options, on_ready: impl FnOnce(u16)) -> Result<(), Strin
                 apply_event(&mut s, ev);
             }
             if s.running && !s.sim.stopped && s.error.is_none() {
-                if let Err(e) = s.sim.step() {
-                    s.error = Some(e.message);
-                    s.running = false;
-                }
-                s.sample_traces();
+                s.advance();
             }
             s.fps
         };
@@ -239,16 +335,21 @@ fn apply_event(s: &mut Shared, ev: Event) {
         Event::Pause => s.running = false,
         Event::Step => {
             s.running = false;
-            if let Err(e) = s.sim.step() {
-                s.error = Some(e.message);
+            s.halt = None;
+            if s.error.is_none() {
+                s.advance();
             }
-            s.sample_traces();
+        }
+        Event::Back => {
+            s.step_back();
         }
         Event::Reset => match Simulation::build(&s.project) {
             Ok(sim) => {
                 s.sim = sim;
+                s.past.clear();
                 s.running = false;
                 s.error = None;
+                s.halt = None;
                 for t in &mut s.traces {
                     t.points.clear();
                 }
@@ -421,6 +522,7 @@ fn parse_event(query: &str) -> Option<Event> {
         "pause" => Event::Pause,
         "step" => Event::Step,
         "reset" => Event::Reset,
+        "back" => Event::Back,
         "speed" => Event::Speed(num("fps")? as u32),
         "mouse" => Event::Mouse {
             window: url_decode(param(query, "win")?),
@@ -498,12 +600,41 @@ fn frame_json(shared: &Arc<Mutex<Shared>>) -> String {
     if let Some(e) = &s.error {
         log.insert(0, json_string(&format!("ошибка: {e}")));
     }
+    let halt = match &s.halt {
+        Some(h) => {
+            let inst = h.instance.and_then(|i| s.sim.instances().get(i));
+            format!(
+                "{{\"kind\":{},\"message\":{},\"instance\":{},\"path\":{},\"class\":{},\"line\":{}}}",
+                json_string(h.kind),
+                json_string(&h.message),
+                h.instance.map(|i| i.to_string()).unwrap_or("null".into()),
+                json_string(inst.map(|i| i.path.as_str()).unwrap_or("")),
+                json_string(inst.map(|i| i.class_name.as_str()).unwrap_or("")),
+                h.line
+            )
+        }
+        None => "null".into(),
+    };
     format!(
-        "{{\"tick\":{},\"running\":{},\"stopped\":{},\"windows\":[{}],\"log\":[{}]}}",
+        "{{\"tick\":{},\"running\":{},\"stopped\":{},\"canBack\":{},\"halt\":{},\"windows\":[{}],\"log\":[{}]}}",
         s.sim.tick_number(),
         s.running,
         s.sim.stopped,
+        !s.past.is_empty(),
+        halt,
         windows.join(","),
         log.join(",")
     )
+}
+
+/// Текст ошибки с именем экземпляра и строкой.
+fn describe_error(sim: &Simulation, e: &crate::sim::interp::RuntimeError) -> String {
+    let mut out = e.message.clone();
+    if let Some(inst) = e.instance.and_then(|i| sim.instances().get(i)) {
+        out = format!("{} [{}]: {out}", inst.path, inst.class_name);
+    }
+    if e.line > 0 {
+        out = format!("{out} (строка {})", e.line);
+    }
+    out
 }

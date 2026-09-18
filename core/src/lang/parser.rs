@@ -152,7 +152,12 @@ impl Parser {
                 return Ok(body);
             }
             let before = self.pos;
+            let line = self.tokens[self.pos].line;
+            let mark = body.len();
             self.statement(&mut body)?;
+            if body.len() > mark {
+                body.insert(mark, Stmt::At(line));
+            }
             if self.pos == before {
                 return self.error(format!("не удалось разобрать оператор: {}", self.peek()));
             }

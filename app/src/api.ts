@@ -12,8 +12,10 @@ export interface ClassInfo {
 }
 export interface Project { root: string; dir: string; native: boolean; unsaved: boolean; canUndo: boolean; canRedo: boolean; classes: ClassInfo[] }
 export interface Instance { index: number; path: string; name: string; class: string; parent: number | null; handle: number }
+export interface Halt { kind: 'error' | 'breakpoint'; message: string; instance: number | null; path: string; class: string; line: number }
+export interface Breakpoint { id: number; index: number | null; path: string; class: string; expr: string; enabled: boolean }
 export interface Frame {
-  tick: number; running: boolean; stopped: boolean;
+  tick: number; running: boolean; stopped: boolean; canBack: boolean; halt: Halt | null;
   windows: { id: number; name: string; w: number; h: number; svg: string; controls: Control[] }[];
   log: string[];
 }
@@ -96,6 +98,13 @@ export const api = {
     const j = await r.json();
     if (!r.ok) throw new Error(j.error ?? r.statusText);
   },
+  breakpoints: () => get<Breakpoint[]>('/api/breakpoints'),
+  breakpointAdd: (target: { index: number } | { class: string }, expr: string) =>
+    fetch(`/api/breakpoint/add?${'index' in target ? 'index=' + target.index : 'class=' + encodeURIComponent(target.class)}&expr=${encodeURIComponent(expr)}`, { method: 'POST' }).then(r => r.json()),
+  breakpointRemove: (id: number) => fetch(`/api/breakpoint/remove?id=${id}`, { method: 'POST' }),
+  breakpointToggle: (id: number) => fetch(`/api/breakpoint/toggle?id=${id}`, { method: 'POST' }),
+  eval: (index: number, expr: string) => get<{ ok: boolean; value?: string; error?: string }>(`/api/eval/${index}?expr=${encodeURIComponent(expr)}`),
+  profile: () => get<{ tick: number; total: number; items: { index: number; path: string; class: string; ns: number }[] }>('/api/profile'),
   undo: () => fetch('/api/undo', { method: 'POST' }).then(r => r.json() as Promise<{ ok: boolean; canUndo: boolean; canRedo: boolean }>),
   redo: () => fetch('/api/redo', { method: 'POST' }).then(r => r.json() as Promise<{ ok: boolean; canUndo: boolean; canRedo: boolean }>),
   setValue: (index: number, name: string, value: string) =>

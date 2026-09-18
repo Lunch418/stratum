@@ -201,6 +201,12 @@ button.attention { border-color: var(--state-pause); }
 .palette .row .title { flex: 1; }
 .palette .row .hint { font-size: 11px; }
 
+.halt { display: flex; align-items: center; gap: 8px; padding: 5px 10px; font-size: 12px; border-bottom: 1px solid var(--border); background: var(--accent-soft); }
+.halt.error { background: rgba(201, 59, 59, 0.12); color: var(--state-error); }
+.halt .spacer { flex: 1; }
+.line-error { background: rgba(201, 59, 59, 0.18); }
+.line-halt { background: var(--accent-soft); }
+
 /* тосты */
 .toast { position: fixed; left: 50%; bottom: 36px; transform: translateX(-50%); background: var(--text-primary); color: var(--bg-surface); padding: 6px 14px; border-radius: var(--radius); font-size: 12px; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
 

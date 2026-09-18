@@ -72,7 +72,7 @@ impl Matrix {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Matrices {
     pub items: BTreeMap<i64, Matrix>,
     next_temp: i64,
@@ -300,7 +300,7 @@ impl Element {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Arrays {
     pub items: HashMap<u32, Vec<Element>>,
     next: u32,

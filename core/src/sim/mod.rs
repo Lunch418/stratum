@@ -37,6 +37,7 @@ impl std::fmt::Display for BuildError {
 }
 
 /// Имидж с разобранным текстом.
+#[derive(Clone)]
 struct CompiledClass {
     name: String,
     model: Model,
@@ -103,6 +104,7 @@ pub mod wm {
     pub const FLAG_ALWAYS: u32 = 256;
 }
 
+#[derive(Clone)]
 pub struct Simulation {
     classes: Vec<CompiledClass>,
     pub registrations: Vec<Registration>,
@@ -126,6 +128,8 @@ pub struct Simulation {
     pub effects: Effects,
     pub tick: u64,
     pub stopped: bool,
+    /// Время текста каждого экземпляра за последний такт, наносекунды.
+    pub profile: Vec<u64>,
 }
 
 impl Simulation {
@@ -194,6 +198,7 @@ impl Simulation {
             effects: Effects::default(),
             tick: 0,
             stopped: false,
+            profile: Vec::new(),
         };
 
         // рисунки имиджей нужны окнам модели (OpenSchemeWindow)
@@ -423,7 +428,12 @@ impl Simulation {
             if disabled_roots.iter().any(|&d| self.descends_from(index, d)) {
                 continue;
             }
+            let started = std::time::Instant::now();
             self.run_instance(index)?;
+            if self.profile.len() != self.instances.len() {
+                self.profile.resize(self.instances.len(), 0);
+            }
+            self.profile[index] = started.elapsed().as_nanos() as u64;
         }
         self.tick += 1;
         self.effects.gfx.flush_dibs();
@@ -459,7 +469,13 @@ impl Simulation {
             let immediate = self.classes[class].model.is_function;
             let mut frame = Frame { sim: self, instance: index, immediate };
             let mut interp = Interpreter::new();
-            interp.run(&body, &mut frame).map(|_| ())
+            interp.run(&body, &mut frame).map(|_| ()).map_err(|mut e| {
+                if e.line == 0 {
+                    e.line = interp.line;
+                }
+                e.instance.get_or_insert(index);
+                e
+            })
         };
         // exit() прерывает только текущий имидж
         self.effects.clear_exit();
@@ -467,6 +483,27 @@ impl Simulation {
             self.stopped = true;
         }
         result
+    }
+
+    /// Вычисляет выражение на языке Stratum в контексте экземпляра: для
+    /// условных точек останова и окна наблюдения.
+    pub fn eval_in(&mut self, instance: usize, src: &str) -> Result<Value, String> {
+        if instance >= self.instances.len() {
+            return Err("нет такого экземпляра".into());
+        }
+        let model = crate::lang::parse(&format!("__dbg := ({src})")).map_err(|e| e.to_string())?;
+        let expr = model
+            .body
+            .iter()
+            .find_map(|st| match st {
+                crate::lang::ast::Stmt::Assign { value, .. } => Some(value.clone()),
+                _ => None,
+            })
+            .ok_or("не выражение")?;
+        let immediate = self.classes[self.instances[instance].class].model.is_function;
+        let mut frame = Frame { sim: self, instance, immediate };
+        let mut interp = Interpreter::new();
+        interp.eval(&expr, &mut frame).map_err(|e| e.message)
     }
 
     /// Событие мыши в пространстве `space`: координаты в единицах

@@ -9,6 +9,7 @@ import { ModelView } from './components/ModelView';
 import { Messages } from './components/Messages';
 import { PathDialog } from './components/PathDialog';
 import { Graphs } from './components/Graphs';
+import { Debug } from './components/Debug';
 import { Palette, type Command } from './components/Palette';
 
 export default function App() {
@@ -74,6 +75,7 @@ export default function App() {
       if ((e.target as HTMLElement).closest('.monaco-editor, input, textarea')) return;
       if (e.code === 'F5' && e.shiftKey) { e.preventDefault(); api.event('type=reset').then(() => s.refreshInstances()); }
       else if (e.code === 'F5') { e.preventDefault(); api.event(frame?.running ? 'type=pause' : 'type=run'); }
+      else if (e.code === 'F10' && e.shiftKey) { e.preventDefault(); api.event('type=back'); }
       else if (e.code === 'F10') { e.preventDefault(); api.event('type=step'); }
       else if (e.key === 'e' && e.ctrlKey) { e.preventDefault(); s.setTab(s.tab === 'code' ? 'scheme' : 'code'); }
       else if (e.key === 's' && e.ctrlKey) { e.preventDefault(); save(); }
@@ -107,6 +109,8 @@ export default function App() {
   const commands: Command[] = [
     { id: 'run', title: running ? 'Пауза' : 'Пуск', hint: 'F5', group: 'модель', run: () => api.event(running ? 'type=pause' : 'type=run') },
     { id: 'step', title: 'Шаг', hint: 'F10', group: 'модель', run: () => api.event('type=step') },
+    { id: 'back', title: 'Такт назад', hint: 'Shift+F10', group: 'модель', run: () => api.event('type=back') },
+    { id: 'bottom-debug', title: 'Панель: Отладка', group: 'вид', run: () => s.setBottomTab('debug') },
     { id: 'reset', title: 'Сброс', hint: 'Shift+F5', group: 'модель', run: () => api.event('type=reset').then(() => s.refreshInstances()) },
     { id: 'save', title: 'Сохранить проект', hint: 'Ctrl+S', group: 'проект', run: save },
     { id: 'saveas', title: 'Сохранить проект как…', group: 'проект', run: () => setDialog('saveAs') },
@@ -132,6 +136,7 @@ export default function App() {
         <span className="brand">Stratum Modern</span>
         <button className={`primary${running ? ' paused' : ''}`} onClick={() => api.event(running ? 'type=pause' : 'type=run')} title="F5">{running ? 'Пауза' : 'Пуск'}</button>
         <button onClick={() => api.event('type=step')} title="F10">Шаг</button>
+        <button onClick={() => api.event('type=back')} title="Shift+F10 — такт назад по истории" disabled={!frame?.canBack || running}>Назад</button>
         <button onClick={() => api.event('type=reset').then(() => s.refreshInstances())} title="Shift+F5">Сброс</button>
         <label className="muted" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>Скорость
           <input type="range" min={1} max={200} defaultValue={30} onChange={e => api.event('type=speed&fps=' + e.target.value)} />
@@ -170,6 +175,14 @@ export default function App() {
             <button className={s.tab === 'code' ? 'active' : ''} onClick={() => s.setTab('code')}>Код{s.selectedClass ? ` · ${s.selectedClass}` : ''}</button>
             <button className={s.tab === 'model' ? 'active' : ''} onClick={() => s.setTab('model')}>Окно модели{frame?.windows.length ? ` (${frame.windows.length})` : ''}</button>
           </div>
+          {frame?.halt && (
+            <div className={`halt ${frame.halt.kind}`}>
+              <span>{frame.halt.kind === 'error' ? 'Ошибка' : 'Остановлено'}: {frame.halt.message}{frame.halt.line ? ` (строка ${frame.halt.line})` : ''}</span>
+              <span className="spacer" />
+              {frame.halt.class && <button className="small" onClick={() => { s.select(frame.halt!.class, frame.halt!.instance); s.setTab('code'); }}>К коду</button>}
+              {frame.halt.kind === 'error' && <button className="small" onClick={() => api.event('type=back')} disabled={!frame.canBack}>Такт назад</button>}
+            </div>
+          )}
           {s.tab === 'scheme' && (
             <div className="breadcrumbs">
               {s.schemePath.map((p, i) => <span key={i}>{i > 0 && ' › '}<button onClick={() => s.goToScheme(i)}>{p}</button></span>)}
@@ -186,9 +199,10 @@ export default function App() {
           <div className="tabs small-tabs">
             <button className={s.bottomTab === 'messages' ? 'active' : ''} onClick={() => s.setBottomTab('messages')}>Сообщения</button>
             <button className={s.bottomTab === 'graphs' ? 'active' : ''} onClick={() => s.setBottomTab('graphs')}>Графики{s.traceCount ? ` (${s.traceCount})` : ''}</button>
+            <button className={s.bottomTab === 'debug' ? 'active' : ''} onClick={() => s.setBottomTab('debug')}>Отладка</button>
           </div>
           <div className="tab-body" style={{ display: 'flex', flexDirection: 'column' }}>
-            {s.bottomTab === 'messages' ? <Messages /> : <Graphs />}
+            {s.bottomTab === 'messages' ? <Messages /> : s.bottomTab === 'graphs' ? <Graphs /> : <Debug />}
           </div>
         </section>
       </div>

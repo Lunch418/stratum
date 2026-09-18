@@ -49,11 +49,23 @@ pub struct Interpreter {
     /// Предохранитель от зацикливания: такт не должен подвешивать среду.
     pub max_steps: u64,
     steps: u64,
+    /// Строка текущего оператора (по меткам `Stmt::At`).
+    pub line: u32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RuntimeError {
     pub message: String,
+    /// Строка текста имиджа, на которой произошла ошибка (0 — неизвестно).
+    pub line: u32,
+    /// Экземпляр, в котором произошла ошибка (заполняет симуляция).
+    pub instance: Option<usize>,
+}
+
+impl RuntimeError {
+    pub fn new(message: impl Into<String>) -> Self {
+        RuntimeError { message: message.into(), line: 0, instance: None }
+    }
 }
 
 impl Default for Interpreter {
@@ -64,7 +76,7 @@ impl Default for Interpreter {
 
 impl Interpreter {
     pub fn new() -> Self {
-        Interpreter { max_steps: 5_000_000, steps: 0 }
+        Interpreter { max_steps: 5_000_000, steps: 0, line: 0 }
     }
 
     pub fn run(&mut self, body: &[Stmt], vars: &mut dyn Vars) -> Result<Flow, RuntimeError> {
@@ -87,6 +99,8 @@ impl Interpreter {
         if self.steps > self.max_steps {
             return Err(RuntimeError {
                 message: format!("такт не завершился за {} шагов: похоже на вечный цикл", self.max_steps),
+                line: self.line,
+                instance: None,
             });
         }
         Ok(())
@@ -95,6 +109,7 @@ impl Interpreter {
     fn statement(&mut self, stmt: &Stmt, vars: &mut dyn Vars) -> Result<Flow, RuntimeError> {
         self.tick_budget()?;
         match stmt {
+            Stmt::At(line) => self.line = *line,
             Stmt::Declare(decl) => {
                 let ty = ValueType::from_name(&decl.var_type);
                 for name in &decl.names {

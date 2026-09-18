@@ -508,6 +508,85 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
             s.models.remove(&name.to_lowercase());
             json("{\"ok\":true}".into())
         }
+        // точки останова: index или class + expr
+        ("POST", ["breakpoint", "add"]) => {
+            let get = |k: &str| super::param(query, k).map(super::url_decode);
+            let Some(expr) = get("expr").filter(|e| !e.trim().is_empty()) else {
+                return error("400 Bad Request", "нужно выражение expr");
+            };
+            let index = get("index").and_then(|v| v.parse::<usize>().ok());
+            let class = get("class").filter(|c| !c.is_empty());
+            if index.is_none() && class.is_none() {
+                return error("400 Bad Request", "нужен index или class");
+            }
+            let mut s = shared.lock().unwrap();
+            let id = s.next_breakpoint;
+            s.next_breakpoint += 1;
+            s.breakpoints.push(super::Breakpoint { id, index, class, expr: expr.trim().to_string(), enabled: true });
+            json(format!("{{\"ok\":true,\"id\":{id}}}"))
+        }
+        ("POST", ["breakpoint", "remove"]) => {
+            let id: u32 = super::param(query, "id").and_then(|v| v.parse().ok()).unwrap_or(0);
+            let mut s = shared.lock().unwrap();
+            s.breakpoints.retain(|b| b.id != id);
+            json("{\"ok\":true}".into())
+        }
+        ("POST", ["breakpoint", "toggle"]) => {
+            let id: u32 = super::param(query, "id").and_then(|v| v.parse().ok()).unwrap_or(0);
+            let mut s = shared.lock().unwrap();
+            if let Some(b) = s.breakpoints.iter_mut().find(|b| b.id == id) {
+                b.enabled = !b.enabled;
+            }
+            json("{\"ok\":true}".into())
+        }
+        ("GET", ["breakpoints"]) => {
+            let s = shared.lock().unwrap();
+            let items: Vec<String> = s
+                .breakpoints
+                .iter()
+                .map(|b| {
+                    let path = b.index.and_then(|i| s.sim.instances().get(i)).map(|i| i.path.clone()).unwrap_or_default();
+                    format!(
+                        "{{\"id\":{},\"index\":{},\"path\":{},\"class\":{},\"expr\":{},\"enabled\":{}}}",
+                        b.id,
+                        b.index.map(|i| i.to_string()).unwrap_or("null".into()),
+                        json_string(&path),
+                        json_string(b.class.as_deref().unwrap_or("")),
+                        json_string(&b.expr),
+                        b.enabled
+                    )
+                })
+                .collect();
+            json(format!("[{}]", items.join(",")))
+        }
+        // вычислить выражение в контексте экземпляра (окно наблюдения)
+        ("GET", ["eval", index]) => {
+            let Ok(i) = index.parse::<usize>() else { return error("400 Bad Request", "нужен номер экземпляра") };
+            let Some(expr) = super::param(query, "expr").map(super::url_decode) else {
+                return error("400 Bad Request", "нужно выражение expr");
+            };
+            let mut s = shared.lock().unwrap();
+            match s.sim.eval_in(i, &expr) {
+                Ok(v) => json(format!("{{\"ok\":true,\"value\":{}}}", json_string(&v.to_string()))),
+                Err(e) => json(format!("{{\"ok\":false,\"error\":{}}}", json_string(&e))),
+            }
+        }
+        // профиль последнего такта: время текста каждого экземпляра
+        ("GET", ["profile"]) => {
+            let s = shared.lock().unwrap();
+            let mut rows: Vec<(usize, u64)> = s.sim.profile.iter().copied().enumerate().filter(|(_, t)| *t > 0).collect();
+            rows.sort_by(|a, b| b.1.cmp(&a.1));
+            let total: u64 = rows.iter().map(|r| r.1).sum();
+            let items: Vec<String> = rows
+                .iter()
+                .take(40)
+                .filter_map(|(i, t)| {
+                    let inst = s.sim.instances().get(*i)?;
+                    Some(format!("{{\"index\":{i},\"path\":{},\"class\":{},\"ns\":{t}}}", json_string(&inst.path), json_string(&inst.class_name)))
+                })
+                .collect();
+            json(format!("{{\"tick\":{},\"total\":{total},\"items\":[{}]}}", s.sim.tick_number(), items.join(",")))
+        }
         ("POST", ["undo"]) | ("POST", ["redo"]) => {
             let mut s = shared.lock().unwrap();
             let done = if parts[0] == "undo" { s.undo() } else { s.redo() };

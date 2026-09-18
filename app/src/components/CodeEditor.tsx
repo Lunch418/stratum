@@ -118,6 +118,20 @@ export function CodeEditor() {
   const [dirty, setDirty] = useState(false);
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
   const monacoRef = useRef<Monaco | null>(null);
+  const halt = useStore(s => s.frame?.halt);
+  const decorations = useRef<string[]>([]);
+
+  // подсветка строки ошибки времени выполнения в тексте этого имиджа
+  useEffect(() => {
+    const editor = editorRef.current, monaco = monacoRef.current;
+    if (!editor || !monaco) return;
+    const mine = halt && halt.line > 0 && klass && halt.class.toLowerCase() === klass.name.toLowerCase();
+    decorations.current = editor.deltaDecorations(decorations.current, mine ? [{
+      range: new monaco.Range(halt.line, 1, halt.line, 1),
+      options: { isWholeLine: true, className: halt.kind === 'error' ? 'line-error' : 'line-halt', glyphMarginClassName: 'glyph-halt' },
+    }] : []);
+    if (mine) editor.revealLineInCenter(halt.line);
+  }, [halt?.message, halt?.line, klass?.name]);
 
   useEffect(() => { setText(klass?.text ?? ''); setDirty(false); }, [klass?.name]);
 

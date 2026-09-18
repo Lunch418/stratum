@@ -28,8 +28,8 @@ interface State {
   say: (m: Message) => void;
   showToast: (t: string) => void;
   toggleTheme: () => void;
-  bottomTab: 'messages' | 'graphs';
-  setBottomTab: (t: 'messages' | 'graphs') => void;
+  bottomTab: 'messages' | 'graphs' | 'debug';
+  setBottomTab: (t: 'messages' | 'graphs' | 'debug') => void;
   paletteOpen: boolean;
   setPaletteOpen: (v: boolean) => void;
   traceCount: number;

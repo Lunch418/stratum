@@ -16,6 +16,25 @@ export function Inspector() {
   const [changed, setChanged] = useState<Set<string>>(new Set());
   const prev = useRef<Map<string, string>>(new Map());
   const [renaming, setRenaming] = useState<string | null>(null);
+  // выражения-наблюдения: считаются ядром в контексте выбранного экземпляра
+  const [watches, setWatches] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('watches') ?? '[]'); } catch { return []; } });
+  const [watchValues, setWatchValues] = useState<Map<string, string>>(new Map());
+  const [newWatch, setNewWatch] = useState('');
+  useEffect(() => { try { localStorage.setItem('watches', JSON.stringify(watches)); } catch { /* приватный режим */ } }, [watches]);
+  useEffect(() => {
+    if (instance === null || !watches.length) { setWatchValues(new Map()); return; }
+    let alive = true;
+    const run = async () => {
+      const m = new Map<string, string>();
+      for (const w of watches) {
+        try { const r = await api.eval(instance, w); m.set(w, r.ok ? (r.value ?? '') : `⚠ ${r.error}`); } catch { m.set(w, '—'); }
+      }
+      if (alive) setWatchValues(m);
+    };
+    run();
+    const id = setInterval(run, frame?.running ? 300 : 1500);
+    return () => { alive = false; clearInterval(id); };
+  }, [instance, watches.join('\n'), frame?.running, frame?.tick && !frame.running ? frame.tick : 0]);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const reload = useStore(s => s.reload);
   const say = useStore(s => s.say);
@@ -98,6 +117,29 @@ export function Inspector() {
             </div>
           )}
         </div>
+        {instance !== null && (
+          <>
+            <div className="panel-title">Наблюдение <span className="spacer" /><span className="muted">{watches.length}</span></div>
+            <table className="vars">
+              <tbody>
+                {watches.map(w => (
+                  <tr key={w}>
+                    <td className="mono" style={{ width: '50%' }}>{w}</td>
+                    <td className="num">{watchValues.get(w) ?? '…'}</td>
+                    <td style={{ width: 28, padding: 0 }}><button className="small ghost" onClick={() => setWatches(ws => ws.filter(x => x !== w))} title="Убрать">×</button></td>
+                  </tr>
+                ))}
+                <tr>
+                  <td colSpan={3} style={{ padding: '3px 4px' }}>
+                    <form onSubmit={e => { e.preventDefault(); const v = newWatch.trim(); if (v && !watches.includes(v)) setWatches(ws => [...ws, v]); setNewWatch(''); }}>
+                      <input type="text" className="mono" placeholder="выражение, напр. sqrt(x*x+y*y)" value={newWatch} onChange={e => setNewWatch(e.target.value)} style={{ width: '100%' }} />
+                    </form>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </>
+        )}
         <div className="panel-title">Переменные</div>
         <table className="vars">
           <thead><tr><th>Имя</th><th>Тип</th><th>По умолчанию</th><th>{instance !== null ? 'Сейчас' : 'Описание'}</th>{instance !== null && <th></th>}</tr></thead>

@@ -650,7 +650,7 @@ pub fn encode_bmp24(w: u32, h: u32, rgb: &[u8]) -> Vec<u8> {
 }
 
 /// Все окна и пространства модели.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Gfx {
     pub spaces: BTreeMap<Handle, Space>,
     /// Имя окна (в нижнем регистре) → пространство.
