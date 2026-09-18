@@ -274,11 +274,24 @@ fn dump_object(space: &stratum_core::gfx::Space, h: stratum_core::gfx::Handle, d
 
 fn cmd_play(args: &[String]) -> Result<(), String> {
     let opts = parse_run_options(args)?;
+    // если рядом есть сборка IDE (app/dist), отдаётся она
+    let exe_dir = std::env::current_exe().ok().and_then(|p| p.parent().map(|d| d.to_path_buf()));
+    let static_dir = ["app/dist", "../app/dist", "../../app/dist", "../../../app/dist"]
+        .iter()
+        .flat_map(|rel| {
+            let mut v = vec![PathBuf::from(rel)];
+            if let Some(d) = &exe_dir {
+                v.push(d.join(rel));
+            }
+            v
+        })
+        .find(|p| p.join("index.html").exists());
     stratum_core::player::serve(stratum_core::player::Options {
         project: opts.path,
         libraries: opts.libraries,
         port: opts.port,
         fps: 30,
+        static_dir,
     })
 }
 

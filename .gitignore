@@ -8,3 +8,5 @@
 __pycache__/
 *.pyc
 /core/target/
+/app/node_modules/
+/app/dist/
