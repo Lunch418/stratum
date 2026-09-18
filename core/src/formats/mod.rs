@@ -73,13 +73,13 @@ pub fn load_project(
     let (dir, spj) = if path.is_dir() {
         let spj = std::fs::read_dir(path)?
             .filter_map(|e| e.ok().map(|e| e.path()))
-            .find(|p| p.extension().is_some_and(|e| e.eq_ignore_ascii_case("spj")));
+            .find(|p| p.extension().is_some_and(|e| e.eq_ignore_ascii_case("spj") || e.eq_ignore_ascii_case("prj")));
         match spj {
             Some(spj) => (path.to_path_buf(), spj),
             None => return Ok(Err(FormatError {
                 path: path.display().to_string(),
                 offset: 0,
-                message: "в папке нет файла проекта .spj".into(),
+                message: "в папке нет файла проекта .spj/.prj".into(),
             })),
         }
     } else {

@@ -652,9 +652,9 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
                 }
                 if p.is_dir() {
                     let is_project = p.join("project.json").is_file()
-                        || std::fs::read_dir(&p).map(|r| r.filter_map(|x| x.ok()).any(|x| x.path().extension().is_some_and(|x| x.eq_ignore_ascii_case("spj")))).unwrap_or(false);
+                        || std::fs::read_dir(&p).map(|r| r.filter_map(|x| x.ok()).any(|x| x.path().extension().is_some_and(|x| x.eq_ignore_ascii_case("spj") || x.eq_ignore_ascii_case("prj")))).unwrap_or(false);
                     entries.push((name, p.display().to_string(), if is_project { "project" } else { "dir" }));
-                } else if p.extension().is_some_and(|x| x.eq_ignore_ascii_case("spj")) || name == "project.json" {
+                } else if p.extension().is_some_and(|x| x.eq_ignore_ascii_case("spj") || x.eq_ignore_ascii_case("prj")) || name == "project.json" {
                     entries.push((name, p.display().to_string(), "file"));
                 }
             }

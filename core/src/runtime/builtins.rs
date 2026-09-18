@@ -77,6 +77,7 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
         // диалог ввода строки: без окна возвращаем значение по умолчанию
         "inputbox" => Value::Str(s(args, 2)),
         "change" => Value::Str(s(args, 0).replace(&s(args, 1), &s(args, 2))),
+        "replicate" => Value::Str(s(args, 0).repeat(f(args, 1).max(0.0) as usize)),
         "exp" => num(f(args, 0).exp()),
         "ln" => num(safe_ln(f(args, 0))),
         "lg" => num(safe_log10(f(args, 0))),
