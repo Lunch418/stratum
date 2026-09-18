@@ -6,6 +6,7 @@
 //! и отправляет команды и события мыши/клавиатуры на `/event`.
 
 pub mod api;
+pub mod editor;
 
 use crate::formats::{self, Class, LoadedProject};
 use crate::gfx::svg;

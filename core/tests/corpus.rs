@@ -137,8 +137,21 @@ fn vector_graphics_of_the_corpus_parse() {
     let mut files = Vec::new();
     collect(&root, &mut files);
     let (mut ok, mut failed) = (0, Vec::new());
+    let mut round_trip_failed: Vec<String> = Vec::new();
     let mut try_blob = |data: &[u8], what: String| match vdr::parse(data, &what) {
-        Ok(_) => ok += 1,
+        Ok(pic) => {
+            ok += 1;
+            // запись в формате 3.0 и повторное чтение должны дать ту же картинку
+            let again = vdr::write(&pic);
+            match vdr::parse(&again, "again") {
+                Ok(back) => {
+                    if let Err(e) = same_picture(&pic, &back) {
+                        round_trip_failed.push(format!("{what}: {e}"));
+                    }
+                }
+                Err(e) => round_trip_failed.push(format!("{what}: повторное чтение: {e}")),
+            }
+        }
         Err(e) => failed.push(e.to_string()),
     };
     for file in &files {
@@ -157,6 +170,37 @@ fn vector_graphics_of_the_corpus_parse() {
     }
     assert!(ok >= 350, "разобрано {ok}, ошибки: {failed:#?}");
     assert!(failed.len() <= 16, "{failed:#?}");
+    assert!(round_trip_failed.is_empty(), "{}", round_trip_failed.join("\n"));
+}
+
+fn same_picture(a: &stratum_core::formats::vdr::Picture, b: &stratum_core::formats::vdr::Picture) -> Result<(), String> {
+    use stratum_core::formats::vdr::ObjectKind;
+    let check = |ok: bool, what: &str| if ok { Ok(()) } else { Err(what.to_string()) };
+    check(a.origin == b.origin && a.scale == b.scale && a.window == b.window, "заголовок")?;
+    check(a.zorder == b.zorder, "zorder")?;
+    check(a.objects.len() == b.objects.len(), "число объектов")?;
+    for (x, y) in a.objects.iter().zip(&b.objects) {
+        check(x.handle == y.handle && x.name == y.name && x.flags == y.flags, "объект: handle/имя/флаги")?;
+        let same = match (&x.kind, &y.kind) {
+            (ObjectKind::Polyline { x: a1, y: a2, w: a3, h: a4, pen: p1, brush: b1, points: pt1 }, ObjectKind::Polyline { x: c1, y: c2, w: c3, h: c4, pen: p2, brush: b2, points: pt2 }) =>
+                (a1, a2, a3, a4, p1, b1, pt1) == (c1, c2, c3, c4, p2, b2, pt2),
+            (ObjectKind::Bitmap { x: a1, y: a2, w: a3, h: a4, src: s1, dib: d1, masked: m1 }, ObjectKind::Bitmap { x: c1, y: c2, w: c3, h: c4, src: s2, dib: d2, masked: m2 }) =>
+                (a1, a2, a3, a4, s1, d1, m1) == (c1, c2, c3, c4, s2, d2, m2),
+            (ObjectKind::Text { x: a1, y: a2, w: a3, h: a4, text: t1 }, ObjectKind::Text { x: c1, y: c2, w: c3, h: c4, text: t2 }) => (a1, a2, a3, a4, t1) == (c1, c2, c3, c4, t2),
+            (ObjectKind::Control { class: k1, caption: c1, style: s1, .. }, ObjectKind::Control { class: k2, caption: c2, style: s2, .. }) => (k1, c1, s1) == (k2, c2, s2),
+            (ObjectKind::Group { children: g1 }, ObjectKind::Group { children: g2 }) => g1 == g2,
+            (ObjectKind::Unknown { .. }, ObjectKind::Unknown { .. }) => true,
+            _ => false,
+        };
+        check(same, &format!("объект #{}: тело", x.handle))?;
+    }
+    check(a.pens.len() == b.pens.len() && a.pens.iter().zip(&b.pens).all(|(p, q)| (p.handle, p.color, p.style, p.width, p.rop) == (q.handle, q.color, q.style, q.width, q.rop)), "перья")?;
+    check(a.brushes.len() == b.brushes.len() && a.brushes.iter().zip(&b.brushes).all(|(p, q)| (p.handle, p.color, p.style, p.hatch, p.rop, p.dib) == (q.handle, q.color, q.style, q.hatch, q.rop, q.dib)), "кисти")?;
+    check(a.fonts.len() == b.fonts.len() && a.fonts.iter().zip(&b.fonts).all(|(p, q)| (p.handle, p.height, p.weight, p.italic, p.underline, &p.face) == (q.handle, q.height, q.weight, q.italic, q.underline, &q.face)), "шрифты")?;
+    check(a.strings.len() == b.strings.len() && a.strings.iter().zip(&b.strings).all(|(p, q)| (p.handle, &p.text) == (q.handle, &q.text)), "строки")?;
+    check(a.texts.len() == b.texts.len() && a.texts.iter().zip(&b.texts).all(|(p, q)| p.handle == q.handle && p.parts.len() == q.parts.len() && p.parts.iter().zip(&q.parts).all(|(u, v)| (u.fg, u.bg, u.font, u.string) == (v.fg, v.bg, v.font, v.string))), "тексты")?;
+    check(a.dibs.len() == b.dibs.len() && a.dibs.iter().zip(&b.dibs).all(|(p, q)| (p.handle, &p.bmp, &p.mask, &p.file, p.double) == (q.handle, &q.bmp, &q.mask, &q.file, q.double)), "растры")?;
+    Ok(())
 }
 
 fn walk_ext(dir: &Path, ext: &str) -> Vec<PathBuf> {

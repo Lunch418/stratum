@@ -692,45 +692,7 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
             let mut s = shared.lock().unwrap();
             let gfx = &mut s.sim.effects.gfx;
             let Some(space) = gfx.window_space(&win).and_then(|h| gfx.space_mut(h)) else { return error("404 Not Found", "нет такого окна") };
-            let num: f64 = value.parse().unwrap_or(0.0);
-            let done = match field.as_str() {
-                "x" | "y" | "w" | "h" | "angle" | "visible" | "name" | "alpha" => space.objects.get_mut(&handle).map(|o| match field.as_str() {
-                    "x" => o.x = num,
-                    "y" => o.y = num,
-                    "w" => o.w = num.max(0.0),
-                    "h" => o.h = num.max(0.0),
-                    "angle" => o.angle = num,
-                    "visible" => o.visible = num != 0.0,
-                    "alpha" => o.alpha = num.clamp(0.0, 255.0) as u8,
-                    _ => o.name = value.clone(),
-                }).is_some(),
-                "pen.color" | "pen.width" | "pen.style" => {
-                    let pen = space.objects.get(&handle).and_then(|o| match &o.shape { crate::gfx::Shape::Polyline { pen, .. } => Some(*pen), _ => None });
-                    pen.and_then(|p| space.pens.get_mut(&p)).map(|p| match field.as_str() {
-                        "pen.color" => p.color = parse_color(&value),
-                        "pen.width" => p.width = num.max(0.0) as u16,
-                        _ => p.style = num.max(0.0) as u16,
-                    }).is_some()
-                }
-                "brush.color" | "brush.style" => {
-                    let brush = space.objects.get(&handle).and_then(|o| match &o.shape { crate::gfx::Shape::Polyline { brush, .. } => Some(*brush), _ => None });
-                    brush.and_then(|b| space.brushes.get_mut(&b)).map(|b| match field.as_str() {
-                        "brush.color" => b.color = parse_color(&value),
-                        _ => b.style = num.max(0.0) as u16,
-                    }).is_some()
-                }
-                "zorder" => {
-                    let n = (num.max(0.0) as usize).min(space.zorder.len().saturating_sub(1));
-                    if let Some(pos) = space.zorder.iter().position(|&h| h == handle) {
-                        let h = space.zorder.remove(pos);
-                        space.zorder.insert(n, h);
-                        true
-                    } else {
-                        false
-                    }
-                }
-                _ => false,
-            };
+            let done = set_object_field(space, handle, &field, &value);
             json(format!("{{\"ok\":{done}}}"))
         }
         // граф зависимостей схемы имиджа: узлы — переменные экземпляров,
@@ -773,6 +735,16 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
             }
             let nodes_json: Vec<String> = nodes.iter().map(|n| json_string(n)).collect();
             json(format!("{{\"instances\":[{}],\"nodes\":[{}],\"edges\":[{}]}}", labels.join(","), nodes_json.join(","), edges.join(",")))
+        }
+        // редактор рисунка/схемы/иконки имиджа
+        (m, ["picture", class]) => {
+            let class = super::url_decode(class);
+            let kind = super::editor::Kind::parse(&super::param(query, "kind").map(super::url_decode).unwrap_or_default());
+            let mut s = shared.lock().unwrap();
+            match super::editor::handle(m, &class, kind, body, &mut s) {
+                Ok(j) => json(j),
+                Err((status, msg)) => error(status, &msg),
+            }
         }
         ("POST", ["undo"]) | ("POST", ["redo"]) => {
             let mut s = shared.lock().unwrap();
@@ -870,8 +842,51 @@ fn help_dir() -> Option<std::path::PathBuf> {
     candidates.into_iter().find(|p| p.is_dir())
 }
 
+/// Меняет поле графического объекта (инспектор и редактор рисунка).
+pub(crate) fn set_object_field(space: &mut Space, handle: u32, field: &str, value: &str) -> bool {
+    let num: f64 = value.parse().unwrap_or(0.0);
+    match field {
+        "x" | "y" | "w" | "h" | "angle" | "visible" | "name" | "alpha" => space.objects.get_mut(&handle).map(|o| match field {
+            "x" => o.x = num,
+            "y" => o.y = num,
+            "w" => o.w = num.max(0.0),
+            "h" => o.h = num.max(0.0),
+            "angle" => o.angle = num,
+            "visible" => o.visible = num != 0.0,
+            "alpha" => o.alpha = num.clamp(0.0, 255.0) as u8,
+            _ => o.name = value.to_string(),
+        }).is_some(),
+        "pen.color" | "pen.width" | "pen.style" => {
+            let pen = space.objects.get(&handle).and_then(|o| match &o.shape { crate::gfx::Shape::Polyline { pen, .. } => Some(*pen), _ => None });
+            pen.and_then(|p| space.pens.get_mut(&p)).map(|p| match field {
+                "pen.color" => p.color = parse_color(value),
+                "pen.width" => p.width = num.max(0.0) as u16,
+                _ => p.style = num.max(0.0) as u16,
+            }).is_some()
+        }
+        "brush.color" | "brush.style" => {
+            let brush = space.objects.get(&handle).and_then(|o| match &o.shape { crate::gfx::Shape::Polyline { brush, .. } => Some(*brush), _ => None });
+            brush.and_then(|b| space.brushes.get_mut(&b)).map(|b| match field {
+                "brush.color" => b.color = parse_color(value),
+                _ => b.style = num.max(0.0) as u16,
+            }).is_some()
+        }
+        "zorder" => {
+            let n = (num.max(0.0) as usize).min(space.zorder.len().saturating_sub(1));
+            if let Some(pos) = space.zorder.iter().position(|&h| h == handle) {
+                let h = space.zorder.remove(pos);
+                space.zorder.insert(n, h);
+                true
+            } else {
+                false
+            }
+        }
+        _ => false,
+    }
+}
+
 /// `#rrggbb` или число → COLORREF.
-fn parse_color(v: &str) -> u32 {
+pub(crate) fn parse_color(v: &str) -> u32 {
     if let Some(hex) = v.strip_prefix('#') {
         if let Ok(rgb) = u32::from_str_radix(hex, 16) {
             return ((rgb & 0xFF) << 16) | (rgb & 0xFF00) | (rgb >> 16);
@@ -881,7 +896,7 @@ fn parse_color(v: &str) -> u32 {
 }
 
 /// Свойства графического объекта для инспектора.
-fn object_json(sp: &Space, o: &crate::gfx::Object) -> String {
+pub(crate) fn object_json(sp: &Space, o: &crate::gfx::Object) -> String {
     use crate::gfx::Shape;
     let kind = match &o.shape {
         Shape::Polyline { .. } => "polyline",

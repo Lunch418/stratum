@@ -144,7 +144,7 @@ pub struct Object {
 }
 
 impl Object {
-    fn new(handle: Handle, x: f64, y: f64, w: f64, h: f64, shape: Shape) -> Self {
+    pub fn new(handle: Handle, x: f64, y: f64, w: f64, h: f64, shape: Shape) -> Self {
         Object {
             handle,
             name: String::new(),
@@ -213,6 +213,72 @@ impl Space {
     }
 
     /// Наполняет пространство из рисунка `.vdr`.
+    /// Обратное к `load`: содержимое пространства как рисунок `.vdr` —
+    /// для сохранения отредактированной графики в имидж.
+    pub fn to_picture(&self) -> Picture {
+        use crate::formats::vdr;
+        let mut pic = Picture {
+            version: 0x0300,
+            origin: self.origin,
+            scale: (self.scale.0 * 100.0, self.scale.1 * 100.0),
+            window: self.client,
+            ..Default::default()
+        };
+        pic.zorder = self.zorder.iter().map(|h| *h as u16).collect();
+        for (h, p) in &self.pens {
+            pic.pens.push(vdr::Pen { handle: *h as u16, color: p.color, style: p.style, width: p.width, rop: p.rop });
+        }
+        for (h, b) in &self.brushes {
+            pic.brushes.push(vdr::Brush { handle: *h as u16, color: b.color, style: b.style, hatch: b.hatch, rop: b.rop, dib: b.dib as u16 });
+        }
+        for (h, f) in &self.fonts {
+            pic.fonts.push(vdr::Font { handle: *h as u16, height: f.height, width: 0, weight: f.weight, italic: f.italic, underline: f.underline, face: f.face.clone() });
+        }
+        for (h, s) in &self.strings {
+            pic.strings.push(vdr::StringTool { handle: *h as u16, text: s.clone() });
+        }
+        for (h, parts) in &self.texts {
+            pic.texts.push(vdr::TextTool {
+                handle: *h as u16,
+                parts: parts.iter().map(|p| vdr::TextPart { fg: p.fg, bg: p.bg, font: p.font as u16, string: p.string as u16 }).collect(),
+            });
+        }
+        // растры двойных битовых карт получают свою нумерацию (чанк 1007)
+        let masked_dibs: std::collections::BTreeSet<Handle> = self
+            .objects
+            .values()
+            .filter_map(|o| match &o.shape { Shape::Bitmap { dib, masked: true, .. } => Some(*dib), _ => None })
+            .collect();
+        let mut double_map: BTreeMap<Handle, u16> = BTreeMap::new();
+        for (h, d) in &self.dibs {
+            let double = masked_dibs.contains(h);
+            let handle = if double {
+                let n = double_map.len() as u16 + 1;
+                double_map.insert(*h, n);
+                n
+            } else {
+                *h as u16
+            };
+            pic.dibs.push(vdr::Dib { handle, bmp: d.bmp.clone(), mask: d.mask.clone(), file: d.file.clone(), double });
+        }
+        for (h, o) in &self.objects {
+            let kind = match &o.shape {
+                Shape::Polyline { pen, brush, points } => vdr::ObjectKind::Polyline { x: o.x, y: o.y, w: o.w, h: o.h, pen: *pen as u16, brush: *brush as u16, points: points.clone() },
+                Shape::Bitmap { dib, src, masked } => vdr::ObjectKind::Bitmap {
+                    x: o.x, y: o.y, w: o.w, h: o.h, src: *src,
+                    dib: if *masked { double_map.get(dib).copied().unwrap_or(*dib as u16) } else { *dib as u16 },
+                    masked: *masked,
+                },
+                Shape::Text { text } => vdr::ObjectKind::Text { x: o.x, y: o.y, w: o.w, h: o.h, text: *text as u16 },
+                Shape::Control { class, caption, style, .. } => vdr::ObjectKind::Control { x: o.x, y: o.y, w: o.w, h: o.h, class: class.clone(), caption: caption.clone(), style: *style },
+                Shape::Group { children } => vdr::ObjectKind::Group { children: children.iter().map(|c| *c as u16).collect() },
+                Shape::View3d { .. } | Shape::Unknown => continue,
+            };
+            pic.objects.push(vdr::Object { handle: *h as u16, name: o.name.clone(), flags: o.flags, kind });
+        }
+        pic
+    }
+
     pub fn load(&mut self, pic: &Picture) {
         self.origin = pic.origin;
         // в файле масштаб хранится в процентах, в API — множителем

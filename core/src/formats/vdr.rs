@@ -20,6 +20,8 @@ pub struct Picture {
     pub strings: Vec<StringTool>,
     pub texts: Vec<TextTool>,
     pub dibs: Vec<Dib>,
+    /// Параметры листа (запись типа 34 чанка 1022) как есть — пишутся обратно.
+    pub page: Option<Vec<u8>>,
 }
 
 #[derive(Debug, Clone)]
@@ -432,7 +434,7 @@ fn read_tool(r: &mut Reader, ctx: &Ctx, kind: u16, handle: u16, pic: &mut Pictur
         }
         // параметры листа (чанк 1022): сетка, единицы — пока не нужны
         34 => {
-            r.bytes(34)?;
+            pic.page = Some(r.bytes(34)?);
         }
         110 | 111 => pic.dibs.push(Dib { handle, bmp: Vec::new(), mask: Vec::new(), file: Some(r.string()?), double }),
         103 | 104 => {
@@ -443,6 +445,256 @@ fn read_tool(r: &mut Reader, ctx: &Ctx, kind: u16, handle: u16, pic: &mut Pictur
         other => return r.err(format!("инструмент типа {other} не разобран")),
     }
     Ok(())
+}
+
+/// Собирает рисунок в формате 3.0 (`2D`, версия 0x0300): все координаты
+/// f64, у записей и чанков есть размеры, имена объектов в блоке `0xCD`.
+pub fn write(pic: &Picture) -> Vec<u8> {
+    use super::writer::Writer;
+    let mut w = Writer::new();
+    w.bytes(SIG);
+    w.u16(0x0300);
+    w.u16(0x0300);
+    w.u16(0x00CC);
+    let total_at = w.pos();
+    w.u32(0);
+    for v in [pic.origin.0, pic.origin.1, pic.scale.0, pic.scale.1, pic.window.0, pic.window.1] {
+        w.f64(v);
+    }
+    w.u16(0);
+    w.bytes(&[0u8; 8]);
+
+    // чанк: id, size, count, capacity, delta, [u8 1, u16 0xFFFF], записи
+    fn chunk(w: &mut Writer, id: u16, count: usize, body: impl FnOnce(&mut Writer)) {
+        if count == 0 && id != chunk::ZORDER {
+            return;
+        }
+        let at = w.pos();
+        w.u16(id);
+        w.u32(0);
+        w.u16(count as u16);
+        w.u16(count as u16);
+        w.u16(10);
+        if count > 0 && id != chunk::ZORDER {
+            w.u8(1);
+            w.u16(0xFFFF);
+        }
+        body(w);
+        let size = (w.pos() - at) as u32;
+        w.patch_u32(at + 2, size);
+    }
+    // запись: kind, size(u16|u32), тело; размер — от начала записи
+    fn record(w: &mut Writer, kind: u16, wide_size: bool, body: impl FnOnce(&mut Writer)) {
+        let at = w.pos();
+        w.u16(kind);
+        if wide_size {
+            w.u32(0);
+        } else {
+            w.u16(0);
+        }
+        body(w);
+        let size = (w.pos() - at) as u32;
+        if wide_size {
+            w.patch_u32(at + 2, size);
+        } else {
+            let bytes = (size as u16).to_le_bytes();
+            w.data[at + 2] = bytes[0];
+            w.data[at + 3] = bytes[1];
+        }
+    }
+
+    chunk(&mut w, chunk::ZORDER, pic.zorder.len(), |w| {
+        for z in &pic.zorder {
+            w.u16(*z);
+        }
+    });
+    chunk(&mut w, chunk::OBJECTS, pic.objects.len(), |w| {
+        for o in &pic.objects {
+            let kind = match &o.kind {
+                ObjectKind::Polyline { .. } => 20,
+                ObjectKind::Bitmap { masked: false, .. } => 21,
+                ObjectKind::Bitmap { masked: true, .. } => 22,
+                ObjectKind::Text { .. } => 23,
+                ObjectKind::Control { .. } => 26,
+                ObjectKind::Group { .. } => 3,
+                ObjectKind::Unknown { kind } => *kind,
+            };
+            record(w, kind, false, |w| {
+                w.u16(0);
+                w.u16(o.handle);
+                w.u16(o.flags);
+                match &o.kind {
+                    ObjectKind::Group { children } => {
+                        w.u16(chunk::ZORDER);
+                        w.u32(14 + children.len() as u32 * 2);
+                        w.u16(children.len() as u16);
+                        w.u16(children.len() as u16);
+                        w.u16(10);
+                        for c in children {
+                            w.u16(*c);
+                        }
+                    }
+                    ObjectKind::Polyline { x, y, w: ww, h, pen, brush, points } => {
+                        for v in [*x, *y, *ww, *h] {
+                            w.f64(v);
+                        }
+                        w.u16(*pen);
+                        w.u16(*brush);
+                        w.u16(points.len() as u16);
+                        for (px, py) in points {
+                            w.f64(*px);
+                            w.f64(*py);
+                        }
+                        w.u8(0);
+                    }
+                    ObjectKind::Bitmap { x, y, w: ww, h, src, dib, .. } => {
+                        for v in [*x, *y, *ww, *h, src.0, src.1, src.2, src.3] {
+                            w.f64(v);
+                        }
+                        w.u16(0);
+                        w.u16(*dib);
+                    }
+                    ObjectKind::Text { x, y, w: ww, h, text } => {
+                        for v in [*x, *y, *ww, *h] {
+                            w.f64(v);
+                        }
+                        w.u16(*text);
+                        w.bytes(&[0u8; 18]);
+                    }
+                    ObjectKind::Control { x, y, w: ww, h, class, caption, style } => {
+                        for v in [*x, *y, *ww, *h] {
+                            w.f64(v);
+                        }
+                        w.string(class);
+                        w.string(caption);
+                        w.u16(0);
+                        w.u32(*style);
+                        w.bytes(&[0u8; 10]);
+                    }
+                    ObjectKind::Unknown { .. } => {}
+                }
+                if !o.name.is_empty() {
+                    let bytes = super::cp1251::encode(&o.name);
+                    w.u16(0xCD);
+                    w.u32(bytes.len() as u32 + 6);
+                    w.bytes(&bytes);
+                }
+            });
+        }
+    });
+    chunk(&mut w, 1004, pic.pens.len(), |w| {
+        for p in &pic.pens {
+            record(w, 101, false, |w| {
+                w.u16(0);
+                w.u16(1);
+                w.u16(p.handle);
+                w.u32(p.color);
+                w.u16(p.style);
+                w.u16(p.width);
+                w.u16(p.rop);
+            });
+        }
+    });
+    chunk(&mut w, 1005, pic.brushes.len(), |w| {
+        for b in &pic.brushes {
+            record(w, 102, false, |w| {
+                w.u16(0);
+                w.u16(1);
+                w.u16(b.handle);
+                w.u32(b.color);
+                w.u16(b.style);
+                w.u16(b.hatch);
+                w.u16(b.rop);
+                w.u16(b.dib);
+            });
+        }
+    });
+    for (id, double) in [(1006u16, false), (chunk::DOUBLE_DIBS, true)] {
+        let dibs: Vec<&Dib> = pic.dibs.iter().filter(|d| d.double == double).collect();
+        chunk(&mut w, id, dibs.len(), |w| {
+            for d in dibs {
+                match &d.file {
+                    Some(file) => record(w, if double { 111 } else { 110 }, false, |w| {
+                        w.u16(0);
+                        w.u16(1);
+                        w.u16(d.handle);
+                        w.string(file);
+                    }),
+                    None => record(w, if double { 104 } else { 103 }, true, |w| {
+                        w.u16(1);
+                        w.u16(d.handle);
+                        w.bytes(&d.bmp);
+                        if double {
+                            w.bytes(&d.mask);
+                        }
+                    }),
+                }
+            }
+        });
+    }
+    chunk(&mut w, 1008, pic.fonts.len(), |w| {
+        for f in &pic.fonts {
+            record(w, 105, false, |w| {
+                w.u16(0);
+                w.u16(1);
+                w.u16(f.handle);
+                w.u16(f.height as i16 as u16);
+                w.u16(f.width as i16 as u16);
+                w.u16(0);
+                w.u16(0);
+                w.u16(f.weight as i16 as u16);
+                w.bytes(&[f.italic as u8, f.underline as u8, 0, 204, 0, 0, 0, 0]);
+                let mut face = super::cp1251::encode(&f.face);
+                face.truncate(31);
+                face.resize(32, 0);
+                w.bytes(&face);
+                w.bytes(&[0u8; 8]);
+            });
+        }
+    });
+    chunk(&mut w, 1009, pic.strings.len(), |w| {
+        for st in &pic.strings {
+            record(w, 106, false, |w| {
+                w.u16(0);
+                w.u16(1);
+                w.u16(st.handle);
+                w.string(&st.text);
+            });
+        }
+    });
+    chunk(&mut w, 1010, pic.texts.len(), |w| {
+        for t in &pic.texts {
+            record(w, 107, false, |w| {
+                w.u16(0);
+                w.u16(1);
+                w.u16(t.handle);
+                w.u16(chunk::TEXT_PARTS);
+                w.u32(12 + t.parts.len() as u32 * 12);
+                w.u16(t.parts.len() as u16);
+                w.u16(t.parts.len() as u16);
+                w.u16(10);
+                for p in &t.parts {
+                    w.u32(p.fg);
+                    w.u32(p.bg);
+                    w.u16(p.font);
+                    w.u16(p.string);
+                }
+            });
+        }
+    });
+    if let Some(page) = &pic.page {
+        chunk(&mut w, 1022, 1, |w| {
+            record(w, 34, false, |w| {
+                w.u16(0);
+                w.u16(1);
+                w.u16(1);
+                w.bytes(page);
+            });
+        });
+    }
+    let total = w.pos() as u32;
+    w.patch_u32(total_at, total);
+    w.data
 }
 
 fn read_bmp(r: &mut Reader) -> Result<Vec<u8>> {
