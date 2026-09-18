@@ -17,6 +17,7 @@ export interface Frame {
   windows: { id: number; name: string; w: number; h: number; svg: string }[];
   log: string[];
 }
+export interface Trace { id: number; index: number; path: string; var: string; points: [number, number][] }
 export interface ParseError { line: number; column: number; message: string }
 
 async function get<T>(url: string): Promise<T> {
@@ -77,6 +78,20 @@ export const api = {
     fetch(`/api/link/remove?class=${encodeURIComponent(klass)}&handle=${handle}`, { method: 'POST' }),
   newClass: async (name: string) => {
     const r = await fetch(`/api/class/new?name=${encodeURIComponent(name)}`, { method: 'POST' });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error ?? r.statusText);
+  },
+  traces: (since = 0) => get<{ tick: number; traces: Trace[] }>(`/api/traces?since=${since}`),
+  traceAdd: (index: number, name: string) =>
+    fetch(`/api/trace/add?index=${index}&var=${encodeURIComponent(name)}`, { method: 'POST' }).then(r => r.json() as Promise<{ ok: boolean; id: number }>),
+  traceRemove: (id: number) => fetch(`/api/trace/remove?id=${id}`, { method: 'POST' }),
+  renameClass: async (name: string, to: string) => {
+    const r = await fetch(`/api/class/${encodeURIComponent(name)}/rename?to=${encodeURIComponent(to)}`, { method: 'POST' });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error ?? r.statusText);
+  },
+  deleteClass: async (name: string) => {
+    const r = await fetch(`/api/class/${encodeURIComponent(name)}/delete`, { method: 'POST' });
     const j = await r.json();
     if (!r.ok) throw new Error(j.error ?? r.statusText);
   },

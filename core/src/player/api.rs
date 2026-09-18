@@ -397,6 +397,117 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
             }
             json("{\"ok\":true}".into())
         }
+        // наблюдение: index экземпляра + var
+        ("POST", ["trace", "add"]) => {
+            let get = |k: &str| super::param(query, k).map(super::url_decode);
+            let (Some(index), Some(var)) = (get("index").and_then(|v| v.parse::<usize>().ok()), get("var")) else {
+                return error("400 Bad Request", "нужны index и var");
+            };
+            let mut s = shared.lock().unwrap();
+            if index >= s.sim.instances().len() {
+                return error("404 Not Found", "нет такого экземпляра");
+            }
+            if let Some(t) = s.traces.iter().find(|t| t.instance == index && t.var.eq_ignore_ascii_case(&var)) {
+                return json(format!("{{\"ok\":true,\"id\":{}}}", t.id));
+            }
+            let id = s.next_trace;
+            s.next_trace += 1;
+            s.traces.push(super::Trace { id, instance: index, var, points: Default::default() });
+            s.sample_traces();
+            json(format!("{{\"ok\":true,\"id\":{id}}}"))
+        }
+        ("POST", ["trace", "remove"]) => {
+            let id: u32 = super::param(query, "id").and_then(|v| v.parse().ok()).unwrap_or(0);
+            let mut s = shared.lock().unwrap();
+            s.traces.retain(|t| t.id != id);
+            json("{\"ok\":true}".into())
+        }
+        ("GET", ["traces"]) => {
+            let s = shared.lock().unwrap();
+            // since=такт — отдать только новые точки
+            let since: u64 = super::param(query, "since").and_then(|v| v.parse().ok()).unwrap_or(0);
+            let items: Vec<String> = s
+                .traces
+                .iter()
+                .map(|t| {
+                    let path = s.sim.instances().get(t.instance).map(|i| i.path.clone()).unwrap_or_default();
+                    let pts: Vec<String> = t.points.iter().filter(|p| p.0 >= since).map(|p| format!("[{},{}]", p.0, num(p.1))).collect();
+                    format!(
+                        "{{\"id\":{},\"index\":{},\"path\":{},\"var\":{},\"points\":[{}]}}",
+                        t.id, t.instance, json_string(&path), json_string(&t.var), pts.join(",")
+                    )
+                })
+                .collect();
+            json(format!("{{\"tick\":{},\"traces\":[{}]}}", s.sim.tick_number(), items.join(",")))
+        }
+        // переименовать имидж проекта: обновляются ссылки детей и корень
+        ("POST", ["class", name, "rename"]) => {
+            let name = super::url_decode(name);
+            let Some(to) = super::param(query, "to").map(super::url_decode).map(|t| t.trim().to_string()).filter(|t| !t.is_empty()) else {
+                return error("400 Bad Request", "нужно новое имя to");
+            };
+            let mut s = shared.lock().unwrap();
+            let Some(i) = s.project.classes.iter().position(|c| c.name.eq_ignore_ascii_case(&name)) else {
+                return error("404 Not Found", "нет такого имиджа");
+            };
+            if i >= s.project.own_classes {
+                return error("403 Forbidden", "библиотечный имидж не переименовывается");
+            }
+            if !to.eq_ignore_ascii_case(&name) && s.project.classes.iter().any(|c| c.name.eq_ignore_ascii_case(&to)) {
+                return error("409 Conflict", "имидж с таким именем уже есть");
+            }
+            s.remember();
+            let own = s.project.own_classes;
+            s.project.classes[i].name = to.clone();
+            for c in &mut s.project.classes[..own] {
+                for ch in &mut c.children {
+                    if ch.class_name.eq_ignore_ascii_case(&name) {
+                        ch.class_name = to.clone();
+                    }
+                }
+            }
+            if s.project.project.root.eq_ignore_ascii_case(&name) {
+                s.project.project.root = to.clone();
+            }
+            if let Some(st) = &mut s.project.state {
+                for im in &mut st.images {
+                    if im.class_name.eq_ignore_ascii_case(&name) {
+                        im.class_name = to.clone();
+                    }
+                }
+            }
+            if let Some(m) = s.models.remove(&name.to_lowercase()) {
+                s.models.insert(to.to_lowercase(), m);
+            }
+            json("{\"ok\":true}".into())
+        }
+        ("POST", ["class", name, "delete"]) => {
+            let name = super::url_decode(name);
+            let mut s = shared.lock().unwrap();
+            let Some(i) = s.project.classes.iter().position(|c| c.name.eq_ignore_ascii_case(&name)) else {
+                return error("404 Not Found", "нет такого имиджа");
+            };
+            if i >= s.project.own_classes {
+                return error("403 Forbidden", "библиотечный имидж не удаляется");
+            }
+            if s.project.project.root.eq_ignore_ascii_case(&name) {
+                return error("409 Conflict", "корневой имидж удалить нельзя");
+            }
+            let own = s.project.own_classes;
+            let users: Vec<String> = s.project.classes[..own]
+                .iter()
+                .filter(|c| c.children.iter().any(|ch| ch.class_name.eq_ignore_ascii_case(&name)))
+                .map(|c| c.name.clone())
+                .collect();
+            if !users.is_empty() {
+                return error("409 Conflict", &format!("имидж используется на схемах: {}", users.join(", ")));
+            }
+            s.remember();
+            s.project.classes.remove(i);
+            s.project.own_classes -= 1;
+            s.models.remove(&name.to_lowercase());
+            json("{\"ok\":true}".into())
+        }
         ("POST", ["undo"]) | ("POST", ["redo"]) => {
             let mut s = shared.lock().unwrap();
             let done = if parts[0] == "undo" { s.undo() } else { s.redo() };

@@ -15,6 +15,25 @@ export function Inspector() {
   const [live, setLive] = useState<Map<string, string>>(new Map());
   const [changed, setChanged] = useState<Set<string>>(new Set());
   const prev = useRef<Map<string, string>>(new Map());
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const reload = useStore(s => s.reload);
+  const say = useStore(s => s.say);
+  const select = useStore(s => s.select);
+  useEffect(() => { setRenaming(null); setConfirmDelete(false); }, [selected]);
+
+  async function doRename() {
+    if (!klass || renaming === null) return;
+    const to = renaming.trim();
+    if (!to || to === klass.name) { setRenaming(null); return; }
+    try { await api.renameClass(klass.name, to); setRenaming(null); await reload(); select(to, instance); showToast('Переименовано'); }
+    catch (e) { say({ level: 'error', where: klass.name, text: String(e) }); }
+  }
+  async function doDelete() {
+    if (!klass) return;
+    try { await api.deleteClass(klass.name); setConfirmDelete(false); await reload(); showToast('Имидж удалён'); }
+    catch (e) { setConfirmDelete(false); say({ level: 'error', where: klass.name, text: String(e) }); }
+  }
 
   // живые значения: при работе — часто, на паузе — при смене такта
   useEffect(() => {
@@ -59,10 +78,29 @@ export function Inspector() {
         <div style={{ padding: '8px 10px', fontSize: 12 }}>
           {klass.description && <div className="muted" style={{ marginBottom: 6 }}>{klass.description}</div>}
           <div className="muted">Детей на схеме: {klass.children.length} · связей: {klass.links.length}{klass.library ? ' · библиотечный, только чтение' : ''}</div>
+          {!klass.library && (
+            <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+              <button className="small" onClick={() => setRenaming(klass.name)}>Переименовать…</button>
+              <button className="small" onClick={() => setConfirmDelete(true)} disabled={project?.root.toLowerCase() === klass.name.toLowerCase()}>Удалить имидж</button>
+            </div>
+          )}
+          {renaming !== null && (
+            <form style={{ display: 'flex', gap: 6, marginTop: 8 }} onSubmit={e => { e.preventDefault(); doRename(); }}>
+              <input autoFocus type="text" value={renaming} onChange={e => setRenaming(e.target.value)} style={{ flex: 1 }} onKeyDown={e => e.key === 'Escape' && setRenaming(null)} />
+              <button type="submit" className="small primary" style={{ minWidth: 0 }}>Ок</button>
+            </form>
+          )}
+          {confirmDelete && (
+            <div style={{ marginTop: 8, display: 'flex', gap: 6, alignItems: 'center' }}>
+              <span>Удалить «{klass.name}»?</span>
+              <button className="small" onClick={doDelete}>Да</button>
+              <button className="small ghost" onClick={() => setConfirmDelete(false)}>Нет</button>
+            </div>
+          )}
         </div>
         <div className="panel-title">Переменные</div>
         <table className="vars">
-          <thead><tr><th>Имя</th><th>Тип</th><th>По умолчанию</th><th>{instance !== null ? 'Сейчас' : 'Описание'}</th></tr></thead>
+          <thead><tr><th>Имя</th><th>Тип</th><th>По умолчанию</th><th>{instance !== null ? 'Сейчас' : 'Описание'}</th>{instance !== null && <th></th>}</tr></thead>
           <tbody>
             {vars.map((v, i) => (
               <tr key={v.name}>
@@ -77,6 +115,13 @@ export function Inspector() {
                         onBlur={e => { if (e.target.value !== live.get(v.name)) api.setValue(instance, v.name, e.target.value).then(() => showToast('Значение записано')); }} />
                     </td>
                   : <td className="muted">{v.description}</td>}
+                {instance !== null && (
+                  <td style={{ width: 28, padding: 0 }}>
+                    {v.type.toUpperCase() === 'FLOAT' && (
+                      <button className="small ghost" title="На график" onClick={() => api.traceAdd(instance, v.name).then(() => { useStore.getState().setBottomTab('graphs'); showToast('Добавлено на график'); })}>∿</button>
+                    )}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

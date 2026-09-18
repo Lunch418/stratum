@@ -28,6 +28,12 @@ interface State {
   say: (m: Message) => void;
   showToast: (t: string) => void;
   toggleTheme: () => void;
+  bottomTab: 'messages' | 'graphs';
+  setBottomTab: (t: 'messages' | 'graphs') => void;
+  paletteOpen: boolean;
+  setPaletteOpen: (v: boolean) => void;
+  traceCount: number;
+  setTraceCount: (n: number) => void;
   unsaved: boolean;
   markUnsaved: () => void;
   /// перечитать проект с сервера, сохранив выбор и путь по схемам
@@ -63,6 +69,18 @@ export const useStore = create<State>((set, get) => ({
   say: m => set(s => ({ messages: [...s.messages.slice(-199), m] })),
   showToast: t => { set({ toast: t }); setTimeout(() => set({ toast: null }), 1800); },
   unsaved: false,
+  bottomTab: 'messages',
+  setBottomTab: bottomTab => set({ bottomTab }),
+  paletteOpen: false,
+  setPaletteOpen: paletteOpen => set({ paletteOpen }),
+  traceCount: 0,
+  setTraceCount: traceCount => set({ traceCount }),
+  bottomTab: 'messages',
+  setBottomTab: bottomTab => set({ bottomTab }),
+  paletteOpen: false,
+  setPaletteOpen: paletteOpen => set({ paletteOpen }),
+  traceCount: 0,
+  setTraceCount: traceCount => set({ traceCount }),
   markUnsaved: () => set(s => ({ unsaved: true, project: s.project ? { ...s.project, canUndo: true, canRedo: false } : s.project })),
   reload: async () => {
     const project = await api.project();

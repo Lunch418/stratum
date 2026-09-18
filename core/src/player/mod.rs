@@ -32,8 +32,20 @@ enum Event {
     Key { msg: u32, vk: u32 },
 }
 
+/// Наблюдаемая переменная: значения по тактам для графика.
+pub struct Trace {
+    pub id: u32,
+    pub instance: usize,
+    pub var: String,
+    pub points: VecDeque<(u64, f64)>,
+}
+
+pub const TRACE_LEN: usize = 2000;
+
 pub struct Shared {
     pub sim: Simulation,
+    pub traces: Vec<Trace>,
+    pub next_trace: u32,
     pub running: bool,
     pub fps: u32,
     events: VecDeque<Event>,
@@ -52,6 +64,26 @@ pub struct Shared {
 }
 
 impl Shared {
+    /// После каждого такта дописывает значения наблюдаемых переменных.
+    pub fn sample_traces(&mut self) {
+        let tick = self.sim.tick_number();
+        let n = self.sim.instances().len();
+        for t in &mut self.traces {
+            if t.instance >= n {
+                continue;
+            }
+            let Some(v) = self.sim.value(t.instance, &t.var) else { continue };
+            let f = v.as_float();
+            if t.points.back().is_some_and(|p| p.0 == tick) {
+                continue;
+            }
+            t.points.push_back((tick, f));
+            if t.points.len() > TRACE_LEN {
+                t.points.pop_front();
+            }
+        }
+    }
+
     /// Вызывается перед каждой правкой проекта: запоминает состояние.
     pub fn remember(&mut self) {
         let own = self.project.classes[..self.project.own_classes].to_vec();
@@ -140,6 +172,8 @@ pub fn serve_with(opts: Options, on_ready: impl FnOnce(u16)) -> Result<(), Strin
         .collect();
     let shared = Arc::new(Mutex::new(Shared {
         sim,
+        traces: Vec::new(),
+        next_trace: 1,
         running: false,
         fps: opts.fps.max(1),
         events: VecDeque::new(),
@@ -167,6 +201,7 @@ pub fn serve_with(opts: Options, on_ready: impl FnOnce(u16)) -> Result<(), Strin
                     s.error = Some(e.message);
                     s.running = false;
                 }
+                s.sample_traces();
             }
             s.fps
         };
@@ -205,12 +240,16 @@ fn apply_event(s: &mut Shared, ev: Event) {
             if let Err(e) = s.sim.step() {
                 s.error = Some(e.message);
             }
+            s.sample_traces();
         }
         Event::Reset => match Simulation::build(&s.project) {
             Ok(sim) => {
                 s.sim = sim;
                 s.running = false;
                 s.error = None;
+                for t in &mut s.traces {
+                    t.points.clear();
+                }
             }
             Err(e) => s.error = Some(e.to_string()),
         },

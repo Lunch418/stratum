@@ -165,6 +165,31 @@ table.vars input:focus { border-color: var(--accent); background: var(--bg-surfa
 .topbar .sep { width: 1px; height: 22px; background: var(--border); margin: 0 4px; }
 button.attention { border-color: var(--state-pause); }
 
+/* нижняя панель: вкладки и графики */
+.tabs.small-tabs button { padding: 4px 12px; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; }
+.graphs { flex: 1; min-height: 0; grid-template-columns: 220px 1fr; }
+.graphs .legend { border-right: 1px solid var(--border); overflow: auto; font-size: 12px; }
+.graphs .legend .item { display: flex; align-items: center; gap: 6px; padding: 3px 8px; cursor: pointer; }
+.graphs .legend .item.off { opacity: .45; }
+.graphs .legend .swatch { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+.graphs .legend .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.graphs .legend .val { font-size: 11px; }
+.graphs .plot { position: relative; overflow: hidden; }
+.graphs .plot svg { display: block; }
+.graphs .plot .grid { stroke: var(--border); stroke-width: 1; }
+.graphs .plot .tick { font-size: 10px; font-family: var(--font-mono); fill: var(--text-muted); }
+
+/* палитра команд */
+.palette-backdrop { align-items: flex-start; padding-top: 12vh; }
+.palette { width: min(640px, 92vw); }
+.palette input { width: 100%; border: 0; border-bottom: 1px solid var(--border); border-radius: 6px 6px 0 0; padding: 10px 14px; font-size: 14px; background: transparent; outline: none; }
+.palette .list { max-height: 50vh; overflow: auto; padding: 4px; }
+.palette .row { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 3px; cursor: pointer; }
+.palette .row.active { background: var(--accent-soft); }
+.palette .row .group { font-size: 11px; min-width: 76px; }
+.palette .row .title { flex: 1; }
+.palette .row .hint { font-size: 11px; }
+
 /* тосты */
 .toast { position: fixed; left: 50%; bottom: 36px; transform: translateX(-50%); background: var(--text-primary); color: var(--bg-surface); padding: 6px 14px; border-radius: var(--radius); font-size: 12px; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
 
