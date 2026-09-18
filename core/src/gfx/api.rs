@@ -140,6 +140,11 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
             ok(gfx.space_mut(h(args, 0)).is_some_and(|sp| rotate(sp, h(args, 1), cx, cy, angle)))
         }
         "hideobject2d" => ok(object_mut(gfx, args).map(|o| o.visible = false).is_some()),
+        "setshowobject2d" => {
+            let show = f(args, 2) != 0.0;
+            ok(object_mut(gfx, args).map(|o| o.visible = show).is_some())
+        }
+        "getshowobject2d" => ok(object(gfx, args).is_some_and(|o| o.visible)),
         "showobject2d" => ok(object_mut(gfx, args).map(|o| o.visible = true).is_some()),
         "deleteobject2d" => ok(gfx.space_mut(h(args, 0)).is_some_and(|sp| sp.delete_object(h(args, 1)))),
         "objecttotop2d" => ok(gfx.space_mut(h(args, 0)).map(|sp| sp.to_top(h(args, 1))).is_some()),

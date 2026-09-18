@@ -10,7 +10,7 @@
 pub mod interp;
 
 use crate::formats::{Class, LoadedProject};
-use crate::lang::{self, ast::Model};
+use crate::lang::{self, ast::{Model, Stmt}};
 use crate::runtime::builtins::Effects;
 use crate::runtime::constants;
 use crate::runtime::value::{Value, ValueType};
@@ -40,6 +40,9 @@ impl std::fmt::Display for BuildError {
 struct CompiledClass {
     name: String,
     model: Model,
+    /// Текст в разделяемой обёртке: по сообщению имидж может исполняться,
+    /// пока другой экземпляр того же класса ещё считается.
+    body: std::sync::Arc<Vec<Stmt>>,
     /// Ошибка разбора текста; мешает только если имидж попал на схему.
     parse_error: Option<lang::ParseError>,
 }
@@ -67,8 +70,43 @@ impl Instance {
     }
 }
 
+/// Подписка имиджа на сообщение окна (`RegisterObject`).
+#[derive(Debug, Clone)]
+pub struct Registration {
+    pub instance: usize,
+    pub space: crate::gfx::Handle,
+    /// Объект, над которым должна быть мышь (0 — любой).
+    pub object: crate::gfx::Handle,
+    pub msg: u32,
+    pub flags: u32,
+}
+
+pub mod wm {
+    pub const KEYDOWN: u32 = 256;
+    pub const KEYUP: u32 = 257;
+    pub const MOUSEMOVE: u32 = 512;
+    pub const LBUTTONDOWN: u32 = 513;
+    pub const LBUTTONUP: u32 = 514;
+    pub const LBUTTONDBLCLK: u32 = 515;
+    pub const RBUTTONDOWN: u32 = 516;
+    pub const RBUTTONUP: u32 = 517;
+    pub const MBUTTONDOWN: u32 = 519;
+    pub const MBUTTONUP: u32 = 520;
+    pub const ALLMOUSEMESSAGE: u32 = 1536;
+    pub const ALLKEYMESSAGE: u32 = 1537;
+    pub const SPACEDONE: u32 = 1539;
+    pub const SPACEINIT: u32 = 1540;
+    /// Флаг регистрации: сообщение только когда мышь над объектом.
+    pub const FLAG_OVER_OBJECT: u32 = 1;
+    /// Флаг регистрации: доставлять и на паузе.
+    pub const FLAG_ALWAYS: u32 = 256;
+}
+
 pub struct Simulation {
     classes: Vec<CompiledClass>,
+    pub registrations: Vec<Registration>,
+    /// Нажатые сейчас виртуальные клавиши (для `GetAsyncKeyState`).
+    pub keys_down: std::collections::HashSet<u32>,
     /// Папка файла каждого имиджа (имя в нижнем регистре) — для
     /// `GetClassDirectory`.
     class_dirs: HashMap<String, String>,
@@ -128,7 +166,8 @@ impl Simulation {
                 Ok(m) => (m, None),
                 Err(e) => (Model::default(), Some(e)),
             };
-            classes.push(CompiledClass { name: cls.name.clone(), model, parse_error });
+            let body = std::sync::Arc::new(model.body.clone());
+            classes.push(CompiledClass { name: cls.name.clone(), model, body, parse_error });
         }
 
         let root = project
@@ -137,6 +176,8 @@ impl Simulation {
 
         let mut sim = Simulation {
             classes,
+            registrations: Vec::new(),
+            keys_down: std::collections::HashSet::new(),
             class_dirs: HashMap::new(),
             instances: Vec::new(),
             cells: Vec::new(),
@@ -358,41 +399,187 @@ impl Simulation {
     }
 
     /// Один такт: снимок старых значений, затем тексты в порядке вычисления.
+    /// Имиджи с `_enable = 0` или `_disable = 1` пропускаются вместе со своей
+    /// подсхемой — они работают только по сообщениям.
     pub fn step(&mut self) -> Result<(), RuntimeError> {
         self.old.clone_from(&self.cells);
-        let mut effects = std::mem::take(&mut self.effects);
-        effects.clear_exit();
         let order = self.order.clone();
-        let mut result = Ok(());
+        let mut disabled_roots: Vec<usize> = Vec::new();
         for index in order {
-            let class = self.instances[index].class;
-            if self.classes[class].model.body.is_empty() {
+            if self.stopped {
+                break;
+            }
+            if self.is_disabled(index) {
+                disabled_roots.push(index);
                 continue;
             }
-            // текст временно забирается из имиджа, чтобы кадр мог занять
-            // симуляцию под запись переменных
-            let body = std::mem::take(&mut self.classes[class].model.body);
-            {
-                let mut frame = Frame { sim: self, instance: index };
-                let mut interp = Interpreter::new(&mut effects);
-                if let Err(e) = interp.run(&body, &mut frame) {
-                    result = Err(e);
+            if disabled_roots.iter().any(|&d| self.descends_from(index, d)) {
+                continue;
+            }
+            self.run_instance(index)?;
+        }
+        self.tick += 1;
+        Ok(())
+    }
+
+    fn is_disabled(&self, index: usize) -> bool {
+        let vars = &self.instances[index].vars;
+        let enable = vars.get("_enable").map(|&c| self.cells[c].as_float());
+        let disable = vars.get("_disable").map(|&c| self.cells[c].as_float());
+        enable == Some(0.0) || disable.is_some_and(|d| d != 0.0)
+    }
+
+    fn descends_from(&self, mut index: usize, ancestor: usize) -> bool {
+        while let Some(p) = self.instances[index].parent {
+            if p == ancestor {
+                return true;
+            }
+            index = p;
+        }
+        false
+    }
+
+    /// Исполняет текст одного экземпляра (в такте или по сообщению).
+    fn run_instance(&mut self, index: usize) -> Result<(), RuntimeError> {
+        let class = self.instances[index].class;
+        let body = std::sync::Arc::clone(&self.classes[class].body);
+        if body.is_empty() {
+            return Ok(());
+        }
+        self.effects.clear_exit();
+        let result = {
+            let mut frame = Frame { sim: self, instance: index };
+            let mut interp = Interpreter::new();
+            interp.run(&body, &mut frame).map(|_| ())
+        };
+        // exit() прерывает только текущий имидж
+        self.effects.clear_exit();
+        if self.effects.stop_requested {
+            self.stopped = true;
+        }
+        result
+    }
+
+    /// Событие мыши в пространстве `space`: координаты в единицах
+    /// пространства, `keys` — состояние кнопок (MK_LBUTTON=1, MK_RBUTTON=2).
+    pub fn mouse(&mut self, space: crate::gfx::Handle, msg: u32, x: f64, y: f64, keys: u32) -> Result<(), RuntimeError> {
+        let under = self.effects.gfx.space(space).and_then(|sp| sp.object_at(x, y));
+        let targets: Vec<Registration> = self
+            .registrations
+            .iter()
+            .filter(|r| r.space == space && message_matches(r.msg, msg))
+            .filter(|r| {
+                if r.flags & wm::FLAG_OVER_OBJECT != 0 && r.object != 0 {
+                    self.effects.gfx.space(space).is_some_and(|sp| covers(sp, r.object, under))
+                } else {
+                    true
+                }
+            })
+            .cloned()
+            .collect();
+        for r in targets {
+            self.set_var(r.instance, "msg", Value::Float(msg as f64));
+            self.set_var(r.instance, "xPos", Value::Float(x));
+            self.set_var(r.instance, "yPos", Value::Float(y));
+            self.set_var(r.instance, "fwKeys", Value::Float(keys as f64));
+            self.run_instance(r.instance)?;
+        }
+        Ok(())
+    }
+
+    /// Событие клавиатуры: `vk` — виртуальный код клавиши Windows.
+    pub fn key(&mut self, space: crate::gfx::Handle, msg: u32, vk: u32) -> Result<(), RuntimeError> {
+        if msg == wm::KEYDOWN {
+            self.keys_down.insert(vk);
+        } else if msg == wm::KEYUP {
+            self.keys_down.remove(&vk);
+        }
+        let targets: Vec<Registration> = self
+            .registrations
+            .iter()
+            .filter(|r| r.space == space && message_matches(r.msg, msg))
+            .cloned()
+            .collect();
+        for r in targets {
+            self.set_var(r.instance, "msg", Value::Float(msg as f64));
+            self.set_var(r.instance, "wVkey", Value::Float(vk as f64));
+            self.set_var(r.instance, "fwKeys", Value::Float(vk as f64));
+            self.run_instance(r.instance)?;
+        }
+        Ok(())
+    }
+
+    /// Устанавливает переменную, если она есть у экземпляра (обе фазы).
+    fn set_var(&mut self, instance: usize, name: &str, value: Value) {
+        if let Some(&cell) = self.instances[instance].vars.get(&name.to_ascii_lowercase()) {
+            let v = value.cast_to(self.types[cell]);
+            self.cells[cell] = v.clone();
+            self.old[cell] = v;
+        }
+    }
+
+    /// `SendMessage` от `sender`: переменные копируются в приёмник, его
+    /// текст исполняется, значения копируются обратно.
+    fn send_message(&mut self, sender: usize, object: &str, class: &str, pairs: &[(String, String)]) -> Result<(), RuntimeError> {
+        let mut targets: Vec<usize> = Vec::new();
+        if !object.is_empty() {
+            if let Some(t) = self.resolve_path(sender, object) {
+                targets.push(t);
+            }
+        } else if !class.is_empty() {
+            targets.extend((0..self.instances.len()).filter(|&i| self.instances[i].class_name.eq_ignore_ascii_case(class)));
+        }
+        for target in targets {
+            if target == sender {
+                continue;
+            }
+            for (from, to) in pairs {
+                if let Some(v) = self.get_var_value(sender, from) {
+                    self.set_var(target, to, v);
                 }
             }
-            self.classes[class].model.body = body;
-            if result.is_err() {
-                break;
-            }
-            // exit() прерывает только текущий имидж
-            effects.clear_exit();
-            if effects.stop_requested {
-                self.stopped = true;
-                break;
+            self.run_instance(target)?;
+            for (from, to) in pairs {
+                if let Some(v) = self.get_var_value(target, to) {
+                    self.set_var(sender, from, v);
+                }
             }
         }
-        self.effects = effects;
-        self.tick += 1;
-        result
+        Ok(())
+    }
+
+    fn get_var_value(&self, instance: usize, name: &str) -> Option<Value> {
+        let cell = *self.instances[instance].vars.get(&name.to_ascii_lowercase())?;
+        Some(self.cells[cell].clone())
+    }
+
+    /// Путь к экземпляру: "" — сам, ".." — родитель, "..\имя" — брат,
+    /// "имя" — ребёнок или любой экземпляр с таким именем.
+    fn resolve_path(&self, from: usize, path: &str) -> Option<usize> {
+        let path = path.trim().replace('/', "\\");
+        if path.is_empty() {
+            return Some(from);
+        }
+        let mut current = from;
+        for part in path.split('\\') {
+            if part.is_empty() {
+                continue;
+            }
+            current = if part == ".." {
+                self.instances[current].parent?
+            } else {
+                let child = (0..self.instances.len()).find(|&i| {
+                    self.instances[i].parent == Some(current)
+                        && (self.instances[i].name.eq_ignore_ascii_case(part)
+                            || self.instances[i].class_name.eq_ignore_ascii_case(part))
+                });
+                match child {
+                    Some(c) => c,
+                    None => self.find(part)?,
+                }
+            };
+        }
+        Some(current)
     }
 
     pub fn run(&mut self, ticks: u64) -> Result<(), RuntimeError> {
@@ -404,6 +591,25 @@ impl Simulation {
         }
         Ok(())
     }
+}
+
+/// Подходит ли зарегистрированное сообщение под пришедшее.
+fn message_matches(registered: u32, msg: u32) -> bool {
+    registered == msg
+        || (registered == wm::ALLMOUSEMESSAGE && (wm::MOUSEMOVE..=521).contains(&msg))
+        || (registered == wm::ALLKEYMESSAGE && (msg == wm::KEYDOWN || msg == wm::KEYUP))
+}
+
+/// Объект `wanted` (или группа с ним) находится под мышью.
+fn covers(sp: &crate::gfx::Space, wanted: crate::gfx::Handle, under: Option<crate::gfx::Handle>) -> bool {
+    let mut cur = under;
+    while let Some(h) = cur {
+        if h == wanted {
+            return true;
+        }
+        cur = sp.objects.get(&h).and_then(|o| o.parent);
+    }
+    false
 }
 
 /// Доступ к переменным одного экземпляра во время исполнения его текста.
@@ -446,6 +652,10 @@ impl Vars for Frame<'_> {
         constants::lookup(name).map(Value::Float)
     }
 
+    fn effects(&mut self) -> &mut Effects {
+        &mut self.sim.effects
+    }
+
     fn call_special(&mut self, name: &str, args: &[Value]) -> Option<Value> {
         let arg = |i: usize| args.get(i).map(|v| v.as_string()).unwrap_or_default();
         let lower = name.to_ascii_lowercase();
@@ -466,6 +676,59 @@ impl Vars for Frame<'_> {
                 Some(i) => Value::Handle(i as f64),
                 None => Value::Handle(0.0),
             },
+            "registerobject" => {
+                // RegisterObject(HSpace | WindowName, hObject, path, msg, flags)
+                let space = match args.first() {
+                    Some(Value::Str(name)) => self.sim.effects.gfx.window_space(name).unwrap_or(0),
+                    Some(v) => v.as_float() as crate::gfx::Handle,
+                    None => 0,
+                };
+                let object = args.get(1).map(|v| v.as_float() as crate::gfx::Handle).unwrap_or(0);
+                let Some(target) = self.sim.resolve_path(self.instance, &arg(2)) else { return Some(Value::Float(0.0)) };
+                let msg = args.get(3).map(|v| v.as_float() as u32).unwrap_or(0);
+                let flags = args.get(4).map(|v| v.as_float() as u32).unwrap_or(0);
+                let dup = self.sim.registrations.iter().any(|r| r.instance == target && r.space == space && r.msg == msg);
+                if space != 0 && !dup {
+                    self.sim.registrations.push(Registration { instance: target, space, object, msg, flags });
+                }
+                Value::Float(1.0)
+            }
+            "unregisterobject" => {
+                let space = args.first().map(|v| v.as_float() as crate::gfx::Handle).unwrap_or(0);
+                let msg = args.get(3).map(|v| v.as_float() as u32);
+                let target = self.sim.resolve_path(self.instance, &arg(2)).unwrap_or(self.instance);
+                self.sim.registrations.retain(|r| !(r.instance == target && r.space == space && msg.is_none_or(|m| m == r.msg)));
+                Value::Float(1.0)
+            }
+            "setcapture" => {
+                let space = args.first().map(|v| v.as_float() as crate::gfx::Handle).unwrap_or(0);
+                let target = self.sim.resolve_path(self.instance, &arg(1)).unwrap_or(self.instance);
+                if space != 0 {
+                    self.sim.registrations.push(Registration { instance: target, space, object: 0, msg: wm::ALLMOUSEMESSAGE, flags: 0x10000 });
+                }
+                Value::Float(1.0)
+            }
+            "releasecapture" => {
+                self.sim.registrations.retain(|r| r.flags & 0x10000 == 0);
+                Value::Float(1.0)
+            }
+            "getasynckeystate" => {
+                let vk = args.first().map(|v| v.as_float() as u32).unwrap_or(0);
+                Value::Float(if self.sim.keys_down.contains(&vk) { -32768.0 } else { 0.0 })
+            }
+            "sendmessage" => {
+                let object = arg(0);
+                let class = arg(1);
+                let pairs: Vec<(String, String)> = args[2.min(args.len())..]
+                    .chunks(2)
+                    .filter(|c| c.len() == 2)
+                    .map(|c| (c[0].as_string(), c[1].as_string()))
+                    .collect();
+                if let Err(e) = self.sim.send_message(self.instance, &object, &class, &pairs) {
+                    self.sim.effects.log.push(format!("SendMessage: {}", e.message));
+                }
+                Value::Float(1.0)
+            }
             "getvarf" | "getvars" | "getvarh" | "getvarc" => {
                 let target = self.resolve(&arg(0))?;
                 let var = arg(1).to_ascii_lowercase();

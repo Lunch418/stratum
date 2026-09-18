@@ -32,6 +32,8 @@ pub trait Vars {
     fn call_special(&mut self, _name: &str, _args: &[Value]) -> Option<Value> {
         None
     }
+    /// Побочные эффекты и графика модели.
+    fn effects(&mut self) -> &mut Effects;
 }
 
 #[derive(Debug)]
@@ -43,8 +45,7 @@ pub enum Flow {
     Return(Option<Value>),
 }
 
-pub struct Interpreter<'a> {
-    pub effects: &'a mut Effects,
+pub struct Interpreter {
     /// Предохранитель от зацикливания: такт не должен подвешивать среду.
     pub max_steps: u64,
     steps: u64,
@@ -55,9 +56,15 @@ pub struct RuntimeError {
     pub message: String,
 }
 
-impl<'a> Interpreter<'a> {
-    pub fn new(effects: &'a mut Effects) -> Self {
-        Interpreter { effects, max_steps: 5_000_000, steps: 0 }
+impl Default for Interpreter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Interpreter {
+    pub fn new() -> Self {
+        Interpreter { max_steps: 5_000_000, steps: 0 }
     }
 
     pub fn run(&mut self, body: &[Stmt], vars: &mut dyn Vars) -> Result<Flow, RuntimeError> {
@@ -100,20 +107,20 @@ impl<'a> Interpreter<'a> {
             // присваиваний трактуем как обычное
             Stmt::Assign { target, value } | Stmt::AssignDeferred { target, value } => {
                 let v = self.eval(value, vars)?;
-                if self.effects.exit_requested {
+                if vars.effects().exit_requested {
                     return Ok(Flow::Exit);
                 }
                 vars.set(target, v);
             }
             Stmt::Expr(e) => {
                 self.eval(e, vars)?;
-                if self.effects.exit_requested {
+                if vars.effects().exit_requested {
                     return Ok(Flow::Exit);
                 }
             }
             Stmt::If { condition, then_body, else_body } => {
                 let c = self.eval(condition, vars)?;
-                if self.effects.exit_requested {
+                if vars.effects().exit_requested {
                     return Ok(Flow::Exit);
                 }
                 return self.block(if c.is_true() { then_body } else { else_body }, vars);
@@ -121,7 +128,7 @@ impl<'a> Interpreter<'a> {
             Stmt::While { condition, body } => loop {
                 self.tick_budget()?;
                 let c = self.eval(condition, vars)?;
-                if self.effects.exit_requested {
+                if vars.effects().exit_requested {
                     return Ok(Flow::Exit);
                 }
                 if !c.is_true() {
@@ -141,7 +148,7 @@ impl<'a> Interpreter<'a> {
                     other => return Ok(other),
                 }
                 let c = self.eval(condition, vars)?;
-                if self.effects.exit_requested {
+                if vars.effects().exit_requested {
                     return Ok(Flow::Exit);
                 }
                 // цикл идёт, пока условие истинно
@@ -154,7 +161,7 @@ impl<'a> Interpreter<'a> {
                 let mut matched = false;
                 for arm in arms {
                     let c = self.eval(&arm.condition, vars)?;
-                    if self.effects.exit_requested {
+                    if vars.effects().exit_requested {
                         return Ok(Flow::Exit);
                     }
                     if c.is_true() {
@@ -235,16 +242,16 @@ impl<'a> Interpreter<'a> {
                 for a in args {
                     values.push(self.eval_in(a, vars, phase)?);
                 }
-                self.effects.outputs.clear();
+                vars.effects().outputs.clear();
                 let result = match vars.call_special(name, &values) {
                     Some(v) => v,
-                    None => match builtins::call(name, &values, self.effects) {
+                    None => match builtins::call(name, &values, vars.effects()) {
                         Some(v) => v,
-                        None => builtins::call_stub(name, self.effects),
+                        None => builtins::call_stub(name, vars.effects()),
                     },
                 };
                 // выходные аргументы пишутся в переменные, стоящие на их местах
-                let outputs = std::mem::take(&mut self.effects.outputs);
+                let outputs = std::mem::take(&mut vars.effects().outputs);
                 for (index, value) in outputs {
                     if let Some(target) = args.get(index).and_then(var_name) {
                         vars.set(target, value);

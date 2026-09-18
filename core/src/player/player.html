@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Stratum Modern — плеер</title>
+<style>
+  :root { --bg:#14161c; --surface:#22262f; --border:#303541; --text:#e6e8ee; --muted:#8b92a3; --accent:#6fa0ff; --run:#3dcb7a; --pause:#f0b23c; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:13px/1.4 Manrope, system-ui, sans-serif; }
+  header { display:flex; align-items:center; gap:10px; padding:8px 14px; background:var(--surface); border-bottom:1px solid var(--border); }
+  header h1 { font-size:13px; font-weight:600; margin:0 12px 0 0; color:var(--muted); letter-spacing:.06em; text-transform:uppercase; }
+  button { background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:4px; padding:6px 12px; cursor:pointer; font:inherit; }
+  button:hover { border-color:var(--accent); }
+  button.primary { background:var(--run); color:#0b1a10; border-color:transparent; font-weight:600; min-width:96px; }
+  button.primary.paused { background:var(--pause); }
+  .counter { font:13px/1 "JetBrains Mono", ui-monospace, monospace; font-variant-numeric:tabular-nums; color:var(--muted); margin-left:auto; }
+  main { display:flex; flex-wrap:wrap; gap:14px; padding:14px; }
+  .win { background:#fff; border:1px solid var(--border); border-radius:4px; overflow:hidden; }
+  .win .title { background:var(--surface); color:var(--muted); font-size:11px; letter-spacing:.06em; text-transform:uppercase; padding:4px 8px; border-bottom:1px solid var(--border); }
+  .win .body { position:relative; overflow:auto; }
+  .win svg { display:block; }
+  input[type=range] { width:120px; }
+  #log { color:var(--muted); font-size:11px; padding:0 14px 14px; white-space:pre-wrap; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Stratum Modern</h1>
+  <button id="run" class="primary">Пуск</button>
+  <button id="stepBtn" title="F10">Шаг</button>
+  <button id="reset" title="Shift+F5">Сброс</button>
+  <label>Скорость <input id="speed" type="range" min="1" max="200" value="30"></label>
+  <span id="speedVal">30 тактов/с</span>
+  <span class="counter" id="counter">такт 0</span>
+</header>
+<main id="windows"></main>
+<div id="log"></div>
+<script>
+const $ = s => document.querySelector(s);
+let running = false, lastSvg = {};
+async function post(q) { await fetch('/event?' + q, {method:'POST'}); }
+$('#run').onclick = () => post(running ? 'type=pause' : 'type=run');
+$('#stepBtn').onclick = () => post('type=step');
+$('#reset').onclick = () => post('type=reset');
+$('#speed').oninput = e => { $('#speedVal').textContent = e.target.value + ' тактов/с'; post('type=speed&fps=' + e.target.value); };
+document.addEventListener('keydown', e => {
+  if (e.code === 'F10') { e.preventDefault(); post('type=step'); }
+  else if (e.code === 'F5' && e.shiftKey) { e.preventDefault(); post('type=reset'); }
+  else if (e.code === 'F5') { e.preventDefault(); post(running ? 'type=pause' : 'type=run'); }
+  else if (e.target === document.body) post('type=key&msg=256&vk=' + e.keyCode);
+});
+document.addEventListener('keyup', e => { if (e.target === document.body) post('type=key&msg=257&vk=' + e.keyCode); });
+
+function attach(div, name) {
+  const body = div.querySelector('.body');
+  const send = (msg, e) => {
+    const svg = body.querySelector('svg'); if (!svg) return;
+    const r = svg.getBoundingClientRect();
+    const x = (e.clientX - r.left) * (svg.viewBox.baseVal.width / r.width);
+    const y = (e.clientY - r.top) * (svg.viewBox.baseVal.height / r.height);
+    const keys = (e.buttons & 1 ? 1 : 0) | (e.buttons & 2 ? 2 : 0) | (e.buttons & 4 ? 16 : 0);
+    post(`type=mouse&win=${encodeURIComponent(name)}&msg=${msg}&x=${x.toFixed(2)}&y=${y.toFixed(2)}&keys=${keys}`);
+  };
+  body.onmousemove = e => send(512, e);
+  body.onmousedown = e => { send(e.button === 0 ? 513 : e.button === 2 ? 516 : 519, e); };
+  body.onmouseup = e => { send(e.button === 0 ? 514 : e.button === 2 ? 517 : 520, e); };
+  body.ondblclick = e => send(515, e);
+  body.oncontextmenu = e => e.preventDefault();
+}
+
+async function poll() {
+  try {
+    const r = await fetch('/frame'); const f = await r.json();
+    running = f.running;
+    $('#run').textContent = running ? 'Пауза' : 'Пуск';
+    $('#run').classList.toggle('paused', running);
+    $('#counter').textContent = 'такт ' + f.tick + (f.stopped ? ' · остановлено' : '');
+    const main = $('#windows');
+    for (const w of f.windows) {
+      let div = document.getElementById('win-' + w.id);
+      if (!div) {
+        div = document.createElement('div'); div.className = 'win'; div.id = 'win-' + w.id;
+        div.innerHTML = `<div class="title"></div><div class="body"></div>`;
+        main.appendChild(div); attach(div, w.name);
+      }
+      div.querySelector('.title').textContent = w.name;
+      if (lastSvg[w.id] !== w.svg) { div.querySelector('.body').innerHTML = w.svg; lastSvg[w.id] = w.svg; }
+    }
+    for (const div of [...main.children]) if (!f.windows.some(w => 'win-' + w.id === div.id)) div.remove();
+    $('#log').textContent = f.log.join('\n');
+  } catch (e) { $('#log').textContent = 'нет связи с ядром: ' + e; }
+  setTimeout(poll, 40);
+}
+poll();
+</script>
+</body>
+</html>

@@ -20,6 +20,7 @@ fn main() -> ExitCode {
         Some("info") => cmd_info(&args[1..]),
         Some("check") => cmd_check(&args[1..]),
         Some("render") => cmd_render(&args[1..]),
+        Some("play") => cmd_play(&args[1..]),
         Some("--help") | Some("-h") | None => {
             usage();
             Ok(())
@@ -46,7 +47,9 @@ fn usage() {
          info PROJECT\n      состав проекта: имиджи, экземпляры, связи\n  \
          check КАТАЛОГ\n      прогнать все .cls каталога через парсеры форматов и языка\n  \
          render PROJECT [--ticks N] [--out ПАПКА] [--lib ПАПКА]\n      \
-         просчитать N тактов и записать окна модели в SVG"
+         просчитать N тактов и записать окна модели в SVG\n  \
+         play PROJECT [--port 8765] [--lib ПАПКА]\n      \
+         открыть плеер в браузере: транспорт, окно модели, мышь и клавиатура"
     );
 }
 
@@ -57,6 +60,7 @@ struct RunOptions {
     watch: Vec<String>,
     libraries: Vec<PathBuf>,
     out: PathBuf,
+    port: u16,
 }
 
 fn parse_run_options(args: &[String]) -> Result<RunOptions, String> {
@@ -67,6 +71,7 @@ fn parse_run_options(args: &[String]) -> Result<RunOptions, String> {
         watch: Vec::new(),
         libraries: Vec::new(),
         out: PathBuf::from("."),
+        port: 8765,
     };
     let mut i = 0;
     while i < args.len() {
@@ -80,6 +85,10 @@ fn parse_run_options(args: &[String]) -> Result<RunOptions, String> {
                     .map_err(|_| "после --ticks нужно число")?;
             }
             "--dump" => opts.dump = true,
+            "--port" => {
+                i += 1;
+                opts.port = args.get(i).ok_or("после --port нужно число")?.parse().map_err(|_| "после --port нужно число")?;
+            }
             "--out" => {
                 i += 1;
                 opts.out = PathBuf::from(args.get(i).ok_or("после --out нужна папка")?);
@@ -261,6 +270,16 @@ fn dump_object(space: &stratum_core::gfx::Space, h: stratum_core::gfx::Handle, d
             dump_object(space, *c, depth + 1);
         }
     }
+}
+
+fn cmd_play(args: &[String]) -> Result<(), String> {
+    let opts = parse_run_options(args)?;
+    stratum_core::player::serve(stratum_core::player::Options {
+        project: opts.path,
+        libraries: opts.libraries,
+        port: opts.port,
+        fps: 30,
+    })
 }
 
 fn safe_name(name: &str) -> String {
