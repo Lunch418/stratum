@@ -470,6 +470,241 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
             }).unwrap_or(0))
         }
 
+        // ── шрифты и тексты ───────────────────────────────────────────────
+        "createfont2dpt" => {
+            let flags = f(args, 3) as u32;
+            handle(gfx.space_mut(h(args, 0)).map(|sp| sp.add_font(Font {
+                face: s(args, 1),
+                height: -(f(args, 2) * 96.0 / 72.0).round() as i32,
+                weight: if flags & 8 != 0 { 700 } else { 400 },
+                italic: flags & 1 != 0,
+                underline: flags & 2 != 0,
+            })).unwrap_or(0))
+        }
+        "getfontname2d" => Value::Str(gfx.space(h(args, 0)).and_then(|sp| sp.fonts.get(&h(args, 1))).map(|f| f.face.clone()).unwrap_or_default()),
+        "getfontsize2d" => num(gfx.space(h(args, 0)).and_then(|sp| sp.fonts.get(&h(args, 1))).map(|f| (f.height.abs() as f64 * 72.0 / 96.0).round()).unwrap_or(0.0)),
+        "getfontstyle2d" => num(gfx.space(h(args, 0)).and_then(|sp| sp.fonts.get(&h(args, 1))).map(|f| {
+            (if f.italic { 1.0 } else { 0.0 }) + (if f.underline { 2.0 } else { 0.0 }) + (if f.weight >= 700 { 8.0 } else { 0.0 })
+        }).unwrap_or(0.0)),
+        "setfontname2d" => {
+            let face = s(args, 2);
+            ok(gfx.space_mut(h(args, 0)).and_then(|sp| sp.fonts.get_mut(&h(args, 1))).map(|f| f.face = face).is_some())
+        }
+        "setfontsize2d" => {
+            let pt = f(args, 2);
+            ok(gfx.space_mut(h(args, 0)).and_then(|sp| sp.fonts.get_mut(&h(args, 1))).map(|f| f.height = -(pt * 96.0 / 72.0).round() as i32).is_some())
+        }
+        "setfontstyle2d" => {
+            let st = f(args, 2) as u32;
+            ok(gfx.space_mut(h(args, 0)).and_then(|sp| sp.fonts.get_mut(&h(args, 1))).map(|f| {
+                f.italic = st & 1 != 0;
+                f.underline = st & 2 != 0;
+                f.weight = if st & 8 != 0 { 700 } else { 400 };
+            }).is_some())
+        }
+        "getfontlist" => Value::Handle(0.0),
+        "gettextcount2d" => num(gfx.space(h(args, 0)).and_then(|sp| sp.texts.get(&h(args, 1))).map(|t| t.len() as f64).unwrap_or(0.0)),
+        "settextstring2d" | "settextfont2d" | "settextfgcolor2d" | "settextbkcolor2d" => {
+            let idx = f(args, 2) as usize;
+            let v = f(args, 3);
+            ok(gfx.space_mut(h(args, 0)).and_then(|sp| sp.texts.get_mut(&h(args, 1))).and_then(|parts| parts.get_mut(idx)).map(|p| match lower.as_str() {
+                "settextstring2d" => p.string = v as Handle,
+                "settextfont2d" => p.font = v as Handle,
+                "settextfgcolor2d" => p.fg = v as u32,
+                _ => p.bg = v as u32,
+            }).is_some())
+        }
+        // AddText2d(HSpace, HText, index, HFont, HString, fg, bg)
+        "addtext2d" => {
+            let idx = f(args, 2) as usize;
+            let part = super::TextPart { font: h(args, 3), string: h(args, 4), fg: f(args, 5) as u32, bg: f(args, 6) as u32 };
+            ok(gfx.space_mut(h(args, 0)).and_then(|sp| sp.texts.get_mut(&h(args, 1))).map(|parts| parts.insert(idx.min(parts.len()), part)).is_some())
+        }
+        "removetext2d" => {
+            let idx = f(args, 2) as usize;
+            ok(gfx.space_mut(h(args, 0)).and_then(|sp| sp.texts.get_mut(&h(args, 1))).is_some_and(|parts| {
+                if idx < parts.len() { parts.remove(idx); true } else { false }
+            }))
+        }
+        "gettextbkcolor" | "gettextfgcolor" => Value::Color(0.0),
+
+        // ── инструменты и растры ─────────────────────────────────────────
+        "gettoolref2d" => num(1.0),
+        "getnexttool2d" => {
+            let kind = f(args, 1) as u32;
+            let cur = h(args, 2);
+            handle(gfx.space(h(args, 0)).map(|sp| {
+                let keys: Vec<Handle> = match kind {
+                    1 => sp.pens.keys().copied().collect(),
+                    2 => sp.brushes.keys().copied().collect(),
+                    3 => sp.dibs.keys().copied().collect(),
+                    5 => sp.fonts.keys().copied().collect(),
+                    6 => sp.strings.keys().copied().collect(),
+                    7 => sp.texts.keys().copied().collect(),
+                    _ => Vec::new(),
+                };
+                if cur == 0 { keys.first().copied().unwrap_or(0) } else { keys.iter().skip_while(|k| **k != cur).nth(1).copied().unwrap_or(0) }
+            }).unwrap_or(0))
+        }
+        "getbrushdib2d" => handle(gfx.space(h(args, 0)).and_then(|sp| sp.brushes.get(&h(args, 1))).map(|b| b.dib).unwrap_or(0)),
+        "setbrushdib2d" => {
+            let dib = h(args, 2);
+            ok(gfx.space_mut(h(args, 0)).and_then(|sp| sp.brushes.get_mut(&h(args, 1))).map(|b| b.dib = dib).is_some())
+        }
+        "setbkbrush2d" | "getbkbrush2d" | "setcrdsystem2d" | "setrgncreatemode" | "setlinearrows2d" | "setpoints2d" | "sethyperjump2d" | "setspacelayers2d" => ok(gfx.space(h(args, 0)).is_some()),
+        "getrgncreatemode" | "getspacelayers2d" => num(0.0),
+        "createrdib2d" | "createrdoubledib2d" => {
+            let file = s(args, 1);
+            let data = gfx.find_file(&file).and_then(|p| std::fs::read(p).ok());
+            handle(gfx.space_mut(h(args, 0)).map(|sp| sp.add_dib(Dib::new(data.unwrap_or_default(), Vec::new(), Some(file)))).unwrap_or(0))
+        }
+        "setdibobject2d" | "setddibobject2d" => {
+            let dib = h(args, 2);
+            ok(object_mut(gfx, args).map(|o| if let Shape::Bitmap { dib: d, .. } = &mut o.shape { *d = dib }).is_some())
+        }
+        "setrdib2d" | "setrdoubledib2d" => {
+            let file = s(args, 2);
+            let data = gfx.find_file(&file).and_then(|p| std::fs::read(p).ok());
+            ok(gfx.space_mut(h(args, 0)).and_then(|sp| sp.dibs.get_mut(&h(args, 1))).map(|d| {
+                *d = Dib::new(data.unwrap_or_default(), Vec::new(), Some(file));
+            }).is_some())
+        }
+        "getrdib2d" | "getrdoubledib2d" => Value::Str(gfx.space(h(args, 0)).and_then(|sp| sp.dibs.get(&h(args, 1))).and_then(|d| d.file.clone()).unwrap_or_default()),
+
+        // ── объекты: порядок, группы, буфер обмена ────────────────────────
+        "isobjectsintersect2d" => {
+            let (a, b) = (h(args, 1), h(args, 2));
+            ok(gfx.space(h(args, 0)).and_then(|sp| Some((sp.objects.get(&a)?, sp.objects.get(&b)?))).is_some_and(|(p, q)| {
+                p.x < q.x + q.w && q.x < p.x + p.w && p.y < q.y + q.h && q.y < p.y + p.h
+            }))
+        }
+        "setcurrentobject2d" => ok(object(gfx, args).is_some()),
+        "getcurrentobject2d" => handle(0),
+        "lockobject2d" => ok(object(gfx, args).is_some()),
+        "getlastprimary2d" => handle(gfx.last_primary),
+        "copytoclipboard2d" => {
+            let copied = gfx.space(h(args, 0)).and_then(|sp| {
+                let o = sp.objects.get(&h(args, 1))?.clone();
+                let (pen, brush) = match &o.shape {
+                    Shape::Polyline { pen, brush, .. } => (sp.pens.get(pen).cloned(), sp.brushes.get(brush).cloned()),
+                    _ => (None, None),
+                };
+                Some((o, pen, brush))
+            });
+            gfx.clipboard = copied;
+            ok(gfx.clipboard.is_some())
+        }
+        // PasteFromClipboard2d(HSpace, x, y, flags)
+        "pastefromclipboard2d" => {
+            let (x, y) = (f(args, 1), f(args, 2));
+            let Some((mut o, pen, brush)) = gfx.clipboard.clone() else { return Some(handle(0)) };
+            handle(gfx.space_mut(h(args, 0)).map(|sp| {
+                if let Shape::Polyline { pen: p, brush: b, .. } = &mut o.shape {
+                    if let Some(pen) = pen { *p = sp.add_pen(pen); }
+                    if let Some(brush) = brush { *b = sp.add_brush(brush); }
+                }
+                o.x = x;
+                o.y = y;
+                o.parent = None;
+                sp.add_object(o)
+            }).unwrap_or(0))
+        }
+        "getbottomobject2d" => handle(gfx.space(h(args, 0)).and_then(|sp| sp.zorder.first().copied()).unwrap_or(0)),
+        "gettopobject2d" => handle(gfx.space(h(args, 0)).and_then(|sp| sp.zorder.last().copied()).unwrap_or(0)),
+        "getupperobject2d" | "getlowerobject2d" => {
+            let cur = h(args, 1);
+            handle(gfx.space(h(args, 0)).and_then(|sp| {
+                let i = sp.zorder.iter().position(|z| *z == cur)?;
+                if lower == "getupperobject2d" { sp.zorder.get(i + 1).copied() } else { i.checked_sub(1).and_then(|k| sp.zorder.get(k).copied()) }
+            }).unwrap_or(0))
+        }
+        "getobjectfromzorder2d" => {
+            let n = f(args, 1).max(1.0) as usize - 1;
+            handle(gfx.space(h(args, 0)).and_then(|sp| sp.zorder.get(n).copied()).unwrap_or(0))
+        }
+        "swapobject2d" => {
+            let (a, b) = (h(args, 1), h(args, 2));
+            ok(gfx.space_mut(h(args, 0)).is_some_and(|sp| {
+                match (sp.zorder.iter().position(|z| *z == a), sp.zorder.iter().position(|z| *z == b)) {
+                    (Some(i), Some(j)) => { sp.zorder.swap(i, j); true }
+                    _ => false,
+                }
+            }))
+        }
+        "deletegroup2d" => {
+            let g = h(args, 1);
+            ok(gfx.space_mut(h(args, 0)).is_some_and(|sp| {
+                let Some(Shape::Group { children }) = sp.objects.get(&g).map(|o| o.shape.clone()) else { return false };
+                for c in &children {
+                    if let Some(o) = sp.objects.get_mut(c) { o.parent = None; }
+                    if !sp.zorder.contains(c) { sp.zorder.push(*c); }
+                }
+                sp.delete_object(g)
+            }))
+        }
+        "getgroupitemsnum2d" => num(object(gfx, args).map(|o| match &o.shape { Shape::Group { children } => children.len() as f64, _ => 0.0 }).unwrap_or(0.0)),
+        "isgroupcontainobject2d" => {
+            let item = h(args, 2);
+            ok(object(gfx, args).is_some_and(|o| matches!(&o.shape, Shape::Group { children } if children.contains(&item))))
+        }
+        "setgroupitem2d" => {
+            let (idx, item) = (f(args, 2) as usize, h(args, 3));
+            ok(object_mut(gfx, args).is_some_and(|o| match &mut o.shape {
+                Shape::Group { children } if idx < children.len() => { children[idx] = item; true }
+                _ => false,
+            }))
+        }
+        "setgroupitems2d" => {
+            let items: Vec<Handle> = (2..args.len()).map(|i| h(args, i)).filter(|c| *c != 0).collect();
+            ok(object_mut(gfx, args).is_some_and(|o| match &mut o.shape {
+                Shape::Group { children } => { *children = items; true }
+                _ => false,
+            }))
+        }
+
+        // ── списки (LISTBOX/COMBOBOX): строки контрола через перевод строки ──
+        "lbaddstring" => {
+            let t = s(args, 2);
+            num(object_mut(gfx, args).and_then(|o| match &mut o.shape {
+                Shape::Control { text, .. } => {
+                    if !text.is_empty() { text.push('\n'); }
+                    text.push_str(&t);
+                    Some(text.lines().count() as f64 - 1.0)
+                }
+                _ => None,
+            }).unwrap_or(-1.0))
+        }
+        "lbclearlist" => ok(object_mut(gfx, args).map(|o| if let Shape::Control { text, .. } = &mut o.shape { text.clear() }).is_some()),
+        "lbdeletestring" => {
+            let i = f(args, 2) as usize;
+            ok(object_mut(gfx, args).is_some_and(|o| match &mut o.shape {
+                Shape::Control { text, .. } => {
+                    let mut lines: Vec<&str> = text.lines().collect();
+                    if i < lines.len() { lines.remove(i); *text = lines.join("\n"); true } else { false }
+                }
+                _ => false,
+            }))
+        }
+        "lbgetstring" => {
+            let i = f(args, 2) as usize;
+            Value::Str(object(gfx, args).and_then(|o| match &o.shape { Shape::Control { text, .. } => text.lines().nth(i).map(str::to_string), _ => None }).unwrap_or_default())
+        }
+        "lbfindstring" | "lbfindstringexact" => {
+            let needle = s(args, 3).to_lowercase();
+            let from = f(args, 2).max(0.0) as usize;
+            num(object(gfx, args).and_then(|o| match &o.shape {
+                Shape::Control { text, .. } => text.lines().enumerate().skip(from).find(|(_, l)| {
+                    let l = l.to_lowercase();
+                    if lower == "lbfindstringexact" { l == needle } else { l.starts_with(&needle) }
+                }).map(|(i, _)| i as f64),
+                _ => None,
+            }).unwrap_or(-1.0))
+        }
+        "lbgetcaretindex" => num(object(gfx, args).map(|o| match &o.shape { Shape::Control { style, .. } => (*style >> 24) as f64, _ => 0.0 }).unwrap_or(0.0)),
+        "lbsetcaretindex" | "lbsetselindex" => ok(object(gfx, args).is_some()),
+        "getcontroltextlength2d" => num(object(gfx, args).map(|o| match &o.shape { Shape::Control { text, .. } => text.chars().count() as f64, _ => 0.0 }).unwrap_or(0.0)),
+        "setcontrolfocus2d" | "dbsetcontroltable" => ok(object(gfx, args).is_some()),
+
         // ── прозрачность и растр по пикселям ─────────────────────────────
         "setobjectalpha2d" => {
             let a = f(args, 2).clamp(0.0, 255.0) as u8;
@@ -481,6 +716,16 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
         "audiosetvolume" | "audiosettone" | "beginwritevideo2d" | "endwritevideo2d" | "writevideoframe2d" | "closevideo" | "videocompressdialog" | "saverectarea2d" => ok(true),
         // сенсор Kinect и сетевые объекты: устройств нет
         "nui_init" | "nui_initinstance" | "nui_createinstance" | "nui_getdevicecount" | "registernetobject" | "initanalyzer" => num(0.0),
+        "getwindowtitle" => Value::Str(gfx.window_space(&s(args, 0)).and_then(|h| gfx.space(h)).map(|sp| sp.window.clone()).unwrap_or_default()),
+        "iswindowvisible" => ok(gfx.window_space(&s(args, 0)).and_then(|h| gfx.space(h)).is_some_and(|sp| sp.visible)),
+        "isiconic" => num(0.0),
+        "setwindowsize" => {
+            let (w, hh) = (f(args, 1), f(args, 2));
+            ok(window_space_mut(gfx, &s(args, 0)).map(|sp| sp.client = (w, hh)).is_some())
+        }
+        "getprojectprop" => Value::Str(String::new()),
+        "setprojectprop" => ok(true),
+        "removetexture" => ok(true),
         "getobjectalpha2d" => num(object(gfx, args).map(|o| o.alpha as f64).unwrap_or(255.0)),
         "getdibpixel2d" | "getddibpixel2d" => {
             let (x, y) = (f(args, 2) as i64, f(args, 3) as i64);

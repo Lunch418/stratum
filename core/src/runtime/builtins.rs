@@ -37,6 +37,8 @@ pub struct Effects {
     pub sounds: Vec<(String, String, bool)>,
     /// Открытые через MCI псевдонимы: alias → файл.
     pub mci: BTreeMap<String, String>,
+    /// Потоки (`CreateStream`).
+    pub streams: super::extra::Streams,
 }
 
 impl Effects {
@@ -480,6 +482,9 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
             boolean(true)
         }
         _ => {
+            if let Some(v) = super::extra::call(name, args, fx) {
+                return Some(v);
+            }
             if let Some(v) = crate::gfx::api3d::call(name, args, &mut fx.gfx, &mut fx.matrices, &mut fx.outputs) {
                 return Some(v);
             }

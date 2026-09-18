@@ -660,6 +660,7 @@ impl Simulation {
     /// пространства, `keys` — состояние кнопок (MK_LBUTTON=1, MK_RBUTTON=2).
     pub fn mouse(&mut self, space: crate::gfx::Handle, msg: u32, x: f64, y: f64, keys: u32) -> Result<(), RuntimeError> {
         let under = self.effects.gfx.space(space).and_then(|sp| sp.object_at(x, y));
+        self.effects.gfx.last_primary = under.unwrap_or(0);
         let targets: Vec<Registration> = self
             .registrations
             .iter()
@@ -1019,6 +1020,141 @@ impl Vars for Frame<'_> {
                     None => Value::Float(0.0),
                 }
             }
+            // ── состав схемы имиджа: экземпляры, связи, переменные ─────────
+            "getobjectcount" => {
+                let target = self.resolve_arg(args.first())?;
+                Value::Float((0..self.sim.instances.len()).filter(|&i| self.sim.instances[i].parent == Some(target)).count() as f64)
+            }
+            "gethobjectbynum" => {
+                let target = self.resolve_arg(args.first())?;
+                let n = args.get(1).map(|v| v.as_float()).unwrap_or(0.0) as usize;
+                let kids: Vec<usize> = (0..self.sim.instances.len()).filter(|&i| self.sim.instances[i].parent == Some(target)).collect();
+                Value::Handle(kids.get(n).map(|&i| self.sim.instances[i].handle as f64).unwrap_or(0.0))
+            }
+            "getobjectclass" | "getnamebyhandle" => {
+                let target = self.resolve_arg(args.first())?;
+                let h = args.get(1).map(|v| v.as_float()).unwrap_or(0.0) as u16;
+                let child = (0..self.sim.instances.len()).find(|&i| self.sim.instances[i].parent == Some(target) && self.sim.instances[i].handle == h);
+                Value::Str(child.map(|i| if lower == "getobjectclass" { self.sim.instances[i].class_name.clone() } else { self.sim.instances[i].name.clone() }).unwrap_or_default())
+            }
+            "setobjectname" => {
+                let target = self.resolve_arg(args.first())?;
+                let h = args.get(1).map(|v| v.as_float()).unwrap_or(0.0) as u16;
+                let name = arg(2);
+                let child = (0..self.sim.instances.len()).find(|&i| self.sim.instances[i].parent == Some(target) && self.sim.instances[i].handle == h);
+                match child {
+                    Some(i) => {
+                        self.sim.instances[i].name = name;
+                        Value::Float(1.0)
+                    }
+                    None => Value::Float(0.0),
+                }
+            }
+            "getclassfile" => {
+                let class = arg(0);
+                Value::Str(self.sim.class_meta.iter().find(|c| c.name.eq_ignore_ascii_case(&class)).map(|c| {
+                    std::path::Path::new(&c.source).file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default()
+                }).unwrap_or_default())
+            }
+            "getvarcount" => {
+                let class = arg(0);
+                Value::Float(self.sim.class_meta.iter().find(|c| c.name.eq_ignore_ascii_case(&class)).map(|c| c.vars.len() as f64).unwrap_or(0.0))
+            }
+            // GetVarInfo(class, n, &name, &type, &default, &description)
+            "getvarinfo" => {
+                let class = arg(0);
+                let n = args.get(1).map(|v| v.as_float()).unwrap_or(0.0) as usize;
+                match self.sim.class_meta.iter().find(|c| c.name.eq_ignore_ascii_case(&class)).and_then(|c| c.vars.get(n)).cloned() {
+                    Some(v) => {
+                        let fx = &mut self.sim.effects;
+                        fx.outputs.push((2, Value::Str(v.name)));
+                        fx.outputs.push((3, Value::Str(v.var_type)));
+                        fx.outputs.push((4, Value::Str(v.default)));
+                        fx.outputs.push((5, Value::Str(v.description)));
+                        Value::Float(1.0)
+                    }
+                    None => Value::Float(0.0),
+                }
+            }
+            "getprojectclasses" => {
+                let names: Vec<String> = self.sim.class_meta.iter().map(|c| c.name.clone()).collect();
+                let h = self.sim.effects.arrays.new_array();
+                if let Some(arr) = self.sim.effects.arrays.get_mut(h) {
+                    for n in names {
+                        let mut el = crate::runtime::data::Element { type_name: "STRING".into(), ..Default::default() };
+                        el.set("", Value::Str(n));
+                        arr.push(el);
+                    }
+                }
+                Value::Handle(h as f64)
+            }
+            // GetModelText(class, HStream) — текст в поток; SetModelText — из потока
+            "getmodeltext" => {
+                let class = arg(0);
+                let h = args.get(1).map(|v| v.as_float()).unwrap_or(0.0) as u32;
+                let text = self.sim.class_meta.iter().find(|c| c.name.eq_ignore_ascii_case(&class)).map(|c| c.text.clone());
+                match (text, self.sim.effects.streams.items.get_mut(&h)) {
+                    (Some(t), Some(st)) => {
+                        let bytes = crate::formats::cp1251::encode(&t);
+                        let start = st.pos.min(st.data.len());
+                        st.data.truncate(start);
+                        st.data.extend_from_slice(&bytes);
+                        Value::Float(1.0)
+                    }
+                    _ => Value::Float(0.0),
+                }
+            }
+            "setmodeltext" => {
+                let class = arg(0);
+                let h = args.get(1).map(|v| v.as_float()).unwrap_or(0.0) as u32;
+                let Some(text) = self.sim.effects.streams.items.get(&h).map(|st| crate::formats::cp1251::decode(&st.data)) else { return Some(Value::Float(0.0)) };
+                match crate::lang::parse(&text) {
+                    Ok(m) => {
+                        if let Some(c) = self.sim.class_meta.iter_mut().find(|c| c.name.eq_ignore_ascii_case(&class)) {
+                            c.text = text;
+                        }
+                        Value::Float(if self.sim.hot_swap_text(&class, m) { 1.0 } else { 0.0 })
+                    }
+                    Err(e) => {
+                        self.sim.effects.log.push(format!("SetModelText {class}: {e}"));
+                        Value::Float(0.0)
+                    }
+                }
+            }
+            "setvarstodefault" => {
+                let target = self.resolve_arg(args.first())?;
+                let class = self.sim.instances[target].class;
+                let meta = self.sim.class_meta.get(class).cloned();
+                if let Some(meta) = meta {
+                    for v in &meta.vars {
+                        if let Some(&c) = self.sim.instances[target].vars.get(&v.name.to_ascii_lowercase()) {
+                            self.sim.cells[c] = Value::parse_default(&v.default, self.sim.types[c]);
+                        }
+                    }
+                }
+                Value::Float(1.0)
+            }
+            "getcalcorder" => {
+                let target = self.resolve_arg(args.first())?;
+                let h = args.get(1).map(|v| v.as_float()).unwrap_or(0.0) as u16;
+                let kids: Vec<usize> = (0..self.sim.instances.len()).filter(|&i| self.sim.instances[i].parent == Some(target)).collect();
+                Value::Float(kids.iter().position(|&i| self.sim.instances[i].handle == h).map(|p| p as f64 + 1.0).unwrap_or(0.0))
+            }
+            "setcalcorder" | "createlink" | "removelink" | "setlinkvars" | "createobject" | "deleteobject" | "createclass" | "deleteclass" | "openclassscheme" | "closeclassscheme" | "loadobjectstate" | "saveobjectstate" | "loadproject" | "unloadproject" | "setactiveproject" => {
+                // перестройка схемы на ходу: принимаем без действия, о чём сообщаем один раз
+                *self.sim.effects.missing.entry(name.to_string()).or_insert(0) += 1;
+                Value::Float(0.0)
+            }
+            "getlink" => Value::Handle(0.0),
+            "getuniqueclassname" => {
+                let base = arg(0);
+                let mut n = 1;
+                while self.sim.class_meta.iter().any(|c| c.name.eq_ignore_ascii_case(&format!("{base}{n}"))) {
+                    n += 1;
+                }
+                Value::Str(format!("{base}{n}"))
+            }
+            "isprojectexist" => Value::Float(1.0),
             _ => {
                 let class = self.sim.classes.iter().position(|c| c.model.is_function && c.name.eq_ignore_ascii_case(name))?;
                 return Some(self.sim.call_function(class, args));

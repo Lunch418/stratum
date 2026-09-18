@@ -664,6 +664,10 @@ pub struct Gfx {
     pub pictures: BTreeMap<String, Picture>,
     /// Трёхмерные пространства; дескрипторы общие с двумерными.
     pub spaces3d: BTreeMap<Handle, space3d::Space3d>,
+    /// Буфер обмена `CopyToClipboard2d` (объект вместе с инструментами).
+    pub clipboard: Option<(Object, Option<Pen>, Option<Brush>)>,
+    /// Последний объект, попавший под мышь (`GetLastPrimary2d`).
+    pub last_primary: Handle,
     /// Папка проекта — здесь ищутся `.vdr`, `.bmp` и наборы иконок.
     pub project_dir: std::path::PathBuf,
     pub library_dirs: Vec<std::path::PathBuf>,
