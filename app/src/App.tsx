@@ -10,6 +10,7 @@ import { Messages } from './components/Messages';
 import { PathDialog } from './components/PathDialog';
 import { Graphs } from './components/Graphs';
 import { Graph } from './components/Graph';
+import { PictureEditor } from './components/PictureEditor';
 import { Debug } from './components/Debug';
 import { Help } from './components/Help';
 import { OpenDialog } from './components/OpenDialog';
@@ -56,7 +57,7 @@ export default function App() {
     s.load().then(() => {
       // #code/Имя, #model, #scheme — прямые ссылки на вкладку и имидж
       const [tab, name] = location.hash.slice(1).split('/');
-      if (tab === 'code' || tab === 'model' || tab === 'scheme' || tab === 'graph') s.setTab(tab);
+      if (tab === 'code' || tab === 'model' || tab === 'scheme' || tab === 'graph' || tab === 'picture' || tab === 'icon') s.setTab(tab);
       if (name) s.select(decodeURIComponent(name));
       if (useStore.getState().project?.empty) setDialog('open');
     }).catch(e => s.say({ level: 'error', where: 'ядро', text: String(e) }));
@@ -138,6 +139,8 @@ export default function App() {
     { id: 'tab-code', title: 'Вкладка: Код', hint: 'Ctrl+E', group: 'вид', run: () => s.setTab('code') },
     { id: 'tab-model', title: 'Вкладка: Окно модели', group: 'вид', run: () => s.setTab('model') },
     { id: 'tab-graph', title: 'Вкладка: Граф зависимостей', group: 'вид', run: () => s.setTab('graph') },
+    { id: 'tab-picture', title: 'Вкладка: Рисунок имиджа', group: 'вид', run: () => s.setTab('picture') },
+    { id: 'tab-icon', title: 'Вкладка: Иконка имиджа', group: 'вид', run: () => s.setTab('icon') },
     { id: 'bottom-graphs', title: 'Панель: Графики', group: 'вид', run: () => s.setBottomTab('graphs') },
     { id: 'bottom-messages', title: 'Панель: Сообщения', group: 'вид', run: () => s.setBottomTab('messages') },
     { id: 'theme', title: s.theme === 'light' ? 'Тёмная тема' : 'Светлая тема', group: 'вид', run: s.toggleTheme },
@@ -201,6 +204,8 @@ export default function App() {
             <button className={s.tab === 'scheme' ? 'active' : ''} onClick={() => s.setTab('scheme')}>Схема</button>
             <button className={s.tab === 'code' ? 'active' : ''} onClick={() => s.setTab('code')}>Код{s.selectedClass ? ` · ${s.selectedClass}` : ''}</button>
             <button className={s.tab === 'model' ? 'active' : ''} onClick={() => s.setTab('model')}>Окно модели{frame?.windows.length ? ` (${frame.windows.length})` : ''}</button>
+            <button className={s.tab === 'picture' ? 'active' : ''} onClick={() => s.setTab('picture')}>Рисунок{s.selectedClass ? ` · ${s.selectedClass}` : ''}</button>
+            <button className={s.tab === 'icon' ? 'active' : ''} onClick={() => s.setTab('icon')}>Иконка</button>
             <button className={s.tab === 'graph' ? 'active' : ''} onClick={() => s.setTab('graph')}>Граф</button>
           </div>
           {frame?.halt && (
@@ -221,6 +226,8 @@ export default function App() {
             {s.tab === 'code' && <CodeEditor />}
             {s.tab === 'model' && <ModelView />}
             {s.tab === 'graph' && <Graph />}
+            {s.tab === 'picture' && <PictureEditor kind="image" />}
+            {s.tab === 'icon' && <PictureEditor kind="icon" />}
           </div>
         </section>
         <aside className="right">

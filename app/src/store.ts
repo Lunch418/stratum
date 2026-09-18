@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { api, type ClassInfo, type Frame, type Instance, type Project } from './api';
 
-export type Tab = 'scheme' | 'code' | 'model' | 'graph';
+export type Tab = 'scheme' | 'code' | 'model' | 'graph' | 'picture' | 'icon';
 
 interface Message { level: 'info' | 'error'; where: string; text: string }
 

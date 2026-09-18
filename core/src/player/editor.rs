@@ -72,19 +72,38 @@ fn num(v: f64) -> String {
 
 /// Состояние для страницы: SVG всего листа (включая элементы схемы) и список объектов.
 pub fn state_json(sp: &Space, kind: Kind) -> String {
+    // лист общий для рисунка и схемы: иконки имиджей и линии связей
+    // (элементы схемы) показываются только в режиме схемы
     let mut shown = sp.clone();
     for o in shown.objects.values_mut() {
-        o.scheme_element = false;
+        if kind == Kind::Scheme || kind == Kind::Icon {
+            o.scheme_element = false;
+        }
     }
+    let editable = |o: &crate::gfx::Object| kind == Kind::Scheme || !o.scheme_element;
+    // SVG покрывает и лист, и всё, что лежит за его краями
+    let (mut x0, mut y0, mut x1, mut y1) = (sp.origin.0, sp.origin.1, sp.origin.0 + sp.client.0, sp.origin.1 + sp.client.1);
+    for o in sp.objects.values() {
+        if !matches!(o.shape, Shape::Group { .. }) && editable(o) {
+            x0 = x0.min(o.x);
+            y0 = y0.min(o.y);
+            x1 = x1.max(o.x + o.w);
+            y1 = y1.max(o.y + o.h);
+        }
+    }
+    shown.origin = (x0, y0);
+    shown.scale = (1.0, 1.0);
+    shown.client = ((x1 - x0).max(1.0), (y1 - y0).max(1.0));
     let svg = svg::render(&shown);
-    let objects: Vec<String> = sp.zorder.iter().filter_map(|h| sp.objects.get(h)).map(|o| super::api::object_json(sp, o)).collect();
+    let view = format!("[{},{},{},{}]", num(x0), num(y0), num(shown.client.0), num(shown.client.1));
+    let objects: Vec<String> = sp.zorder.iter().filter_map(|h| sp.objects.get(h)).filter(|o| editable(o)).map(|o| super::api::object_json(sp, o)).collect();
     let kind_name = match kind {
         Kind::Image => "image",
         Kind::Scheme => "scheme",
         Kind::Icon => "icon",
     };
     format!(
-        "{{\"kind\":\"{kind_name}\",\"origin\":[{},{}],\"client\":[{},{}],\"scale\":{},\"svg\":{},\"objects\":[{}]}}",
+        "{{\"kind\":\"{kind_name}\",\"origin\":[{},{}],\"client\":[{},{}],\"scale\":{},\"view\":{view},\"svg\":{},\"objects\":[{}]}}",
         num(sp.origin.0), num(sp.origin.1), num(sp.client.0), num(sp.client.1), num(sp.scale.0),
         super::json_string(&svg),
         objects.join(",")
