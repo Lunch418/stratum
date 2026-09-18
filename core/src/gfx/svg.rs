@@ -38,6 +38,20 @@ fn render_object(sp: &Space, h: Handle, out: &mut String) {
     if !o.visible || o.scheme_element {
         return;
     }
+    if o.alpha < 255 {
+        let _ = write!(out, "<g opacity=\"{:.3}\">\n", o.alpha as f64 / 255.0);
+        let mut plain = o.clone();
+        plain.alpha = 255;
+        let mut tmp = String::new();
+        render_shape(sp, &plain, h, &mut tmp);
+        out.push_str(&tmp);
+        out.push_str("</g>\n");
+        return;
+    }
+    render_shape(sp, o, h, out);
+}
+
+fn render_shape(sp: &Space, o: &super::Object, h: Handle, out: &mut String) {
     match &o.shape {
         Shape::Group { children } => {
             for c in children {

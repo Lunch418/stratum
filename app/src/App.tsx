@@ -15,9 +15,10 @@ export default function App() {
   const s = useStore();
   const frame = s.frame;
   const [dialog, setDialog] = useState<'saveAs' | 'export' | null>(null);
-  const [layout, setLayout] = useState(() => {
-    try { return { left: 260, right: 300, bottom: 160, ...JSON.parse(localStorage.getItem('layout') ?? '{}') }; }
-    catch { return { left: 260, right: 300, bottom: 160 }; }
+  const [layout, setLayout] = useState<{ left: number; right: number; bottom: number }>(() => {
+    const def = { left: 260, right: 300, bottom: 160 };
+    try { return { ...def, ...JSON.parse(localStorage.getItem('layout') ?? '{}') as Partial<typeof def> }; }
+    catch { return def; }
   });
   const [dragging, setDragging] = useState<'left' | 'right' | 'bottom' | null>(null);
   useEffect(() => { try { localStorage.setItem('layout', JSON.stringify(layout)); } catch { /* приватный режим */ } }, [layout]);

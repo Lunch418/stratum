@@ -135,11 +135,15 @@ pub struct Dib {
     pub mask: Vec<u8>,
     /// Имя файла базы иконок для ссылок (`SYSTEM.DBM`).
     pub file: Option<String>,
+    /// Двойная битовая карта (чанк 1007): у них своя нумерация
+    /// дескрипторов, независимая от обычных (1006).
+    pub double: bool,
 }
 
 /// Идентификаторы чанков. Инструменты (1004–1010) различаются по типу записи,
 /// поэтому здесь только те, что нужны разбору структуры.
 mod chunk {
+    pub const DOUBLE_DIBS: u16 = 1007;
     pub const TEXT_PARTS: u16 = 1011;
     pub const OBJECTS: u16 = 1020;
     pub const ZORDER: u16 = 1021;
@@ -246,7 +250,16 @@ fn read_chunk(r: &mut Reader, ctx: &Ctx, id: u16, pic: &mut Picture) -> Result<(
 fn read_item(r: &mut Reader, ctx: &Ctx, id: u16, pic: &mut Picture) -> Result<()> {
     let at = r.pos;
     let kind = r.u16()?;
-    let end = if ctx.sized { Some(at + r.u16()? as usize) } else { None };
+    // размер записи — u16; у растров (103/104) он не помещается, там u32
+    let end = if ctx.sized {
+        if matches!(kind, 103 | 104) {
+            Some(at + r.u32()? as usize)
+        } else {
+            Some(at + r.u16()? as usize)
+        }
+    } else {
+        None
+    };
     if id == chunk::OBJECTS {
         let (handle, flags, mut name);
         if ctx.sized {
@@ -276,12 +289,12 @@ fn read_item(r: &mut Reader, ctx: &Ctx, id: u16, pic: &mut Picture) -> Result<()
         }
         pic.objects.push(Object { handle, name, flags, kind: body });
     } else {
-        if ctx.sized && kind != 103 && kind != 104 {
+        if ctx.sized && !matches!(kind, 103 | 104) {
             r.u16()?;
         }
         let _refs = r.u16()?;
         let handle = r.u16()?;
-        let result = read_tool(r, ctx, kind, handle, pic);
+        let result = read_tool(r, ctx, kind, handle, pic, id == chunk::DOUBLE_DIBS);
         match (result, end) {
             (Ok(()), Some(end)) => r.pos = end,
             (Ok(()), None) => {}
@@ -356,7 +369,7 @@ fn read_object(r: &mut Reader, ctx: &Ctx, kind: u16) -> Result<ObjectKind> {
     })
 }
 
-fn read_tool(r: &mut Reader, ctx: &Ctx, kind: u16, handle: u16, pic: &mut Picture) -> Result<()> {
+fn read_tool(r: &mut Reader, ctx: &Ctx, kind: u16, handle: u16, pic: &mut Picture, double: bool) -> Result<()> {
     match kind {
         101 => pic.pens.push(Pen {
             handle,
@@ -421,11 +434,11 @@ fn read_tool(r: &mut Reader, ctx: &Ctx, kind: u16, handle: u16, pic: &mut Pictur
         34 => {
             r.bytes(34)?;
         }
-        110 | 111 => pic.dibs.push(Dib { handle, bmp: Vec::new(), mask: Vec::new(), file: Some(r.string()?) }),
+        110 | 111 => pic.dibs.push(Dib { handle, bmp: Vec::new(), mask: Vec::new(), file: Some(r.string()?), double }),
         103 | 104 => {
             let bmp = read_bmp(r)?;
             let mask = if kind == 104 { read_bmp(r)? } else { Vec::new() };
-            pic.dibs.push(Dib { handle, bmp, mask, file: None });
+            pic.dibs.push(Dib { handle, bmp, mask, file: None, double });
         }
         other => return r.err(format!("инструмент типа {other} не разобран")),
     }

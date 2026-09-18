@@ -75,12 +75,6 @@ export const useStore = create<State>((set, get) => ({
   setPaletteOpen: paletteOpen => set({ paletteOpen }),
   traceCount: 0,
   setTraceCount: traceCount => set({ traceCount }),
-  bottomTab: 'messages',
-  setBottomTab: bottomTab => set({ bottomTab }),
-  paletteOpen: false,
-  setPaletteOpen: paletteOpen => set({ paletteOpen }),
-  traceCount: 0,
-  setTraceCount: traceCount => set({ traceCount }),
   markUnsaved: () => set(s => ({ unsaved: true, project: s.project ? { ...s.project, canUndo: true, canRedo: false } : s.project })),
   reload: async () => {
     const project = await api.project();

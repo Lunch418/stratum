@@ -52,6 +52,61 @@ pub struct Dib {
     pub file: Option<String>,
     pub width: u32,
     pub height: u32,
+    /// Пиксели RGB после первого обращения по пикселям; `bmp` перекодируется
+    /// из них раз в такт (`Gfx::flush_dibs`), а не на каждый `SetDibPixel2d`.
+    pub pixels: Option<Vec<u8>>,
+    pub dirty: bool,
+}
+
+impl Dib {
+    pub fn new(bmp: Vec<u8>, mask: Vec<u8>, file: Option<String>) -> Self {
+        let (width, height) = bmp_size(&bmp);
+        Dib { bmp, mask, file, width, height, pixels: None, dirty: false }
+    }
+
+    fn ensure_pixels(&mut self) -> Option<()> {
+        if self.pixels.is_none() {
+            let (w, h, rgb) = decode_bmp(&self.bmp)?;
+            self.width = w;
+            self.height = h;
+            self.pixels = Some(rgb);
+        }
+        Some(())
+    }
+
+    pub fn pixel(&mut self, x: i64, y: i64) -> Option<u32> {
+        self.ensure_pixels()?;
+        if x < 0 || y < 0 || x >= self.width as i64 || y >= self.height as i64 {
+            return None;
+        }
+        let o = ((y as u32 * self.width + x as u32) * 3) as usize;
+        let p = self.pixels.as_ref()?;
+        Some(p[o] as u32 | (p[o + 1] as u32) << 8 | (p[o + 2] as u32) << 16)
+    }
+
+    pub fn set_pixel(&mut self, x: i64, y: i64, color: u32) -> Option<()> {
+        self.ensure_pixels()?;
+        if x < 0 || y < 0 || x >= self.width as i64 || y >= self.height as i64 {
+            return None;
+        }
+        let o = ((y as u32 * self.width + x as u32) * 3) as usize;
+        let p = self.pixels.as_mut()?;
+        p[o] = (color & 0xff) as u8;
+        p[o + 1] = ((color >> 8) & 0xff) as u8;
+        p[o + 2] = ((color >> 16) & 0xff) as u8;
+        self.dirty = true;
+        Some(())
+    }
+
+    /// Перекодирует изменённые пиксели в `bmp`.
+    pub fn flush(&mut self) {
+        if self.dirty {
+            if let Some(p) = &self.pixels {
+                self.bmp = encode_bmp24(self.width, self.height, p);
+            }
+            self.dirty = false;
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -79,6 +134,8 @@ pub struct Object {
     pub flags: u16,
     /// Иконка имиджа или линия связи: показывается только в редакторе схемы.
     pub scheme_element: bool,
+    /// Прозрачность 0–255 (`SetObjectAlpha2d`); 255 — непрозрачный.
+    pub alpha: u8,
     pub shape: Shape,
 }
 
@@ -97,6 +154,7 @@ impl Object {
             parent: None,
             flags: 0,
             scheme_element: false,
+            alpha: 255,
             shape,
         }
     }
@@ -185,10 +243,24 @@ impl Space {
                 .collect();
             self.texts.insert(t.handle as Handle, parts);
         }
-        for d in &pic.dibs {
+        // обычные растры сохраняют номера, двойные (своя нумерация в файле)
+        // получают новые, чтобы не перекрывать обычные
+        for d in pic.dibs.iter().filter(|d| !d.double) {
             self.reserve(d.handle as Handle);
-            let (width, height) = bmp_size(&d.bmp);
-            self.dibs.insert(d.handle as Handle, Dib { bmp: d.bmp.clone(), mask: d.mask.clone(), file: d.file.clone(), width, height });
+        }
+        for o in &pic.objects {
+            self.reserve(o.handle as Handle);
+        }
+        let mut double_map: BTreeMap<Handle, Handle> = BTreeMap::new();
+        for d in &pic.dibs {
+            let dib = Dib::new(d.bmp.clone(), d.mask.clone(), d.file.clone());
+            if d.double {
+                let h = self.alloc();
+                double_map.insert(d.handle as Handle, h);
+                self.dibs.insert(h, dib);
+            } else {
+                self.dibs.insert(d.handle as Handle, dib);
+            }
         }
         for o in &pic.objects {
             let h = o.handle as Handle;
@@ -200,7 +272,11 @@ impl Space {
                 ),
                 ObjectKind::Bitmap { x, y, w, h: hh, src, dib, masked } => Object::new(
                     h, *x, *y, *w, *hh,
-                    Shape::Bitmap { dib: *dib as Handle, src: *src, masked: *masked },
+                    Shape::Bitmap {
+                        dib: if *masked { double_map.get(&(*dib as Handle)).copied().unwrap_or(*dib as Handle) } else { *dib as Handle },
+                        src: *src,
+                        masked: *masked,
+                    },
                 ),
                 ObjectKind::Text { x, y, w, h: hh, text } => {
                     Object::new(h, *x, *y, *w, *hh, Shape::Text { text: *text as Handle })
@@ -486,6 +562,93 @@ pub fn bmp_size(bmp: &[u8]) -> (u32, u32) {
     }
 }
 
+/// Растровое изображение BMP → пиксели RGB построчно сверху вниз.
+/// Понимает 1/4/8 бит с палитрой, 24 и 32 бита без сжатия.
+pub fn decode_bmp(bmp: &[u8]) -> Option<(u32, u32, Vec<u8>)> {
+    if bmp.len() < 54 || &bmp[0..2] != b"BM" {
+        return None;
+    }
+    let u32_at = |i: usize| u32::from_le_bytes([bmp[i], bmp[i + 1], bmp[i + 2], bmp[i + 3]]);
+    let offset = u32_at(10) as usize;
+    let header = u32_at(14) as usize;
+    let w = u32_at(18) as i32;
+    let h_signed = u32_at(22) as i32;
+    let bpp = u16::from_le_bytes([bmp[28], bmp[29]]) as usize;
+    let compression = u32_at(30);
+    if compression != 0 && !(compression == 3 && bpp == 32) {
+        return None;
+    }
+    let (w, h) = (w.unsigned_abs(), h_signed.unsigned_abs());
+    let top_down = h_signed < 0;
+    let colors = if bpp <= 8 {
+        let n = u32_at(46) as usize;
+        if n == 0 { 1 << bpp } else { n }
+    } else {
+        0
+    };
+    let palette = &bmp[14 + header..];
+    let palette = &palette[..(colors * 4).min(palette.len())];
+    let stride = ((w as usize * bpp + 31) / 32) * 4;
+    let mut out = vec![0u8; (w * h) as usize * 3];
+    for row in 0..h as usize {
+        let src_row = if top_down { row } else { h as usize - 1 - row };
+        let line = bmp.get(offset + src_row * stride..offset + (src_row + 1) * stride)?;
+        for x in 0..w as usize {
+            let (r, g, b) = match bpp {
+                24 => (line[x * 3 + 2], line[x * 3 + 1], line[x * 3]),
+                32 => (line[x * 4 + 2], line[x * 4 + 1], line[x * 4]),
+                8 | 4 | 1 => {
+                    let idx = match bpp {
+                        8 => line[x] as usize,
+                        4 => ((line[x / 2] >> (if x % 2 == 0 { 4 } else { 0 })) & 15) as usize,
+                        _ => ((line[x / 8] >> (7 - x % 8)) & 1) as usize,
+                    };
+                    match palette.get(idx * 4..idx * 4 + 3) {
+                        Some(p) => (p[2], p[1], p[0]),
+                        None => (0, 0, 0),
+                    }
+                }
+                _ => return None,
+            };
+            let o = (row * w as usize + x) * 3;
+            out[o] = r;
+            out[o + 1] = g;
+            out[o + 2] = b;
+        }
+    }
+    Some((w, h, out))
+}
+
+/// Пиксели RGB (сверху вниз) → 24-битный BMP.
+pub fn encode_bmp24(w: u32, h: u32, rgb: &[u8]) -> Vec<u8> {
+    let stride = ((w as usize * 3 + 3) / 4) * 4;
+    let size = 54 + stride * h as usize;
+    let mut out = Vec::with_capacity(size);
+    out.extend_from_slice(b"BM");
+    out.extend_from_slice(&(size as u32).to_le_bytes());
+    out.extend_from_slice(&0u32.to_le_bytes());
+    out.extend_from_slice(&54u32.to_le_bytes());
+    out.extend_from_slice(&40u32.to_le_bytes());
+    out.extend_from_slice(&w.to_le_bytes());
+    out.extend_from_slice(&h.to_le_bytes());
+    out.extend_from_slice(&1u16.to_le_bytes());
+    out.extend_from_slice(&24u16.to_le_bytes());
+    out.extend_from_slice(&0u32.to_le_bytes());
+    out.extend_from_slice(&((stride * h as usize) as u32).to_le_bytes());
+    out.extend_from_slice(&[0u8; 16]);
+    for row in (0..h as usize).rev() {
+        let start = out.len();
+        for x in 0..w as usize {
+            let o = (row * w as usize + x) * 3;
+            out.push(rgb[o + 2]);
+            out.push(rgb[o + 1]);
+            out.push(rgb[o]);
+        }
+        out.resize(start + stride, 0);
+    }
+    out
+}
+
 /// Все окна и пространства модели.
 #[derive(Debug, Default)]
 pub struct Gfx {
@@ -562,6 +725,15 @@ impl Gfx {
             }
         }
         None
+    }
+
+    /// Переносит попиксельные правки растров в BMP; вызывается раз в такт.
+    pub fn flush_dibs(&mut self) {
+        for sp in self.spaces.values_mut() {
+            for d in sp.dibs.values_mut() {
+                d.flush();
+            }
+        }
     }
 
     /// Подгружает растры, заданные ссылкой на файл (`default.dbm` и т. п.).

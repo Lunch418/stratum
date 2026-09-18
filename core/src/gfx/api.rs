@@ -85,8 +85,8 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
         ),
 
         // ── пространство ──────────────────────────────────────────────────
-        "getspaceorg2dx" => num(gfx.space(h(args, 0)).map(|sp| sp.origin.0).unwrap_or(0.0)),
-        "getspaceorg2dy" => num(gfx.space(h(args, 0)).map(|sp| sp.origin.1).unwrap_or(0.0)),
+        "getspaceorgx" | "getspaceorg2dx" => num(gfx.space(h(args, 0)).map(|sp| sp.origin.0).unwrap_or(0.0)),
+        "getspaceorgy" | "getspaceorg2dy" => num(gfx.space(h(args, 0)).map(|sp| sp.origin.1).unwrap_or(0.0)),
         "setspaceorg2d" => {
             let (x, y) = (f(args, 1), f(args, 2));
             ok(gfx.space_mut(h(args, 0)).map(|sp| sp.origin = (x, y)).is_some())
@@ -347,10 +347,7 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
         "createdib2d" | "createdoubledib2d" => {
             let file = s(args, 1);
             let data = gfx.find_file(&file).and_then(|p| std::fs::read(p).ok());
-            handle(gfx.space_mut(h(args, 0)).map(|sp| {
-                let (width, height) = data.as_deref().map(super::bmp_size).unwrap_or((0, 0));
-                sp.add_dib(Dib { bmp: data.unwrap_or_default(), mask: Vec::new(), file: Some(file), width, height })
-            }).unwrap_or(0))
+            handle(gfx.space_mut(h(args, 0)).map(|sp| sp.add_dib(Dib::new(data.unwrap_or_default(), Vec::new(), Some(file)))).unwrap_or(0))
         }
         "createbitmap2d" | "createdoublebitmap2d" => {
             let (dib, x, y) = (h(args, 1), f(args, 2), f(args, 3));
@@ -445,6 +442,48 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
         }).unwrap_or_default()),
         "enablecontrol2d" | "checkdlgbutton2d" | "setcontrolstyle2d" | "setcontrolfont2d" => ok(object(gfx, args).is_some()),
         "isdlgbuttonchecked2d" | "getcontrolstyle2d" => num(0.0),
+        // CreateControlObject2d(HSpace, ClassName, Text, Style, x, y, w, h)
+        "createcontrolobject2d" => {
+            let (class, text, style) = (s(args, 1), s(args, 2), f(args, 3) as u32);
+            let (x, y, w, hh) = (f(args, 4), f(args, 5), f(args, 6), f(args, 7));
+            handle(gfx.space_mut(h(args, 0)).map(|sp| {
+                sp.add_object(Object::new(0, x, y, w, hh, Shape::Control { class, caption: text.clone(), style, text }))
+            }).unwrap_or(0))
+        }
+
+        // ── прозрачность и растр по пикселям ─────────────────────────────
+        "setobjectalpha2d" => {
+            let a = f(args, 2).clamp(0.0, 255.0) as u8;
+            ok(object_mut(gfx, args).map(|o| o.alpha = a).is_some())
+        }
+        "getobjectsize2dx" | "getactualwidth2d" => num(object(gfx, args).map(|o| o.w).unwrap_or(0.0)),
+        "getobjectsize2dy" | "getactualheight2d" => num(object(gfx, args).map(|o| o.h).unwrap_or(0.0)),
+        "getschemeobject" | "framegetpos2d" => num(0.0),
+        "audiosetvolume" | "audiosettone" | "beginwritevideo2d" | "endwritevideo2d" => ok(true),
+        "getobjectalpha2d" => num(object(gfx, args).map(|o| o.alpha as f64).unwrap_or(255.0)),
+        "getdibpixel2d" | "getddibpixel2d" => {
+            let (x, y) = (f(args, 2) as i64, f(args, 3) as i64);
+            let v = gfx.space_mut(h(args, 0)).and_then(|sp| sp.dibs.get_mut(&h(args, 1))).and_then(|d| d.pixel(x, y));
+            Value::Color(v.unwrap_or(0) as f64)
+        }
+        "setdibpixel2d" | "setddibpixel2d" => {
+            let (x, y, c) = (f(args, 2) as i64, f(args, 3) as i64, f(args, 4) as u32);
+            let done = gfx.space_mut(h(args, 0)).and_then(|sp| sp.dibs.get_mut(&h(args, 1))).and_then(|d| d.set_pixel(x, y, c));
+            ok(done.is_some())
+        }
+
+        // ── экран и рабочая область ───────────────────────────────────────
+        "getscreenwidth" => num(1440.0),
+        "getscreenheight" => num(900.0),
+        "getworkareax" | "getworkareay" => num(0.0),
+        "getworkareawidth" => num(1440.0),
+        "getworkareaheight" => num(860.0),
+        "getprojectdirectory" => Value::Str(gfx.project_dir.display().to_string()),
+
+        // ── принимаем без действия: градиенты, движок, строка состояния, звук ──
+        "setbrushpoints2d" | "setbrushcolors2d" | "setspacerenderengine2d" | "setstatustext" | "setlogstring2d"
+        | "sndplaysound" | "mcisendstring" | "videodialog" | "setspaceorg" => ok(true),
+        "system" => num(0.0),
 
         _ => return None,
     };

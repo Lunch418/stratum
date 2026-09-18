@@ -425,6 +425,7 @@ impl Simulation {
             self.run_instance(index)?;
         }
         self.tick += 1;
+        self.effects.gfx.flush_dibs();
         Ok(())
     }
 

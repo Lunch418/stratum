@@ -68,6 +68,11 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
         "arcsin" => num(f(args, 0).clamp(-1.0, 1.0).asin()),
         "arccos" => num(f(args, 0).clamp(-1.0, 1.0).acos()),
         "arctan" | "atan" => num(f(args, 0).atan()),
+        "getanglebyxy" => num(f(args, 1).atan2(f(args, 0))),
+        "fileexist" => num(if std::path::Path::new(&s(args, 0)).exists() { 1.0 } else { 0.0 }),
+        // диалог ввода строки: без окна возвращаем значение по умолчанию
+        "inputbox" => Value::Str(s(args, 2)),
+        "change" => Value::Str(s(args, 0).replace(&s(args, 1), &s(args, 2))),
         "exp" => num(f(args, 0).exp()),
         "ln" => num(safe_ln(f(args, 0))),
         "lg" => num(safe_log10(f(args, 0))),
