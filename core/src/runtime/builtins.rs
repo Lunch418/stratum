@@ -33,6 +33,10 @@ pub struct Effects {
     /// номер аргумента и новое значение; интерпретатор записывает их в
     /// переменные, переданные на этих позициях.
     pub outputs: Vec<(usize, Value)>,
+    /// Команды звука для плеера: (`play`|`stop`, файл, зациклить).
+    pub sounds: Vec<(String, String, bool)>,
+    /// Открытые через MCI псевдонимы: alias → файл.
+    pub mci: BTreeMap<String, String>,
 }
 
 impl Effects {
@@ -200,6 +204,46 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
         }
         "logmessage" => {
             fx.log.push(s(args, 0));
+            num(0.0)
+        }
+        // звук: SndPlaySound(file, flags) — SND_LOOP = 8; пустое имя останавливает
+        "sndplaysound" => {
+            let file = s(args, 0);
+            let flags = f(args, 1) as u32;
+            if file.is_empty() {
+                fx.sounds.push(("stop".into(), String::new(), false));
+            } else {
+                fx.sounds.push(("play".into(), file, flags & 8 != 0));
+            }
+            num(1.0)
+        }
+        // MCISendString: open <file> alias <x> / play <x> [repeat] / stop|close <x>
+        "mcisendstring" => {
+            let cmd = s(args, 0);
+            let words: Vec<&str> = cmd.split_whitespace().collect();
+            match words.first().map(|w| w.to_ascii_lowercase()).as_deref() {
+                Some("open") => {
+                    let file = words.get(1).unwrap_or(&"").to_string();
+                    let alias = words.iter().position(|w| w.eq_ignore_ascii_case("alias")).and_then(|i| words.get(i + 1)).unwrap_or(&file.as_str()).to_string();
+                    fx.mci.insert(alias.to_lowercase(), file);
+                }
+                Some("play") => {
+                    let alias = words.get(1).unwrap_or(&"").to_lowercase();
+                    if let Some(file) = fx.mci.get(&alias).cloned() {
+                        fx.sounds.push(("play".into(), file, words.iter().any(|w| w.eq_ignore_ascii_case("repeat"))));
+                    }
+                }
+                Some("stop") | Some("close") => {
+                    let alias = words.get(1).unwrap_or(&"").to_lowercase();
+                    if let Some(file) = fx.mci.get(&alias).cloned() {
+                        fx.sounds.push(("stop".into(), file, false));
+                    }
+                    if words[0].eq_ignore_ascii_case("close") {
+                        fx.mci.remove(&alias);
+                    }
+                }
+                _ => {}
+            }
             num(0.0)
         }
         "gettickcount" => num(0.0),

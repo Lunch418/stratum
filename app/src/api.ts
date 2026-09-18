@@ -17,6 +17,7 @@ export interface Breakpoint { id: number; index: number | null; path: string; cl
 export interface Frame {
   tick: number; running: boolean; stopped: boolean; canBack: boolean; halt: Halt | null;
   windows: { id: number; name: string; w: number; h: number; svg: string; controls: Control[] }[];
+  sounds: { cmd: 'play' | 'stop'; file: string; loop: boolean }[];
   log: string[];
 }
 export interface Trace { id: number; index: number; path: string; var: string; points: [number, number][] }

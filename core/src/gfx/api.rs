@@ -497,7 +497,7 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
 
         // ── принимаем без действия: градиенты, движок, строка состояния, звук ──
         "setbrushpoints2d" | "setbrushcolors2d" | "setspacerenderengine2d" | "setstatustext" | "setlogstring2d"
-        | "sndplaysound" | "mcisendstring" | "videodialog" | "setspaceorg" => ok(true),
+        | "videodialog" | "setspaceorg" => ok(true),
         "system" => num(0.0),
 
         _ => return None,

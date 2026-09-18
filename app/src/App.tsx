@@ -5,7 +5,7 @@ import { SchemeCanvas } from './components/SchemeCanvas';
 import { CodeEditor } from './components/CodeEditor';
 import { Hierarchy } from './components/Hierarchy';
 import { Inspector } from './components/Inspector';
-import { ModelView } from './components/ModelView';
+import { ModelView, handleSounds } from './components/ModelView';
 import { Messages } from './components/Messages';
 import { PathDialog } from './components/PathDialog';
 import { Graphs } from './components/Graphs';
@@ -63,7 +63,7 @@ export default function App() {
   useEffect(() => {
     let alive = true;
     const poll = async () => {
-      try { const f = await api.frame(); if (alive) s.setFrame(f); } catch { /* ядро недоступно */ }
+      try { const f = await api.frame(); if (alive) { s.setFrame(f); handleSounds(f.sounds); } } catch { /* ядро недоступно */ }
       if (alive) setTimeout(poll, s.tab === 'model' ? 40 : 250);
     };
     poll();

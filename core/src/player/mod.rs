@@ -436,6 +436,32 @@ fn handle(mut stream: TcpStream, shared: &Arc<Mutex<Shared>>, static_dir: Option
             }
             ("200 OK", "text/plain", b"ok".to_vec())
         }
+        // файл проекта или библиотеки по имени (звук, картинки): ищется как
+        // ресурсы модели — в папке проекта и библиотек
+        ("GET", "/api/file") => {
+            let name = param(&query, "name").map(url_decode).unwrap_or_default();
+            let found = if name.is_empty() || name.contains("..") {
+                None
+            } else {
+                shared.lock().unwrap().sim.effects.gfx.find_file(&name)
+            };
+            match found.and_then(|p| std::fs::read(&p).ok().map(|d| (p, d))) {
+                Some((p, data)) => {
+                    let mime = match p.extension().and_then(|e| e.to_str()).map(|e| e.to_ascii_lowercase()).as_deref() {
+                        Some("wav") => "audio/wav",
+                        Some("mp3") => "audio/mpeg",
+                        Some("ogg") => "audio/ogg",
+                        Some("mid") | Some("midi") => "audio/midi",
+                        Some("bmp") => "image/bmp",
+                        Some("png") => "image/png",
+                        Some("jpg") | Some("jpeg") => "image/jpeg",
+                        _ => "application/octet-stream",
+                    };
+                    ("200 OK", mime, data)
+                }
+                None => ("404 Not Found", "text/plain", b"no such file".to_vec()),
+            }
+        }
         (m, p) if p.starts_with("/api/") => {
             let r = api::handle(m, p, &query, &body_text, shared);
             (r.status, r.mime, r.body.into_bytes())
@@ -562,7 +588,9 @@ pub(crate) fn json_string(s: &str) -> String {
 }
 
 fn frame_json(shared: &Arc<Mutex<Shared>>) -> String {
-    let s = shared.lock().unwrap();
+    let mut s = shared.lock().unwrap();
+    let pending_sounds = std::mem::take(&mut s.sim.effects.sounds);
+    s.sim.effects.sounds = pending_sounds.clone();
     let gfx = &s.sim.effects.gfx;
     let mut windows = Vec::new();
     for (i, name) in gfx.window_order.iter().enumerate() {
@@ -600,6 +628,12 @@ fn frame_json(shared: &Arc<Mutex<Shared>>) -> String {
     if let Some(e) = &s.error {
         log.insert(0, json_string(&format!("ошибка: {e}")));
     }
+    // звук: страница проигрывает файлы через /api/file; очередь одноразовая
+    s.sim.effects.sounds.clear();
+    let sounds: Vec<String> = pending_sounds
+        .iter()
+        .map(|(cmd, file, looped)| format!("{{\"cmd\":{},\"file\":{},\"loop\":{looped}}}", json_string(cmd), json_string(file)))
+        .collect();
     let halt = match &s.halt {
         Some(h) => {
             let inst = h.instance.and_then(|i| s.sim.instances().get(i));
@@ -616,13 +650,14 @@ fn frame_json(shared: &Arc<Mutex<Shared>>) -> String {
         None => "null".into(),
     };
     format!(
-        "{{\"tick\":{},\"running\":{},\"stopped\":{},\"canBack\":{},\"halt\":{},\"windows\":[{}],\"log\":[{}]}}",
+        "{{\"tick\":{},\"running\":{},\"stopped\":{},\"canBack\":{},\"halt\":{},\"windows\":[{}],\"sounds\":[{}],\"log\":[{}]}}",
         s.sim.tick_number(),
         s.running,
         s.sim.stopped,
         !s.past.is_empty(),
         halt,
         windows.join(","),
+        sounds.join(","),
         log.join(",")
     )
 }
