@@ -560,33 +560,53 @@ impl Simulation {
         Some(self.cells[cell].clone())
     }
 
-    /// Путь к экземпляру: "" — сам, ".." — родитель, "..\имя" — брат,
-    /// "имя" — ребёнок или любой экземпляр с таким именем.
+    /// Путь к экземпляру (справка, «Путь»): "" — сам, ".." — родитель,
+    /// "\\" — корень, "Имя" — ребёнок в своей схеме, "#3" — ребёнок по
+    /// handle на схеме, "..\\Имя" — брат; последним может стоять "*" или
+    /// шаблон с "?" — тогда берётся первый подходящий.
     fn resolve_path(&self, from: usize, path: &str) -> Option<usize> {
         let path = path.trim().replace('/', "\\");
         if path.is_empty() {
             return Some(from);
         }
-        let mut current = from;
-        for part in path.split('\\') {
-            if part.is_empty() {
-                continue;
-            }
-            current = if part == ".." {
-                self.instances[current].parent?
-            } else {
-                let child = (0..self.instances.len()).find(|&i| {
-                    self.instances[i].parent == Some(current)
-                        && (self.instances[i].name.eq_ignore_ascii_case(part)
-                            || self.instances[i].class_name.eq_ignore_ascii_case(part))
-                });
-                match child {
-                    Some(c) => c,
-                    None => self.find(part)?,
-                }
+        let mut current = if let Some(rest) = path.strip_prefix('\\') {
+            let root = 0;
+            return self.walk_path(root, rest);
+        } else {
+            from
+        };
+        // относительный путь ищется в схеме текущего имиджа
+        if !path.starts_with("..") {
+            return self.walk_path(current, &path).or_else(|| self.find(&path));
+        }
+        for part in path.split('\\').filter(|p| !p.is_empty()) {
+            current = match part {
+                ".." => self.instances[current].parent?,
+                _ => self.child_named(current, part).or_else(|| self.find(part))?,
             };
         }
         Some(current)
+    }
+
+    fn walk_path(&self, mut current: usize, rest: &str) -> Option<usize> {
+        for part in rest.split('\\').filter(|p| !p.is_empty()) {
+            current = match part {
+                ".." => self.instances[current].parent?,
+                _ => self.child_named(current, part)?,
+            };
+        }
+        Some(current)
+    }
+
+    fn child_named(&self, parent: usize, part: &str) -> Option<usize> {
+        if let Some(h) = part.strip_prefix('#') {
+            let h: u16 = h.parse().ok()?;
+            return (0..self.instances.len()).find(|&i| self.instances[i].parent == Some(parent) && self.instances[i].handle == h);
+        }
+        (0..self.instances.len()).find(|&i| {
+            self.instances[i].parent == Some(parent)
+                && (glob_match(part, &self.instances[i].name) || glob_match(part, &self.instances[i].class_name))
+        })
     }
 
     pub fn run(&mut self, ticks: u64) -> Result<(), RuntimeError> {
@@ -598,6 +618,24 @@ impl Simulation {
         }
         Ok(())
     }
+}
+
+/// Шаблон с "*" и "?", без учёта регистра.
+fn glob_match(pattern: &str, text: &str) -> bool {
+    let (p, t): (Vec<char>, Vec<char>) = (
+        pattern.to_lowercase().chars().collect(),
+        text.to_lowercase().chars().collect(),
+    );
+    fn go(p: &[char], t: &[char]) -> bool {
+        match (p.first(), t.first()) {
+            (None, None) => true,
+            (Some('*'), _) => go(&p[1..], t) || (!t.is_empty() && go(p, &t[1..])),
+            (Some('?'), Some(_)) => go(&p[1..], &t[1..]),
+            (Some(a), Some(b)) if a == b => go(&p[1..], &t[1..]),
+            _ => false,
+        }
+    }
+    go(&p, &t)
 }
 
 /// Подходит ли зарегистрированное сообщение под пришедшее.
@@ -674,7 +712,7 @@ impl Vars for Frame<'_> {
         Some(match lower.as_str() {
             // GetClassName("") — имя своего класса, ".." — родителя
             "getclassname" => {
-                let target = self.resolve(&arg(0))?;
+                let target = self.resolve_arg(args.first())?;
                 Value::Str(self.sim.instances[target].class_name.clone())
             }
             "getclassdirectory" => {
@@ -742,7 +780,7 @@ impl Vars for Frame<'_> {
                 Value::Float(1.0)
             }
             "getvarf" | "getvars" | "getvarh" | "getvarc" => {
-                let target = self.resolve(&arg(0))?;
+                let target = self.resolve_arg(args.first())?;
                 let var = arg(1).to_ascii_lowercase();
                 let cell = self.sim.instances[target].vars.get(&var).copied();
                 match (lower.as_str(), cell) {
@@ -753,7 +791,7 @@ impl Vars for Frame<'_> {
                 }
             }
             "setvar" => {
-                let target = self.resolve(&arg(0))?;
+                let target = self.resolve_arg(args.first())?;
                 let var = arg(1).to_ascii_lowercase();
                 let value = args.get(2).cloned().unwrap_or(Value::Float(0.0));
                 match self.sim.instances[target].vars.get(&var).copied() {
@@ -852,13 +890,19 @@ impl Frame<'_> {
     /// Экземпляр по пути: "" — сам, ".." — родитель, иначе имя класса или
     /// экземпляра на схеме.
     fn resolve(&self, path: &str) -> Option<usize> {
-        let path = path.trim();
-        if path.is_empty() {
-            return Some(self.instance);
+        self.sim.resolve_path(self.instance, path)
+    }
+
+    /// Первый аргумент — путь строкой или дескриптор экземпляра
+    /// (то, что вернул `GetHObject`/`GetHObjectByName`).
+    fn resolve_arg(&self, arg: Option<&Value>) -> Option<usize> {
+        match arg {
+            Some(Value::Handle(h)) | Some(Value::Float(h)) => {
+                let i = *h as usize;
+                (i < self.sim.instances.len()).then_some(i)
+            }
+            Some(v) => self.resolve(&v.as_string()),
+            None => Some(self.instance),
         }
-        if path == ".." {
-            return self.sim.instances[self.instance].parent;
-        }
-        self.sim.find(path)
     }
 }
