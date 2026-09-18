@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, type Variable } from '../api';
 import { classByName, useStore } from '../store';
+import { ObjectProps } from './ObjectProps';
 
 export function Inspector() {
   const project = useStore(s => s.project);
@@ -117,6 +118,7 @@ export function Inspector() {
             </div>
           )}
         </div>
+        <ObjectProps />
         {instance !== null && (
           <>
             <div className="panel-title">Наблюдение <span className="spacer" /><span className="muted">{watches.length}</span></div>

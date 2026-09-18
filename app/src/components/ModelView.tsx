@@ -51,7 +51,7 @@ export function ModelView() {
   }, [frame]);
 
   if (!frame?.windows.length) return <div className="model"><div className="muted" style={{ color: '#eee' }}>Модель не открыла окон — нажмите Пуск или Шаг.</div></div>;
-  return <div className="model" ref={host} tabIndex={0}
+  return <div className="model" ref={host} tabIndex={0} title="Alt+щелчок — свойства объекта в инспекторе"
     onKeyDown={e => { e.preventDefault(); api.event(`type=key&msg=256&vk=${e.keyCode}`); }}
     onKeyUp={e => api.event(`type=key&msg=257&vk=${e.keyCode}`)} />;
 }
@@ -153,7 +153,26 @@ function attach(div: HTMLDivElement, name: string) {
     api.event(`type=mouse&win=${encodeURIComponent(name)}&msg=${msg}&x=${x.toFixed(2)}&y=${y.toFixed(2)}&keys=${keys}`);
   };
   body.onmousemove = e => send(512, e);
-  body.onmousedown = e => { (div.closest('.model') as HTMLElement)?.focus(); send(e.button === 0 ? 513 : e.button === 2 ? 516 : 519, e); };
+  body.onmousedown = e => {
+    (div.closest('.model') as HTMLElement)?.focus();
+    // Alt+щелчок — выбрать объект для инспектора, не отдавая событие модели
+    if (e.altKey && e.button === 0) {
+      e.preventDefault();
+      const svg = body.querySelector('svg');
+      if (!svg) return;
+      const r = svg.getBoundingClientRect();
+      const vb = svg.viewBox.baseVal;
+      // координаты страницы → координаты пространства (как в svg::render)
+      const px = (e.clientX - r.left) * (vb.width / r.width), py = (e.clientY - r.top) * (vb.height / r.height);
+      const g = svg.querySelector('g[transform]');
+      const m = g?.getAttribute('transform')?.match(/translate\(([-\d.e]+) ([-\d.e]+)\) scale\(([-\d.e]+)\)/);
+      const [ox, oy, k] = m ? [Number(m[1]), Number(m[2]), Number(m[3])] : [0, 0, 1];
+      const x = (px - ox) / k, y = (py - oy) / k;
+      api.objectAt(name, x, y).then(o => useStore.getState().pickObject(o ? { win: name, handle: o.handle } : null));
+      return;
+    }
+    send(e.button === 0 ? 513 : e.button === 2 ? 516 : 519, e);
+  };
   body.onmouseup = e => send(e.button === 0 ? 514 : e.button === 2 ? 517 : 520, e);
   body.ondblclick = e => send(515, e);
   body.oncontextmenu = e => e.preventDefault();

@@ -35,6 +35,9 @@ interface State {
   traceCount: number;
   setTraceCount: (n: number) => void;
   openProject: (path: string) => Promise<void>;
+  /// выбранный графический объект окна модели
+  pickedObject: { win: string; handle: number } | null;
+  pickObject: (p: { win: string; handle: number } | null) => void;
   helpTopic: string | null;
   setHelpTopic: (t: string | null) => void;
   unsaved: boolean;
@@ -85,6 +88,8 @@ export const useStore = create<State>((set, get) => ({
     await get().refreshInstances();
     get().showToast('Проект открыт');
   },
+  pickedObject: null,
+  pickObject: pickedObject => set({ pickedObject }),
   helpTopic: null,
   setHelpTopic: helpTopic => set({ helpTopic }),
   markUnsaved: () => set(s => ({ unsaved: true, project: s.project ? { ...s.project, canUndo: true, canRedo: false } : s.project })),

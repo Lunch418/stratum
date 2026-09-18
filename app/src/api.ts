@@ -22,6 +22,11 @@ export interface Frame {
 }
 export interface Trace { id: number; index: number; path: string; var: string; points: [number, number][] }
 export interface Control { handle: number; class: string; text: string; style: number; checked: boolean; enabled: boolean; x: number; y: number; w: number; h: number }
+export interface ObjectProps {
+  handle: number; name: string; kind: string; x: number; y: number; w: number; h: number; angle: number; visible: boolean; alpha: number;
+  zorder: number | null; parent: number | null; pen?: { color: string; width: number; style: number }; brush?: { color: string; style: number };
+  points?: [number, number][]; text?: string; class?: string; children?: number;
+}
 export interface ParseError { line: number; column: number; message: string }
 
 async function get<T>(url: string): Promise<T> {
@@ -115,6 +120,10 @@ export const api = {
     return j as { ok: boolean; dir: string };
   },
   newProject: async () => { await fetch('/api/new', { method: 'POST' }); },
+  objectAt: (win: string, x: number, y: number) => get<ObjectProps | null>(`/api/object?win=${encodeURIComponent(win)}&x=${x}&y=${y}`),
+  object: (win: string, handle: number) => get<ObjectProps | null>(`/api/object?win=${encodeURIComponent(win)}&handle=${handle}`),
+  objectSet: (win: string, handle: number, field: string, value: string | number) =>
+    fetch(`/api/object/set?win=${encodeURIComponent(win)}&handle=${handle}&field=${field}&value=${encodeURIComponent(String(value))}`, { method: 'POST' }),
   undo: () => fetch('/api/undo', { method: 'POST' }).then(r => r.json() as Promise<{ ok: boolean; canUndo: boolean; canRedo: boolean }>),
   redo: () => fetch('/api/redo', { method: 'POST' }).then(r => r.json() as Promise<{ ok: boolean; canUndo: boolean; canRedo: boolean }>),
   setValue: (index: number, name: string, value: string) =>

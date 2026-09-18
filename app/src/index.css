@@ -222,6 +222,13 @@ button.attention { border-color: var(--state-pause); }
 .line-error { background: rgba(201, 59, 59, 0.18); }
 .line-halt { background: var(--accent-soft); }
 
+.props { padding: 6px 10px; font-size: 12px; display: flex; flex-direction: column; gap: 6px; }
+.prop { display: flex; align-items: center; gap: 6px; }
+.prop > span:first-child { color: var(--text-muted); min-width: 64px; }
+.prop input[type="number"], .prop input[type="text"] { flex: 1; min-width: 0; width: 100%; }
+.prop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; }
+.prop-grid .prop > span:first-child { min-width: 52px; }
+
 /* тосты */
 .toast { position: fixed; left: 50%; bottom: 36px; transform: translateX(-50%); background: var(--text-primary); color: var(--bg-surface); padding: 6px 14px; border-radius: var(--radius); font-size: 12px; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
 

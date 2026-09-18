@@ -667,6 +667,72 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
                 items.join(",")
             ))
         }
+        // графический объект окна модели: по точке (x, y) или по handle
+        ("GET", ["object"]) => {
+            let get = |k: &str| super::param(query, k).map(super::url_decode);
+            let Some(win) = get("win") else { return error("400 Bad Request", "нужно окно win") };
+            let s = shared.lock().unwrap();
+            let gfx = &s.sim.effects.gfx;
+            let Some(space) = gfx.window_space(&win).and_then(|h| gfx.space(h)) else { return error("404 Not Found", "нет такого окна") };
+            let handle = match get("handle").and_then(|v| v.parse::<u32>().ok()) {
+                Some(h) => Some(h),
+                None => {
+                    let (x, y) = (get("x").and_then(|v| v.parse().ok()).unwrap_or(0.0), get("y").and_then(|v| v.parse().ok()).unwrap_or(0.0));
+                    space.object_at(x, y)
+                }
+            };
+            let Some(o) = handle.and_then(|h| space.objects.get(&h)) else { return json("null".into()) };
+            json(object_json(space, o))
+        }
+        ("POST", ["object", "set"]) => {
+            let get = |k: &str| super::param(query, k).map(super::url_decode);
+            let (Some(win), Some(handle), Some(field), Some(value)) = (get("win"), get("handle").and_then(|v| v.parse::<u32>().ok()), get("field"), get("value")) else {
+                return error("400 Bad Request", "нужны win, handle, field, value");
+            };
+            let mut s = shared.lock().unwrap();
+            let gfx = &mut s.sim.effects.gfx;
+            let Some(space) = gfx.window_space(&win).and_then(|h| gfx.space_mut(h)) else { return error("404 Not Found", "нет такого окна") };
+            let num: f64 = value.parse().unwrap_or(0.0);
+            let done = match field.as_str() {
+                "x" | "y" | "w" | "h" | "angle" | "visible" | "name" | "alpha" => space.objects.get_mut(&handle).map(|o| match field.as_str() {
+                    "x" => o.x = num,
+                    "y" => o.y = num,
+                    "w" => o.w = num.max(0.0),
+                    "h" => o.h = num.max(0.0),
+                    "angle" => o.angle = num,
+                    "visible" => o.visible = num != 0.0,
+                    "alpha" => o.alpha = num.clamp(0.0, 255.0) as u8,
+                    _ => o.name = value.clone(),
+                }).is_some(),
+                "pen.color" | "pen.width" | "pen.style" => {
+                    let pen = space.objects.get(&handle).and_then(|o| match &o.shape { crate::gfx::Shape::Polyline { pen, .. } => Some(*pen), _ => None });
+                    pen.and_then(|p| space.pens.get_mut(&p)).map(|p| match field.as_str() {
+                        "pen.color" => p.color = parse_color(&value),
+                        "pen.width" => p.width = num.max(0.0) as u16,
+                        _ => p.style = num.max(0.0) as u16,
+                    }).is_some()
+                }
+                "brush.color" | "brush.style" => {
+                    let brush = space.objects.get(&handle).and_then(|o| match &o.shape { crate::gfx::Shape::Polyline { brush, .. } => Some(*brush), _ => None });
+                    brush.and_then(|b| space.brushes.get_mut(&b)).map(|b| match field.as_str() {
+                        "brush.color" => b.color = parse_color(&value),
+                        _ => b.style = num.max(0.0) as u16,
+                    }).is_some()
+                }
+                "zorder" => {
+                    let n = (num.max(0.0) as usize).min(space.zorder.len().saturating_sub(1));
+                    if let Some(pos) = space.zorder.iter().position(|&h| h == handle) {
+                        let h = space.zorder.remove(pos);
+                        space.zorder.insert(n, h);
+                        true
+                    } else {
+                        false
+                    }
+                }
+                _ => false,
+            };
+            json(format!("{{\"ok\":{done}}}"))
+        }
         ("POST", ["undo"]) | ("POST", ["redo"]) => {
             let mut s = shared.lock().unwrap();
             let done = if parts[0] == "undo" { s.undo() } else { s.redo() };
@@ -761,6 +827,56 @@ fn help_dir() -> Option<std::path::PathBuf> {
         }
     }
     candidates.into_iter().find(|p| p.is_dir())
+}
+
+/// `#rrggbb` или число → COLORREF.
+fn parse_color(v: &str) -> u32 {
+    if let Some(hex) = v.strip_prefix('#') {
+        if let Ok(rgb) = u32::from_str_radix(hex, 16) {
+            return ((rgb & 0xFF) << 16) | (rgb & 0xFF00) | (rgb >> 16);
+        }
+    }
+    v.parse::<f64>().unwrap_or(0.0) as u32
+}
+
+/// Свойства графического объекта для инспектора.
+fn object_json(sp: &Space, o: &crate::gfx::Object) -> String {
+    use crate::gfx::Shape;
+    let kind = match &o.shape {
+        Shape::Polyline { .. } => "polyline",
+        Shape::Bitmap { .. } => "bitmap",
+        Shape::Text { .. } => "text",
+        Shape::Control { .. } => "control",
+        Shape::Group { .. } => "group",
+        Shape::View3d { .. } => "view3d",
+        Shape::Unknown => "unknown",
+    };
+    let mut extra = String::new();
+    match &o.shape {
+        Shape::Polyline { pen, brush, points } => {
+            if let Some(p) = sp.pens.get(pen) {
+                extra.push_str(&format!(",\"pen\":{{\"color\":{},\"width\":{},\"style\":{}}}", json_string(&svg::color(p.color)), p.width, p.style));
+            }
+            if let Some(b) = sp.brushes.get(brush) {
+                extra.push_str(&format!(",\"brush\":{{\"color\":{},\"style\":{}}}", json_string(&svg::color(b.color)), b.style));
+            }
+            let pts: Vec<String> = points.iter().map(|(x, y)| format!("[{},{}]", num(*x), num(*y))).collect();
+            extra.push_str(&format!(",\"points\":[{}]", pts.join(",")));
+        }
+        Shape::Text { text } => {
+            let t: String = sp.texts.get(text).map(|parts| parts.iter().filter_map(|p| sp.strings.get(&p.string).cloned()).collect::<Vec<_>>().join("")).unwrap_or_default();
+            extra.push_str(&format!(",\"text\":{}", json_string(&t)));
+        }
+        Shape::Control { class, text, .. } => extra.push_str(&format!(",\"class\":{},\"text\":{}", json_string(class), json_string(text))),
+        Shape::Group { children } => extra.push_str(&format!(",\"children\":{}", children.len())),
+        _ => {}
+    }
+    let z = sp.zorder.iter().position(|&h| h == o.handle).map(|z| z.to_string()).unwrap_or("null".into());
+    format!(
+        "{{\"handle\":{},\"name\":{},\"kind\":{},\"x\":{},\"y\":{},\"w\":{},\"h\":{},\"angle\":{},\"visible\":{},\"alpha\":{},\"zorder\":{},\"parent\":{}{}}}",
+        o.handle, json_string(&o.name), json_string(kind), num(o.x), num(o.y), num(o.w), num(o.h), num(o.angle), o.visible, o.alpha, z,
+        o.parent.map(|p| p.to_string()).unwrap_or("null".into()), extra
+    )
 }
 
 fn bounds_json(sp: &Space) -> String {
