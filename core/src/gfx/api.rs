@@ -78,6 +78,8 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
         "setwindoworg" | "setwindowpos" | "setwindowtitle" | "setwindowprop" | "bringwindowtotop"
         | "setwindowtransparent" | "setwindowtransparentcolor" => ok(window_space(gfx, &s(args, 0)).is_some()),
         "getwindoworgx" | "getwindoworgy" | "getwindowwidth" | "getwindowheight" => num(0.0),
+        // GetWindowProp(name, prop): "hwnd" и прочие свойства ОС нам недоступны
+        "getwindowprop" => num(0.0),
         "getwindowname" => Value::Str(
             gfx.space(h(args, 0)).map(|sp| sp.window.clone()).unwrap_or_default(),
         ),
@@ -266,6 +268,9 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
         "setbrushhatch2d" => { let ht = f(args, 2) as u16; ok(brush_mut(gfx, args).map(|b| b.hatch = ht).is_some()) }
         "setbrushrop2d" => { let r = f(args, 2) as u16; ok(brush_mut(gfx, args).map(|b| b.rop = r).is_some()) }
         "getbrushcolor2d" => num(brush(gfx, args).map(|b| b.color as f64).unwrap_or(0.0)),
+        "getbrushhatch2d" => num(brush(gfx, args).map(|b| b.hatch as f64).unwrap_or(0.0)),
+        "getbrushrop2d" => num(brush(gfx, args).map(|b| b.rop as f64).unwrap_or(0.0)),
+        "getpenrop2d" => num(pen(gfx, args).map(|p| p.rop as f64).unwrap_or(0.0)),
         "getbrushstyle2d" => num(brush(gfx, args).map(|b| b.style as f64).unwrap_or(0.0)),
         "deletetool2d" => {
             let tool = h(args, 2);

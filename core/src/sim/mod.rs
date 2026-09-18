@@ -105,6 +105,10 @@ pub mod wm {
 pub struct Simulation {
     classes: Vec<CompiledClass>,
     pub registrations: Vec<Registration>,
+    /// Описания имиджей — для экземпляров, создаваемых на ходу (функции).
+    class_meta: Vec<Class>,
+    /// Экземпляр-«стек» для каждого имиджа-функции (по номеру класса).
+    function_instances: HashMap<usize, usize>,
     /// Нажатые сейчас виртуальные клавиши (для `GetAsyncKeyState`).
     pub keys_down: std::collections::HashSet<u32>,
     /// Папка файла каждого имиджа (имя в нижнем регистре) — для
@@ -177,6 +181,8 @@ impl Simulation {
         let mut sim = Simulation {
             classes,
             registrations: Vec::new(),
+            class_meta: project.classes.clone(),
+            function_instances: HashMap::new(),
             keys_down: std::collections::HashSet::new(),
             class_dirs: HashMap::new(),
             instances: Vec::new(),
@@ -448,7 +454,8 @@ impl Simulation {
         }
         self.effects.clear_exit();
         let result = {
-            let mut frame = Frame { sim: self, instance: index };
+            let immediate = self.classes[class].model.is_function;
+            let mut frame = Frame { sim: self, instance: index, immediate };
             let mut interp = Interpreter::new();
             interp.run(&body, &mut frame).map(|_| ())
         };
@@ -616,6 +623,8 @@ fn covers(sp: &crate::gfx::Space, wanted: crate::gfx::Handle, under: Option<crat
 struct Frame<'a> {
     sim: &'a mut Simulation,
     instance: usize,
+    /// Имидж-функция: присваивание видно сразу, без фаз.
+    immediate: bool,
 }
 
 impl Vars for Frame<'_> {
@@ -634,6 +643,9 @@ impl Vars for Frame<'_> {
         match self.sim.instances[self.instance].vars.get(&key).copied() {
             Some(cell) => {
                 self.sim.cells[cell] = value.cast_to(self.sim.types[cell]);
+                if self.immediate {
+                    self.sim.old[cell] = self.sim.cells[cell].clone();
+                }
             }
             None => {
                 let cell = self.sim.cells.len();
@@ -752,8 +764,87 @@ impl Vars for Frame<'_> {
                     None => Value::Float(0.0),
                 }
             }
-            _ => return None,
+            _ => {
+                let class = self.sim.classes.iter().position(|c| c.model.is_function && c.name.eq_ignore_ascii_case(name))?;
+                return Some(self.sim.call_function(class, args));
+            }
         })
+    }
+}
+
+impl Simulation {
+    /// Вызов имиджа-функции: параметры по порядку объявления, текст,
+    /// значение `return`.
+    fn call_function(&mut self, class: usize, args: &[Value]) -> Value {
+        let index = match self.function_instances.get(&class) {
+            Some(&i) => i,
+            None => {
+                let meta = self.class_meta[class].clone();
+                let Ok(i) = self.add_instance_bare(&meta) else { return Value::Float(0.0) };
+                self.function_instances.insert(class, i);
+                i
+            }
+        };
+        let params: Vec<String> = self.classes[class]
+            .model
+            .declarations
+            .iter()
+            .filter(|d| d.parameter)
+            .flat_map(|d| d.names.clone())
+            .collect();
+        for (name, value) in params.iter().zip(args) {
+            self.set_var(index, name, value.clone());
+        }
+        let body = std::sync::Arc::clone(&self.classes[class].body);
+        let mut frame = Frame { sim: self, instance: index, immediate: true };
+        let mut interp = Interpreter::new();
+        match interp.run(&body, &mut frame) {
+            Ok(interp::Flow::Return(Some(v))) => v,
+            _ => Value::Float(0.0),
+        }
+    }
+
+    /// Экземпляр без родителя и схемы — для имиджей-функций.
+    fn add_instance_bare(&mut self, cls: &Class) -> Result<usize, BuildError> {
+        let class = self.class_index(&cls.name).ok_or_else(|| BuildError::MissingRoot(cls.name.clone()))?;
+        let index = self.instances.len();
+        let mut instance = Instance {
+            name: cls.name.clone(),
+            class_name: cls.name.clone(),
+            path: format!("<{}>", cls.name),
+            parent: None,
+            handle: 0,
+            class,
+            vars: HashMap::new(),
+            order: Vec::new(),
+        };
+        for v in &cls.vars {
+            let ty = ValueType::from_name(&v.var_type);
+            let cell = self.cells.len();
+            self.cells.push(Value::parse_default(&v.default, ty));
+            self.old.push(ty.default_value());
+            self.types.push(ty);
+            if instance.vars.insert(v.name.to_ascii_lowercase(), cell).is_none() {
+                instance.order.push(v.name.clone());
+            }
+        }
+        for decl in self.classes[class].model.declarations.clone() {
+            let ty = ValueType::from_name(&decl.var_type);
+            for name in &decl.names {
+                let key = name.to_ascii_lowercase();
+                if instance.vars.contains_key(&key) {
+                    continue;
+                }
+                let cell = self.cells.len();
+                self.cells.push(ty.default_value());
+                self.old.push(ty.default_value());
+                self.types.push(ty);
+                instance.vars.insert(key, cell);
+                instance.order.push(name.clone());
+            }
+        }
+        self.instances.push(instance);
+        Ok(index)
     }
 }
 
