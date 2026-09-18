@@ -477,7 +477,12 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
             fx.outputs.push((5, num(h)));
             boolean(true)
         }
-        _ => return crate::gfx::api::call(name, args, &mut fx.gfx),
+        _ => {
+            if let Some(v) = crate::gfx::api3d::call(name, args, &mut fx.gfx, &mut fx.matrices, &mut fx.outputs) {
+                return Some(v);
+            }
+            return crate::gfx::api::call(name, args, &mut fx.gfx);
+        }
     };
     let _ = format_number; // используется в Display значения
     Some(v)

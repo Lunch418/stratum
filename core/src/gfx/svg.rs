@@ -13,7 +13,13 @@ fn esc(s: &str) -> String {
     s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
 }
 
+/// Рендер без доступа к трёхмерным пространствам: проекции рисуются рамкой.
 pub fn render(sp: &Space) -> String {
+    render_in(sp, None)
+}
+
+/// Рендер окна с трёхмерными проекциями.
+pub fn render_in(sp: &Space, gfx: Option<&super::Gfx>) -> String {
     let (w, h) = (sp.client.0.max(1.0), sp.client.1.max(1.0));
     let (ox, oy) = sp.origin;
     let k = sp.scale.0.max(0.001);
@@ -27,13 +33,13 @@ pub fn render(sp: &Space) -> String {
         -ox, -oy
     );
     for &hh in &sp.zorder {
-        render_object(sp, hh, &mut out);
+        render_object(sp, hh, &mut out, gfx);
     }
     out.push_str("</g>\n</svg>\n");
     out
 }
 
-fn render_object(sp: &Space, h: Handle, out: &mut String) {
+fn render_object(sp: &Space, h: Handle, out: &mut String, gfx: Option<&super::Gfx>) {
     let Some(o) = sp.objects.get(&h) else { return };
     if !o.visible || o.scheme_element {
         return;
@@ -43,19 +49,32 @@ fn render_object(sp: &Space, h: Handle, out: &mut String) {
         let mut plain = o.clone();
         plain.alpha = 255;
         let mut tmp = String::new();
-        render_shape(sp, &plain, h, &mut tmp);
+        render_shape(sp, &plain, h, &mut tmp, gfx);
         out.push_str(&tmp);
         out.push_str("</g>\n");
         return;
     }
-    render_shape(sp, o, h, out);
+    render_shape(sp, o, h, out, gfx);
 }
 
-fn render_shape(sp: &Space, o: &super::Object, h: Handle, out: &mut String) {
+fn render_shape(sp: &Space, o: &super::Object, h: Handle, out: &mut String, gfx: Option<&super::Gfx>) {
     match &o.shape {
         Shape::Group { children } => {
             for c in children {
-                render_object(sp, *c, out);
+                render_object(sp, *c, out, gfx);
+            }
+        }
+        Shape::View3d { space, camera } => {
+            let view = gfx.and_then(|g| g.spaces3d.get(space)).and_then(|s3| s3.cameras.get(camera).map(|c| (s3, c)));
+            match view {
+                Some((s3, cam)) => super::space3d::render_view(s3, cam, o.x, o.y, o.w, o.h, out),
+                None => {
+                    let _ = write!(
+                        out,
+                        "<rect x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" fill=\"#dde\" stroke=\"#99a\" data-handle=\"{h}\"/>\n",
+                        o.x, o.y, o.w, o.h
+                    );
+                }
             }
         }
         Shape::Polyline { pen, brush, points } => {

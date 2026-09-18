@@ -66,6 +66,11 @@ pub struct Instance {
 }
 
 impl Instance {
+    /// Номер описания имиджа в проекте (по имени класса).
+    fn class_index_in(&self, project: &LoadedProject) -> Option<usize> {
+        project.classes.iter().position(|c| c.name.eq_ignore_ascii_case(&self.class_name))
+    }
+
     pub fn var_names(&self) -> &[String] {
         &self.order
     }
@@ -229,6 +234,23 @@ impl Simulation {
         sim.expand(project, root, root_index, &mut merges)?;
         sim.apply_links(&merges);
         sim.order = (0..sim.instances.len()).collect();
+        sim.old = sim.cells.clone();
+        // служебные переменные со свойствами объекта на схеме (в оригинале
+        // заполняются по «Стоп» и попадают в снимок; у нас — всегда)
+        for i in 0..sim.instances.len() {
+            let (handle, name, class) = (sim.instances[i].handle, sim.instances[i].name.clone(), sim.instances[i].class_name.clone());
+            let pos = sim.instances[i].parent.and_then(|p| {
+                let parent_class = &project.classes[sim.instances[p].class_index_in(project)?];
+                parent_class.children.iter().find(|c| c.handle == handle).map(|c| (c.x, c.y))
+            });
+            sim.set_var(i, "_hobject", Value::Handle(handle as f64));
+            sim.set_var(i, "_objname", Value::Str(name));
+            sim.set_var(i, "_classname", Value::Str(class));
+            if let Some((x, y)) = pos {
+                sim.set_var(i, "orgx", Value::Float(x));
+                sim.set_var(i, "orgy", Value::Float(y));
+            }
+        }
         sim.apply_state(project);
         sim.old = sim.cells.clone();
         Ok(sim)

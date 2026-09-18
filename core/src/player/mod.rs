@@ -620,7 +620,7 @@ fn frame_json(shared: &Arc<Mutex<Shared>>) -> String {
             json_string(name),
             sp.client.0,
             sp.client.1,
-            json_string(&svg::render(sp)),
+            json_string(&svg::render_in(sp, Some(gfx))),
             controls.join(",")
         ));
     }

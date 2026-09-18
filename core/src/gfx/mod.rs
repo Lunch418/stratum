@@ -4,6 +4,8 @@
 //! 2D-функции языка ([`api`]). Рисование — отдельно ([`svg`]).
 
 pub mod api;
+pub mod api3d;
+pub mod space3d;
 pub mod svg;
 
 use crate::formats::vdr::{self, ObjectKind, Picture};
@@ -115,6 +117,8 @@ pub enum Shape {
     Bitmap { dib: Handle, src: (f64, f64, f64, f64), masked: bool },
     Text { text: Handle },
     Control { class: String, caption: String, style: u32, text: String, checked: bool, enabled: bool },
+    /// Проекция трёхмерного пространства через камеру.
+    View3d { space: Handle, camera: Handle },
     Group { children: Vec<Handle> },
     Unknown,
 }
@@ -658,6 +662,8 @@ pub struct Gfx {
     /// Рисунки имиджей по имени класса (в нижнем регистре) — для
     /// `OpenSchemeWindow`.
     pub pictures: BTreeMap<String, Picture>,
+    /// Трёхмерные пространства; дескрипторы общие с двумерными.
+    pub spaces3d: BTreeMap<Handle, space3d::Space3d>,
     /// Папка проекта — здесь ищутся `.vdr`, `.bmp` и наборы иконок.
     pub project_dir: std::path::PathBuf,
     pub library_dirs: Vec<std::path::PathBuf>,
@@ -681,6 +687,16 @@ impl Gfx {
 
     pub fn window_space(&self, name: &str) -> Option<Handle> {
         self.windows.get(&name.to_lowercase()).copied()
+    }
+
+    pub fn create_space3d(&mut self, owner: Handle) -> Handle {
+        if self.next_space == 0 {
+            self.next_space = 1;
+        }
+        let h = self.next_space;
+        self.next_space += 1;
+        self.spaces3d.insert(h, space3d::Space3d::new(h, owner));
+        h
     }
 
     /// Создаёт окно с пустым пространством или возвращает существующее.

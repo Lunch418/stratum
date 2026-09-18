@@ -103,16 +103,19 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
         "lockspace2d" | "setspacerect2d" => ok(gfx.space(h(args, 0)).is_some()),
 
         // ── объекты: поиск и свойства ─────────────────────────────────────
+        // имена работают и для трёхмерных пространств (их дескрипторы общие)
         "getobject2dbyname" => {
             let name = s(args, 2);
-            handle(gfx.space(h(args, 0)).and_then(|sp| sp.find_by_name(&name)).unwrap_or(0))
+            handle(gfx.space(h(args, 0)).and_then(|sp| sp.find_by_name(&name))
+                .or_else(|| super::api3d::find_by_name(gfx, h(args, 0), &name))
+                .unwrap_or(0))
         }
         "getobjectname2d" => Value::Str(
-            object(gfx, args).map(|o| o.name.clone()).unwrap_or_default(),
+            object(gfx, args).map(|o| o.name.clone()).or_else(|| super::api3d::object_name(gfx, h(args, 0), h(args, 1))).unwrap_or_default(),
         ),
         "setobjectname2d" => {
             let name = s(args, 2);
-            ok(object_mut(gfx, args).map(|o| o.name = name).is_some())
+            ok(object_mut(gfx, args).map(|o| o.name = name.clone()).is_some() || super::api3d::set_name(gfx, h(args, 0), h(args, 1), &name))
         }
         "getobjecttype2d" => num(object(gfx, args).map(|o| match o.shape {
             Shape::Group { .. } => 3.0,
@@ -121,6 +124,7 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
             Shape::Bitmap { masked: true, .. } => 22.0,
             Shape::Text { .. } => 23.0,
             Shape::Control { .. } => 26.0,
+            Shape::View3d { .. } => 27.0,
             Shape::Unknown => 0.0,
         }).unwrap_or(0.0)),
         "getobjectorg2dx" => num(object(gfx, args).map(|o| o.x).unwrap_or(0.0)),
@@ -141,14 +145,14 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
             let (cx, cy, angle) = (f(args, 2), f(args, 3), f(args, 4));
             ok(gfx.space_mut(h(args, 0)).is_some_and(|sp| rotate(sp, h(args, 1), cx, cy, angle)))
         }
-        "hideobject2d" => ok(object_mut(gfx, args).map(|o| o.visible = false).is_some()),
+        "hideobject2d" => ok(object_mut(gfx, args).map(|o| o.visible = false).is_some() || super::api3d::set_visible(gfx, h(args, 0), h(args, 1), false)),
         "setshowobject2d" => {
             let show = f(args, 2) != 0.0;
-            ok(object_mut(gfx, args).map(|o| o.visible = show).is_some())
+            ok(object_mut(gfx, args).map(|o| o.visible = show).is_some() || super::api3d::set_visible(gfx, h(args, 0), h(args, 1), show))
         }
         "getshowobject2d" => ok(object(gfx, args).is_some_and(|o| o.visible)),
-        "showobject2d" => ok(object_mut(gfx, args).map(|o| o.visible = true).is_some()),
-        "deleteobject2d" => ok(gfx.space_mut(h(args, 0)).is_some_and(|sp| sp.delete_object(h(args, 1)))),
+        "showobject2d" => ok(object_mut(gfx, args).map(|o| o.visible = true).is_some() || super::api3d::set_visible(gfx, h(args, 0), h(args, 1), true)),
+        "deleteobject2d" => ok(gfx.space_mut(h(args, 0)).is_some_and(|sp| sp.delete_object(h(args, 1))) || super::api3d::delete(gfx, h(args, 0), h(args, 1))),
         "objecttotop2d" => ok(gfx.space_mut(h(args, 0)).map(|sp| sp.to_top(h(args, 1))).is_some()),
         "objecttobottom2d" => ok(gfx.space_mut(h(args, 0)).map(|sp| sp.to_bottom(h(args, 1))).is_some()),
         "getzorder2d" => num(gfx.space(h(args, 0))

@@ -259,7 +259,7 @@ fn cmd_render(args: &[String]) -> Result<(), String> {
     for name in &gfx.window_order {
         let Some(space) = gfx.window_space(name).and_then(|h| gfx.space(h)) else { continue };
         let file = opts.out.join(format!("{}.svg", safe_name(name)));
-        std::fs::write(&file, stratum_core::gfx::svg::render(space))
+        std::fs::write(&file, stratum_core::gfx::svg::render_in(space, Some(&sim.effects.gfx)))
             .map_err(|e| format!("{}: {e}", file.display()))?;
         if opts.dump {
             for h in &space.zorder {
@@ -302,6 +302,7 @@ fn dump_object(space: &stratum_core::gfx::Space, h: stratum_core::gfx::Handle, d
         Shape::Bitmap { dib, src, .. } => format!("растр dib={dib} src={:?} есть={}", src, space.dibs.get(dib).map(|d| !d.bmp.is_empty()).unwrap_or(false)),
         Shape::Text { text } => format!("текст {text}"),
         Shape::Control { class, .. } => format!("контрол {class}"),
+        Shape::View3d { space, camera } => format!("проекция 3D пространства #{space}, камера #{camera}"),
         Shape::Group { children } => format!("группа из {}", children.len()),
         Shape::Unknown => "?".into(),
     };
