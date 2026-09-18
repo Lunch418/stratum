@@ -14,13 +14,14 @@ import { PictureEditor } from './components/PictureEditor';
 import { Debug } from './components/Debug';
 import { Help } from './components/Help';
 import { Search } from './components/Search';
+import { NewProjectDialog, InfoDialog } from './components/ProjectDialogs';
 import { OpenDialog } from './components/OpenDialog';
 import { Palette, type Command } from './components/Palette';
 
 export default function App() {
   const s = useStore();
   const frame = s.frame;
-  const [dialog, setDialog] = useState<'saveAs' | 'export' | 'open' | 'stateSave' | 'stateLoad' | null>(null);
+  const [dialog, setDialog] = useState<'saveAs' | 'export' | 'open' | 'stateSave' | 'stateLoad' | 'new' | 'info' | null>(null);
   const [menuOpen, setMenuOpen] = useState<'project' | 'model' | null>(null);
   const [layout, setLayout] = useState<{ left: number; right: number; bottom: number }>(() => {
     const def = { left: 260, right: 300, bottom: 160 };
@@ -135,7 +136,8 @@ export default function App() {
     { id: 'search', title: 'Поиск по проекту', hint: 'Ctrl+Shift+F', group: 'правка', run: () => s.setBottomTab('search') },
     { id: 'reset', title: 'Сброс', hint: 'Shift+F5', group: 'модель', run: () => api.event('type=reset').then(() => s.refreshInstances()) },
     { id: 'open', title: 'Открыть проект…', hint: 'Ctrl+O', group: 'проект', run: () => setDialog('open') },
-    { id: 'newproj', title: 'Новый проект', group: 'проект', run: async () => { await api.newProject(); await s.load(); } },
+    { id: 'newproj', title: 'Новый проект…', group: 'проект', run: () => setDialog('new') },
+    { id: 'info', title: 'Информация о проекте…', group: 'проект', run: () => setDialog('info') },
     { id: 'save', title: 'Сохранить проект', hint: 'Ctrl+S', group: 'проект', run: save },
     { id: 'saveas', title: 'Сохранить проект как…', group: 'проект', run: () => setDialog('saveAs') },
     { id: 'export', title: 'Экспорт в Stratum 2000…', group: 'проект', run: () => setDialog('export') },
@@ -178,7 +180,8 @@ export default function App() {
           {menuOpen === 'project' && (
             <div className="context menu" onMouseLeave={() => setMenuOpen(null)}>
               <button onClick={() => { setMenuOpen(null); setDialog('open'); }}>Открыть… <span className="muted">Ctrl+O</span></button>
-              <button onClick={async () => { setMenuOpen(null); await api.newProject(); await s.load(); }}>Новый проект</button>
+              <button onClick={() => { setMenuOpen(null); setDialog('new'); }}>Новый проект…</button>
+              <button onClick={() => { setMenuOpen(null); setDialog('info'); }}>Информация…</button>
               <button onClick={() => { setMenuOpen(null); setDialog('saveAs'); }}>Сохранить как…</button>
               <button onClick={() => { setMenuOpen(null); setDialog('export'); }}>Экспорт в Stratum 2000…</button>
             </div>
@@ -206,6 +209,8 @@ export default function App() {
           onClose={() => setDialog(null)}
           onSubmit={dir => { setDialog(null); s.saveProject(dir).catch(e => s.say({ level: 'error', where: 'проект', text: String(e) })); }} />
       )}
+      {dialog === 'new' && <NewProjectDialog onClose={() => setDialog(null)} />}
+      {dialog === 'info' && <InfoDialog onClose={() => setDialog(null)} />}
       {(dialog === 'stateSave' || dialog === 'stateLoad') && s.project && (
         <PathDialog title={dialog === 'stateSave' ? 'Сохранить состояние' : 'Загрузить состояние'} action={dialog === 'stateSave' ? 'Сохранить' : 'Загрузить'}
           initial={(s.project.dir || '.').replace(/[\\/]+$/, '') + '/state.stt'}

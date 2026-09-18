@@ -629,12 +629,84 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
                 Err(e) => error("400 Bad Request", &e),
             }
         }
+        // новый проект: пустой в памяти или сразу в папке ?dir= с корнем ?root=
         ("POST", ["new"]) => {
+            let dir = super::param(query, "dir").map(super::url_decode).filter(|d| !d.trim().is_empty());
+            let root = super::param(query, "root").map(super::url_decode).filter(|r| !r.trim().is_empty()).unwrap_or_else(|| "Main".into());
             let mut s = shared.lock().unwrap();
-            match s.open(std::path::PathBuf::new()) {
-                Ok(()) => json("{\"ok\":true}".into()),
-                Err(e) => error("500 Internal Server Error", &e),
+            if let Err(e) = s.open(std::path::PathBuf::new()) {
+                return error("500 Internal Server Error", &e);
             }
+            s.project.project.root = root.clone();
+            if let Some(c) = s.project.classes.first_mut() {
+                c.name = root.clone();
+            }
+            s.models.clear();
+            if let Some(dir) = dir {
+                let dir = std::path::PathBuf::from(dir.trim());
+                if let Err(e) = std::fs::create_dir_all(&dir).and_then(|_| crate::formats::native::save(&dir, &s.project)) {
+                    return error("500 Internal Server Error", &e.to_string());
+                }
+                s.project.dir = dir;
+                s.empty = false;
+            }
+            json(format!("{{\"ok\":true,\"root\":{}}}", json_string(&root)))
+        }
+        // сводка проекта: диалог «Информация» оригинала
+        ("GET", ["info"]) => {
+            let s = shared.lock().unwrap();
+            let p = &s.project;
+            let mut functions: std::collections::BTreeMap<String, u32> = std::collections::BTreeMap::new();
+            let mut equations = 0usize;
+            let mut lines = 0usize;
+            fn count_calls(e: &crate::lang::Expr, out: &mut std::collections::BTreeMap<String, u32>) {
+                use crate::lang::Expr;
+                match e {
+                    Expr::Call(name, args) => {
+                        *out.entry(name.clone()).or_insert(0) += 1;
+                        args.iter().for_each(|a| count_calls(a, out));
+                    }
+                    Expr::Unary(_, a) => count_calls(a, out),
+                    Expr::Binary(_, a, b) => {
+                        count_calls(a, out);
+                        count_calls(b, out);
+                    }
+                    _ => {}
+                }
+            }
+            fn walk(body: &[crate::lang::Stmt], out: &mut std::collections::BTreeMap<String, u32>, eq: &mut usize) {
+                use crate::lang::Stmt;
+                for st in body {
+                    match st {
+                        Stmt::Assign { value, .. } | Stmt::AssignDeferred { value, .. } | Stmt::Expr(value) => count_calls(value, out),
+                        Stmt::If { condition, then_body, else_body } => { count_calls(condition, out); walk(then_body, out, eq); walk(else_body, out, eq); }
+                        Stmt::While { condition, body } | Stmt::DoUntil { body, condition } => { count_calls(condition, out); walk(body, out, eq); }
+                        Stmt::Switch { arms, default } => { for a in arms { count_calls(&a.condition, out); walk(&a.body, out, eq); } walk(default, out, eq); }
+                        Stmt::Equation { left, right } => { *eq += 1; count_calls(left, out); count_calls(right, out); }
+                        Stmt::Return(Some(v)) => count_calls(v, out),
+                        _ => {}
+                    }
+                }
+            }
+            for c in &p.classes[..p.own_classes] {
+                lines += c.text.lines().count();
+                if let Some(m) = s.models.get(&c.name.to_lowercase()) {
+                    walk(&m.body, &mut functions, &mut equations);
+                }
+            }
+            let mut fns: Vec<(String, u32)> = functions.into_iter().collect();
+            fns.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+            let fns_json: Vec<String> = fns.iter().map(|(n, c)| format!("[{},{c}]", json_string(n))).collect();
+            let links: usize = p.classes[..p.own_classes].iter().map(|c| c.links.len()).sum();
+            let children: usize = p.classes[..p.own_classes].iter().map(|c| c.children.len()).sum();
+            let props: Vec<String> = p.project.properties.iter().map(|pr| format!("[{},{}]", json_string(&pr.key), json_string(&match &pr.value { crate::formats::project::PropertyValue::Int(i) => i.to_string(), crate::formats::project::PropertyValue::Text(t) => t.clone() }))).collect();
+            json(format!(
+                "{{\"root\":{},\"dir\":{},\"classes\":{},\"libraryClasses\":{},\"instances\":{},\"children\":{},\"links\":{},\"equations\":{},\"lines\":{},\"matrices\":{},\"windows\":{},\"functions\":[{}],\"properties\":[{}],\"libraries\":[{}]}}",
+                json_string(&p.project.root), json_string(&p.dir.display().to_string()), p.own_classes, p.classes.len() - p.own_classes,
+                s.sim.instances().len(), children, links, equations, lines, s.sim.effects.matrices.items.len(), s.sim.effects.gfx.windows.len(),
+                fns_json.join(","), props.join(","),
+                p.library_dirs.iter().map(|d| json_string(&d.display().to_string())).collect::<Vec<_>>().join(",")
+            ))
         }
         // обзор папок для диалога открытия: подпапки и файлы проектов
         ("GET", ["browse"]) => {
