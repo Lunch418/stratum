@@ -95,6 +95,7 @@ pub mod wm {
     pub const ALLMOUSEMESSAGE: u32 = 1536;
     pub const ALLKEYMESSAGE: u32 = 1537;
     pub const SPACEDONE: u32 = 1539;
+    pub const CONTROLNOTIFY: u32 = 1544;
     pub const SPACEINIT: u32 = 1540;
     /// Флаг регистрации: сообщение только когда мышь над объектом.
     pub const FLAG_OVER_OBJECT: u32 = 1;
@@ -490,6 +491,26 @@ impl Simulation {
             self.set_var(r.instance, "xPos", Value::Float(x));
             self.set_var(r.instance, "yPos", Value::Float(y));
             self.set_var(r.instance, "fwKeys", Value::Float(keys as f64));
+            self.run_instance(r.instance)?;
+        }
+        Ok(())
+    }
+
+    /// Уведомление от контрола (кнопка нажата, текст изменён, выбор в
+    /// списке): `code` — wNotifyCode (0 = BN_CLICKED, 768 = EN_CHANGE,
+    /// 1 = LBN_SELCHANGE). Текст и состояние уже применены к объекту.
+    pub fn control_notify(&mut self, space: crate::gfx::Handle, object: crate::gfx::Handle, code: u32) -> Result<(), RuntimeError> {
+        let targets: Vec<Registration> = self
+            .registrations
+            .iter()
+            .filter(|r| r.space == space && (r.object == object || r.object == 0) && message_matches(r.msg, wm::CONTROLNOTIFY))
+            .cloned()
+            .collect();
+        for r in targets {
+            self.set_var(r.instance, "msg", Value::Float(wm::CONTROLNOTIFY as f64));
+            self.set_var(r.instance, "wNotifyCode", Value::Float(code as f64));
+            self.set_var(r.instance, "wParam", Value::Float(code as f64));
+            self.set_var(r.instance, "lParam", Value::Float(object as f64));
             self.run_instance(r.instance)?;
         }
         Ok(())

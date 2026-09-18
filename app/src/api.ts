@@ -14,10 +14,11 @@ export interface Project { root: string; dir: string; native: boolean; unsaved: 
 export interface Instance { index: number; path: string; name: string; class: string; parent: number | null; handle: number }
 export interface Frame {
   tick: number; running: boolean; stopped: boolean;
-  windows: { id: number; name: string; w: number; h: number; svg: string }[];
+  windows: { id: number; name: string; w: number; h: number; svg: string; controls: Control[] }[];
   log: string[];
 }
 export interface Trace { id: number; index: number; path: string; var: string; points: [number, number][] }
+export interface Control { handle: number; class: string; text: string; style: number; checked: boolean; enabled: boolean; x: number; y: number; w: number; h: number }
 export interface ParseError { line: number; column: number; message: string }
 
 async function get<T>(url: string): Promise<T> {

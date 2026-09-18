@@ -440,14 +440,29 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
             Shape::Control { text, .. } => Some(text.clone()),
             _ => None,
         }).unwrap_or_default()),
-        "enablecontrol2d" | "checkdlgbutton2d" | "setcontrolstyle2d" | "setcontrolfont2d" => ok(object(gfx, args).is_some()),
-        "isdlgbuttonchecked2d" | "getcontrolstyle2d" => num(0.0),
+        "enablecontrol2d" => {
+            let e = f(args, 2) != 0.0;
+            ok(object_mut(gfx, args).map(|o| if let Shape::Control { enabled, .. } = &mut o.shape { *enabled = e }).is_some())
+        }
+        "checkdlgbutton2d" => {
+            let c = f(args, 2) != 0.0;
+            ok(object_mut(gfx, args).map(|o| if let Shape::Control { checked, .. } = &mut o.shape { *checked = c }).is_some())
+        }
+        "isdlgbuttonchecked2d" => num(object(gfx, args).and_then(|o| match &o.shape {
+            Shape::Control { checked, .. } => Some(if *checked { 1.0 } else { 0.0 }),
+            _ => None,
+        }).unwrap_or(0.0)),
+        "getcontrolstyle2d" => num(object(gfx, args).and_then(|o| match &o.shape {
+            Shape::Control { style, .. } => Some(*style as f64),
+            _ => None,
+        }).unwrap_or(0.0)),
+        "setcontrolstyle2d" | "setcontrolfont2d" => ok(object(gfx, args).is_some()),
         // CreateControlObject2d(HSpace, ClassName, Text, Style, x, y, w, h)
         "createcontrolobject2d" => {
             let (class, text, style) = (s(args, 1), s(args, 2), f(args, 3) as u32);
             let (x, y, w, hh) = (f(args, 4), f(args, 5), f(args, 6), f(args, 7));
             handle(gfx.space_mut(h(args, 0)).map(|sp| {
-                sp.add_object(Object::new(0, x, y, w, hh, Shape::Control { class, caption: text.clone(), style, text }))
+                sp.add_object(Object::new(0, x, y, w, hh, Shape::Control { class, caption: text.clone(), style, text, checked: false, enabled: true }))
             }).unwrap_or(0))
         }
 

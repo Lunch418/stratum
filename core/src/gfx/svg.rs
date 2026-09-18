@@ -148,13 +148,13 @@ fn render_shape(sp: &Space, o: &super::Object, h: Handle, out: &mut String) {
                 }
             }
         }
-        Shape::Control { class, text, .. } => {
+        Shape::Control { class, .. } => {
+            // сам контрол рисует страница поверх SVG (см. player); здесь —
+            // только место под него, чтобы статический рендер что-то показывал
             let _ = write!(
                 out,
-                "<rect x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" fill=\"#f0f0f0\" stroke=\"#606060\" data-handle=\"{h}\" data-class=\"{}\"{}/>\n\
-                 <text x=\"{:.2}\" y=\"{:.2}\" font-size=\"12\" text-anchor=\"middle\" fill=\"#000\">{}</text>\n",
-                o.x, o.y, o.w, o.h, esc(class), name_attr(&o.name),
-                o.x + o.w / 2.0, o.y + o.h / 2.0 + 4.0, esc(text)
+                "<rect x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" fill=\"#f0f0f0\" stroke=\"#b0b0b0\" data-handle=\"{h}\" data-class=\"{}\"{}/>\n",
+                o.x, o.y, o.w, o.h, esc(class), name_attr(&o.name)
             );
         }
         Shape::Unknown => {}

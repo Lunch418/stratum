@@ -30,6 +30,8 @@ enum Event {
     Speed(u32),
     Mouse { window: String, msg: u32, x: f64, y: f64, keys: u32 },
     Key { msg: u32, vk: u32 },
+    /// Действие в контроле окна модели: код уведомления и новое значение.
+    Control { window: String, handle: u32, code: u32, text: Option<String>, checked: Option<bool> },
 }
 
 /// Наблюдаемая переменная: значения по тактам для графика.
@@ -270,6 +272,23 @@ fn apply_event(s: &mut Shared, ev: Event) {
                 }
             }
         }
+        Event::Control { window, handle, code, text, checked } => {
+            if let Some(space) = s.sim.effects.gfx.window_space(&window) {
+                if let Some(o) = s.sim.effects.gfx.space_mut(space).and_then(|sp| sp.objects.get_mut(&handle)) {
+                    if let crate::gfx::Shape::Control { text: t, checked: c, .. } = &mut o.shape {
+                        if let Some(text) = text {
+                            *t = text;
+                        }
+                        if let Some(checked) = checked {
+                            *c = checked;
+                        }
+                    }
+                }
+                if let Err(e) = s.sim.control_notify(space, handle, code) {
+                    s.error = Some(e.message);
+                }
+            }
+        }
         Event::Key { msg, vk } => {
             let spaces: Vec<_> = s.sim.effects.gfx.spaces.keys().copied().collect();
             for space in spaces {
@@ -411,6 +430,13 @@ fn parse_event(query: &str) -> Option<Event> {
             keys: num("keys").unwrap_or(0.0) as u32,
         },
         "key" => Event::Key { msg: num("msg").unwrap_or(wm::KEYDOWN as f64) as u32, vk: num("vk")? as u32 },
+        "control" => Event::Control {
+            window: url_decode(param(query, "win")?),
+            handle: num("handle")? as u32,
+            code: num("code").unwrap_or(0.0) as u32,
+            text: param(query, "text").map(url_decode),
+            checked: param(query, "checked").map(|v| v == "1"),
+        },
         _ => return None,
     })
 }
@@ -442,12 +468,30 @@ fn frame_json(shared: &Arc<Mutex<Shared>>) -> String {
         if !sp.visible {
             continue;
         }
+        // контролы отдаются отдельно: страница кладёт поверх SVG настоящие
+        // кнопки и поля ввода
+        // как в svg::render: translate(-origin) scale(k)
+        let (ox, oy, k) = (sp.origin.0, sp.origin.1, sp.scale.0.max(0.001));
+        let controls: Vec<String> = sp
+            .objects
+            .values()
+            .filter(|o| o.visible)
+            .filter_map(|o| match &o.shape {
+                crate::gfx::Shape::Control { class, text, style, checked, enabled, .. } => Some(format!(
+                    "{{\"handle\":{},\"class\":{},\"text\":{},\"style\":{},\"checked\":{},\"enabled\":{},\"x\":{},\"y\":{},\"w\":{},\"h\":{}}}",
+                    o.handle, json_string(class), json_string(text), style, checked, enabled,
+                    o.x * k - ox, o.y * k - oy, o.w * k, o.h * k
+                )),
+                _ => None,
+            })
+            .collect();
         windows.push(format!(
-            "{{\"id\":{i},\"name\":{},\"w\":{},\"h\":{},\"svg\":{}}}",
+            "{{\"id\":{i},\"name\":{},\"w\":{},\"h\":{},\"svg\":{},\"controls\":[{}]}}",
             json_string(name),
             sp.client.0,
             sp.client.1,
-            json_string(&svg::render(sp))
+            json_string(&svg::render(sp)),
+            controls.join(",")
         ));
     }
     let mut log: Vec<String> = s.sim.effects.log.iter().rev().take(8).map(|l| json_string(l)).collect();

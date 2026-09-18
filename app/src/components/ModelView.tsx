@@ -1,6 +1,6 @@
 // Окно модели: живые окна из ядра; мышь и клавиатура уходят в модель.
 import { useEffect, useRef } from 'react';
-import { api } from '../api';
+import { api, type Control } from '../api';
 import { useStore } from '../store';
 
 export function ModelView() {
@@ -16,12 +16,18 @@ export function ModelView() {
       if (!div) {
         div = document.createElement('div');
         div.className = 'win'; div.dataset.win = String(w.id);
-        div.innerHTML = `<div class="title"></div><div class="body"></div>`;
+        div.innerHTML = `<div class="title"></div><div class="body"><div class="controls"></div></div>`;
         attach(div, w.name);
         root.appendChild(div);
       }
       div.querySelector('.title')!.textContent = w.name;
-      if (last.current.get(w.id) !== w.svg) { div.querySelector('.body')!.innerHTML = w.svg; last.current.set(w.id, w.svg); }
+      const body = div.querySelector<HTMLDivElement>('.body')!;
+      if (last.current.get(w.id) !== w.svg) {
+        body.querySelector('svg')?.remove();
+        body.insertAdjacentHTML('afterbegin', w.svg);
+        last.current.set(w.id, w.svg);
+      }
+      syncControls(body.querySelector<HTMLDivElement>('.controls')!, w.name, w.controls ?? []);
     }
     for (const div of [...root.children]) if (!frame.windows.some(w => String(w.id) === (div as HTMLElement).dataset.win)) div.remove();
   }, [frame]);
@@ -30,6 +36,91 @@ export function ModelView() {
   return <div className="model" ref={host} tabIndex={0}
     onKeyDown={e => { e.preventDefault(); api.event(`type=key&msg=256&vk=${e.keyCode}`); }}
     onKeyUp={e => api.event(`type=key&msg=257&vk=${e.keyCode}`)} />;
+}
+
+// Настоящие кнопки, флажки, поля ввода и списки поверх SVG: события уходят
+// в модель как WM_CONTROLNOTIFY (0 — нажатие, 768 — правка текста, 1 — выбор)
+function syncControls(layer: HTMLDivElement, win: string, controls: Control[]) {
+  const seen = new Set<string>();
+  for (const c of controls) {
+    const key = String(c.handle);
+    seen.add(key);
+    let el = layer.querySelector<HTMLElement>(`[data-ctl="${key}"]`);
+    const kind = controlKind(c);
+    if (!el || el.dataset.kind !== kind) {
+      el?.remove();
+      el = createControl(kind, win, c);
+      el.dataset.ctl = key; el.dataset.kind = kind;
+      layer.appendChild(el);
+    }
+    el.style.left = `${c.x}px`; el.style.top = `${c.y}px`; el.style.width = `${c.w}px`; el.style.height = `${c.h}px`;
+    updateControl(el, kind, c);
+  }
+  for (const el of [...layer.children] as HTMLElement[]) if (!seen.has(el.dataset.ctl ?? '')) el.remove();
+}
+
+function controlKind(c: Control): string {
+  const cls = c.class.toUpperCase();
+  if (cls === 'BUTTON') {
+    const type = c.style & 0xf;
+    if (type === 2 || type === 3 || type === 5 || type === 6) return 'checkbox'; // BS_CHECKBOX/AUTOCHECKBOX/3STATE
+    if (type === 4 || type === 9) return 'radio';
+    return 'button';
+  }
+  if (cls === 'EDIT') return (c.style & 0x4) ? 'textarea' : 'edit'; // ES_MULTILINE
+  if (cls === 'LISTBOX' || cls === 'COMBOBOX') return 'list';
+  return 'button';
+}
+
+function createControl(kind: string, win: string, c: Control): HTMLElement {
+  const send = (code: number, extra = '') => api.event(`type=control&win=${encodeURIComponent(win)}&handle=${c.handle}&code=${code}${extra}`);
+  let el: HTMLElement;
+  if (kind === 'button') {
+    el = document.createElement('button');
+    el.onclick = () => send(0);
+  } else if (kind === 'checkbox' || kind === 'radio') {
+    el = document.createElement('label');
+    const input = document.createElement('input');
+    input.type = kind; input.name = kind === 'radio' ? `radio-${win}` : '';
+    input.onchange = () => send(0, `&checked=${input.checked ? 1 : 0}`);
+    el.appendChild(input); el.appendChild(document.createElement('span'));
+  } else if (kind === 'edit' || kind === 'textarea') {
+    el = document.createElement(kind === 'edit' ? 'input' : 'textarea');
+    if (kind === 'edit') (el as HTMLInputElement).type = 'text';
+    el.oninput = () => send(768, `&text=${encodeURIComponent((el as HTMLInputElement).value)}`);
+  } else {
+    el = document.createElement('select');
+    (el as HTMLSelectElement).size = 4;
+    el.onchange = () => send(1, `&text=${encodeURIComponent((el as HTMLSelectElement).value)}`);
+  }
+  el.className = 'ctl';
+  el.onmousedown = e => e.stopPropagation();
+  el.onmouseup = e => e.stopPropagation();
+  el.onkeydown = e => e.stopPropagation();
+  return el;
+}
+
+function updateControl(el: HTMLElement, kind: string, c: Control) {
+  const disabled = !c.enabled;
+  if (kind === 'button') { el.textContent = c.text; (el as HTMLButtonElement).disabled = disabled; }
+  else if (kind === 'checkbox' || kind === 'radio') {
+    const input = el.querySelector('input')!;
+    if (document.activeElement !== input) input.checked = c.checked;
+    input.disabled = disabled;
+    el.querySelector('span')!.textContent = c.text;
+  } else if (kind === 'edit' || kind === 'textarea') {
+    const input = el as HTMLInputElement;
+    if (document.activeElement !== input && input.value !== c.text) input.value = c.text;
+    input.disabled = disabled;
+  } else {
+    const sel = el as HTMLSelectElement;
+    const items = c.text.split('\n').filter(Boolean);
+    if ([...sel.options].map(o => o.value).join('\n') !== items.join('\n')) {
+      sel.innerHTML = '';
+      for (const it of items) { const o = document.createElement('option'); o.value = it; o.textContent = it; sel.appendChild(o); }
+    }
+    sel.disabled = disabled;
+  }
 }
 
 function attach(div: HTMLDivElement, name: string) {

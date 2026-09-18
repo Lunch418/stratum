@@ -114,7 +114,7 @@ pub enum Shape {
     Polyline { pen: Handle, brush: Handle, points: Vec<(f64, f64)> },
     Bitmap { dib: Handle, src: (f64, f64, f64, f64), masked: bool },
     Text { text: Handle },
-    Control { class: String, caption: String, style: u32, text: String },
+    Control { class: String, caption: String, style: u32, text: String, checked: bool, enabled: bool },
     Group { children: Vec<Handle> },
     Unknown,
 }
@@ -283,7 +283,7 @@ impl Space {
                 }
                 ObjectKind::Control { x, y, w, h: hh, class, caption, style } => Object::new(
                     h, *x, *y, *w, *hh,
-                    Shape::Control { class: class.clone(), caption: caption.clone(), style: *style, text: caption.clone() },
+                    Shape::Control { class: class.clone(), caption: caption.clone(), style: *style, text: caption.clone(), checked: false, enabled: true },
                 ),
                 ObjectKind::Group { children } => Object::new(
                     h, 0.0, 0.0, 0.0, 0.0,
