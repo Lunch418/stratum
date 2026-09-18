@@ -125,6 +125,7 @@ export function CodeEditor() {
     if (!klass) return;
     const r = await api.setText(klass.name, text);
     updateClass({ ...klass, text });
+    useStore.getState().markUnsaved();
     setDirty(false);
     const monaco = monacoRef.current, editor = editorRef.current;
     if (monaco && editor) {
@@ -133,7 +134,7 @@ export function CodeEditor() {
         severity: 8, message: r.error.message, startLineNumber: r.error.line, startColumn: r.error.column, endLineNumber: r.error.line, endColumn: r.error.column + 1,
       }]);
     }
-    if (r.ok) { showToast('Сохранено'); say({ level: 'info', where: klass.name, text: 'текст принят' }); }
+    if (r.ok) { showToast('Текст принят'); say({ level: 'info', where: klass.name, text: 'текст принят' }); }
     else if (r.error) say({ level: 'error', where: `${klass.name}, строка ${r.error.line}`, text: r.error.message });
   }
 

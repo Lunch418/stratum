@@ -15,6 +15,7 @@ Pinball и другие 2D-примеры выглядят как в ориги�
 | Спецификация формата имиджа `.cls` | [`docs/formats/cls.md`](docs/formats/cls.md) |
 | Спецификация `project.spj` и `_preload.stt` | [`docs/formats/spj.md`](docs/formats/spj.md) |
 | Спецификация векторной графики `.vdr` | [`docs/formats/vdr.md`](docs/formats/vdr.md) |
+| Родной текстовый формат проекта (`project.json`, `*.strat`) и обмен со Stratum 2000 | [`docs/formats/native.md`](docs/formats/native.md) |
 | Справочник встроенных функций (960 имён: типы аргументов, опкоды, описания) | `docs/lang/functions.md`, `functions.json` |
 | Таблицы компилятора: функции, операторы с приоритетами, 414 констант, описатели DLL | `docs/lang/{builtins,operators,constants,tdl}.json` |
 | Справка `SC3.HLP` целиком в markdown — 1329 тем с оглавлением и рисунками | `docs/help/` (собирается локально) |
@@ -43,6 +44,8 @@ cargo build --release
 ./target/release/stratum check ../fixtures          # все .cls через оба парсера
 ./target/release/stratum render ../fixtures/PROJECTS/samples/PINBALL_ --ticks 50 --out /tmp/pinball
 ./target/release/stratum play ../fixtures/user/solar_system     # плеер: http://127.0.0.1:8765/
+./target/release/stratum convert ../fixtures/user/solar_system ~/solar   # импорт в project.json
+./target/release/stratum convert ~/solar /tmp/solar-2000 --to stratum2000  # экспорт обратно
 cargo test --release                                 # юнит-тесты + корпус
 ```
 
@@ -70,7 +73,9 @@ cd ../core && ./target/release/stratum play ../fixtures/user/solar_system
 плеера: иерархия проекта с иконками, холст схемы (панорама, зум, перетаскивание
 блоков, вход в подсхему по двойному клику), редактор кода (Monaco, грамматика
 языка, подсказки по 960 функциям и константам, ошибки разбора в строке),
-инспектор переменных с живыми значениями, окно модели, транспорт, тёмная тема.
+инспектор переменных с живыми значениями, окно модели, транспорт, тёмная тема,
+сохранение проекта в текстовом формате и экспорт в Stratum 2000 (см.
+[`docs/formats/native.md`](docs/formats/native.md)).
 Для разработки фронтенда — `npm run dev` (проксирует API в ядро на 8765).
 
 Стек по ТЗ: React 19 + TypeScript + Vite, Zustand, Monaco.
@@ -129,9 +134,8 @@ make -C helpdeco/gcc
 
 ## Дальше по ТЗ
 
-Этап 3 продолжается: правка связей и добавление имиджей на схему, новый
-текстовый формат проекта и сохранение, командная палитра, Undo/Redo,
-библиотеки с перетаскиванием, Tauri-обёртка. Из этапа 2 остались настоящие
+Этап 3 продолжается: правка связей и добавление имиджей на схему, командная
+палитра, Undo/Redo, библиотеки с перетаскиванием, установщики Tauri. Из этапа 2 остались настоящие
 контролы (Button/Edit/ListBox) и звук.
 
 Не закрыто из этапов 0–1: сверка значений на такте 100 с оригиналом через

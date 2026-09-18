@@ -28,6 +28,9 @@ interface State {
   say: (m: Message) => void;
   showToast: (t: string) => void;
   toggleTheme: () => void;
+  unsaved: boolean;
+  markUnsaved: () => void;
+  saveProject: (dir?: string) => Promise<void>;
 }
 
 export const useStore = create<State>((set, get) => ({
@@ -43,7 +46,7 @@ export const useStore = create<State>((set, get) => ({
   theme: (localStorage.getItem('theme') as 'light' | 'dark') || 'light',
   load: async () => {
     const project = await api.project();
-    set({ project, schemePath: [project.root], selectedClass: project.root });
+    set({ project, schemePath: [project.root], selectedClass: project.root, unsaved: project.unsaved });
     await get().refreshInstances();
   },
   refreshInstances: async () => set({ instances: await api.instances() }),
@@ -55,6 +58,14 @@ export const useStore = create<State>((set, get) => ({
   updateClass: c => set(s => s.project ? { project: { ...s.project, classes: s.project.classes.map(k => k.name === c.name ? c : k) } } : {}),
   say: m => set(s => ({ messages: [...s.messages.slice(-199), m] })),
   showToast: t => { set({ toast: t }); setTimeout(() => set({ toast: null }), 1800); },
+  unsaved: false,
+  markUnsaved: () => set({ unsaved: true }),
+  saveProject: async dir => {
+    const r = await api.save(dir);
+    set(s => ({ unsaved: false, project: s.project ? { ...s.project, dir: r.dir, native: true } : s.project }));
+    get().showToast('Проект сохранён');
+    get().say({ level: 'info', where: 'проект', text: 'сохранено в ' + r.dir });
+  },
   toggleTheme: () => set(s => {
     const theme = s.theme === 'light' ? 'dark' : 'light';
     localStorage.setItem('theme', theme);

@@ -98,7 +98,7 @@ export function SchemeCanvas() {
   function onMouseUp() {
     if (drag && klass) {
       const c = klass.children.find(c => c.handle === drag.handle);
-      if (c) api.moveChild(klass.name, c.handle, c.x, c.y).then(() => showToast('Перемещено'));
+      if (c) api.moveChild(klass.name, c.handle, c.x, c.y).then(() => { showToast('Перемещено'); useStore.getState().markUnsaved(); });
     }
     setDrag(null); setPan(null);
   }

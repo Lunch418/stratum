@@ -143,9 +143,11 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
                 .map(|(i, c)| class_json(c, i >= p.own_classes, s.models.get(&c.name.to_lowercase())))
                 .collect();
             json(format!(
-                "{{\"root\":{},\"dir\":{},\"classes\":[{}]}}",
+                "{{\"root\":{},\"dir\":{},\"native\":{},\"unsaved\":{},\"classes\":[{}]}}",
                 json_string(&p.project.root),
                 json_string(&p.dir.display().to_string()),
+                crate::formats::native::is_native(&p.dir),
+                s.unsaved,
                 classes.join(",")
             ))
         }
@@ -205,6 +207,7 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
             };
             s.project.classes[i].text = body.to_string();
             s.dirty = true;
+            s.unsaved = true;
             match lang::parse(body) {
                 Ok(m) => {
                     s.models.insert(name.to_lowercase(), m);
@@ -233,6 +236,7 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
             }
             s.project.classes[i].vars = vars;
             s.dirty = true;
+            s.unsaved = true;
             json("{\"ok\":true}".into())
         }
         ("POST", ["child", "move"]) => {
@@ -250,8 +254,35 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
                 ch.x = x.parse().unwrap_or(ch.x);
                 ch.y = y.parse().unwrap_or(ch.y);
                 s.dirty = true;
+            s.unsaved = true;
             }
             json("{\"ok\":true}".into())
+        }
+        // сохранить проект в родном формате: в его папку или в ?dir=
+        ("POST", ["save"]) => {
+            let mut s = shared.lock().unwrap();
+            let dir = match super::param(query, "dir").map(super::url_decode).filter(|d| !d.is_empty()) {
+                Some(d) => std::path::PathBuf::from(d),
+                None => s.project.dir.clone(),
+            };
+            if let Err(e) = std::fs::create_dir_all(&dir).and_then(|_| crate::formats::native::save(&dir, &s.project)) {
+                return error("500 Internal Server Error", &e.to_string());
+            }
+            s.project.dir = dir.clone();
+            s.unsaved = false;
+            json(format!("{{\"ok\":true,\"dir\":{}}}", json_string(&dir.display().to_string())))
+        }
+        // экспорт в Stratum 2000 (project.spj + .cls) в папку ?dir=
+        ("POST", ["export"]) => {
+            let Some(dir) = super::param(query, "dir").map(super::url_decode).filter(|d| !d.is_empty()) else {
+                return error("400 Bad Request", "нужна папка dir");
+            };
+            let s = shared.lock().unwrap();
+            let dir = std::path::PathBuf::from(dir);
+            if let Err(e) = crate::formats::native::export_stratum2000(&dir, &s.project) {
+                return error("500 Internal Server Error", &e.to_string());
+            }
+            json(format!("{{\"ok\":true,\"dir\":{},\"classes\":{}}}", json_string(&dir.display().to_string()), s.project.own_classes))
         }
         ("GET", ["instances"]) => {
             let s = shared.lock().unwrap();

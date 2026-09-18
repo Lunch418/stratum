@@ -7,7 +7,7 @@ pub mod api;
 pub mod svg;
 
 use crate::formats::vdr::{self, ObjectKind, Picture};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 pub type Handle = u32;
 
@@ -107,15 +107,15 @@ impl Object {
 pub struct Space {
     pub handle: Handle,
     pub window: String,
-    pub objects: HashMap<Handle, Object>,
+    pub objects: BTreeMap<Handle, Object>,
     /// Порядок отрисовки объектов верхнего уровня, снизу вверх.
     pub zorder: Vec<Handle>,
-    pub pens: HashMap<Handle, Pen>,
-    pub brushes: HashMap<Handle, Brush>,
-    pub fonts: HashMap<Handle, Font>,
-    pub strings: HashMap<Handle, String>,
-    pub texts: HashMap<Handle, Vec<TextPart>>,
-    pub dibs: HashMap<Handle, Dib>,
+    pub pens: BTreeMap<Handle, Pen>,
+    pub brushes: BTreeMap<Handle, Brush>,
+    pub fonts: BTreeMap<Handle, Font>,
+    pub strings: BTreeMap<Handle, String>,
+    pub texts: BTreeMap<Handle, Vec<TextPart>>,
+    pub dibs: BTreeMap<Handle, Dib>,
     pub origin: (f64, f64),
     pub scale: (f64, f64),
     pub client: (f64, f64),
@@ -489,12 +489,12 @@ pub fn bmp_size(bmp: &[u8]) -> (u32, u32) {
 /// Все окна и пространства модели.
 #[derive(Debug, Default)]
 pub struct Gfx {
-    pub spaces: HashMap<Handle, Space>,
+    pub spaces: BTreeMap<Handle, Space>,
     /// Имя окна (в нижнем регистре) → пространство.
-    pub windows: HashMap<String, Handle>,
+    pub windows: BTreeMap<String, Handle>,
     /// Рисунки имиджей по имени класса (в нижнем регистре) — для
     /// `OpenSchemeWindow`.
-    pub pictures: HashMap<String, Picture>,
+    pub pictures: BTreeMap<String, Picture>,
     /// Папка проекта — здесь ищутся `.vdr`, `.bmp` и наборы иконок.
     pub project_dir: std::path::PathBuf,
     pub library_dirs: Vec<std::path::PathBuf>,

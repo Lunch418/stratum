@@ -1,0 +1,419 @@
+//! Родной текстовый формат проекта Stratum Modern.
+//!
+//! Папка проекта:
+//! ```text
+//! project.json                 корневой имидж, свойства, переменные, список имиджей
+//! state.json                   снимок значений (`_preload.stt`), если был
+//! classes/<Имя>.strat.json     описание имиджа: переменные, дети, связи
+//! classes/<Имя>.strat          текст имиджа
+//! classes/<Имя>.icon.vdr       иконка, рисунок и схема — блоки `.vdr` как есть
+//! classes/<Имя>.image.vdr
+//! classes/<Имя>.scheme.vdr
+//! classes/<Имя>.eq.bin         уравнения (библиотеки цепей)
+//! ```
+//! Всё, что нужно человеку и git, лежит текстом; двоичными остаются только
+//! векторные картинки, которые в Stratum 2000 хранились так же.
+
+use std::path::{Path, PathBuf};
+
+use super::json::{self, object, Json};
+use super::project::{Project, ProjectVariable, Property, PropertyValue, State, StateImage};
+use super::{Child, Class, FormatError, Link, LoadedProject, Variable};
+
+pub const FORMAT: &str = "stratum-modern/1";
+pub const PROJECT_FILE: &str = "project.json";
+
+/// Папка выглядит как проект в родном формате.
+pub fn is_native(path: &Path) -> bool {
+    if path.is_dir() {
+        path.join(PROJECT_FILE).is_file()
+    } else {
+        path.file_name().is_some_and(|n| n == PROJECT_FILE)
+    }
+}
+
+/// Имя файла для имиджа: убираем символы, недопустимые в Windows и в URL.
+pub fn file_stem(name: &str) -> String {
+    let s: String = name
+        .chars()
+        .map(|c| if c.is_control() || "<>:\"/\\|?*".contains(c) { '_' } else { c })
+        .collect();
+    let trimmed = s.trim_matches(|c| c == '.' || c == ' ');
+    if trimmed.is_empty() { "image".into() } else { trimmed.to_string() }
+}
+
+/// Уникальные имена файлов для имиджей проекта (регистр не различается —
+/// Windows и macOS).
+fn unique_stems(project: &LoadedProject, sep: &str) -> Vec<String> {
+    let mut used: Vec<String> = Vec::new();
+    for cls in &project.classes[..project.own_classes] {
+        let base = file_stem(&cls.name);
+        let mut stem = base.clone();
+        let mut n = 2;
+        while used.iter().any(|u| u.eq_ignore_ascii_case(&stem)) {
+            stem = format!("{base}{sep}{n}");
+            n += 1;
+        }
+        used.push(stem);
+    }
+    used
+}
+
+/// Записывает проект целиком (только собственные имиджи, без библиотек).
+pub fn save(dir: &Path, project: &LoadedProject) -> std::io::Result<()> {
+    let classes_dir = dir.join("classes");
+    std::fs::create_dir_all(&classes_dir)?;
+
+    let stems = unique_stems(project, "~");
+    let mut list = Vec::new();
+    for (cls, stem) in project.classes[..project.own_classes].iter().zip(&stems) {
+        save_class(&classes_dir, stem, cls)?;
+        list.push(object(vec![("name", Json::Str(cls.name.clone())), ("file", Json::Str(stem.clone()))]));
+    }
+
+    let p = &project.project;
+    let properties = p
+        .properties
+        .iter()
+        .map(|pr| match &pr.value {
+            PropertyValue::Int(i) => object(vec![("key", Json::Str(pr.key.clone())), ("int", Json::Number(*i as f64))]),
+            PropertyValue::Text(t) => object(vec![("key", Json::Str(pr.key.clone())), ("text", Json::Str(t.clone()))]),
+        })
+        .collect();
+    let variables = p
+        .variables
+        .iter()
+        .map(|v| {
+            let mut pairs = vec![
+                ("kind", Json::Number(v.kind as f64)),
+                ("flags", Json::Number(v.flags as f64)),
+                ("name", Json::Str(v.name.clone())),
+                ("description", Json::Str(v.description.clone())),
+            ];
+            if let Some(h) = v.handle {
+                pairs.push(("handle", Json::Number(h as f64)));
+            }
+            object(pairs)
+        })
+        .collect();
+    // в файл попадают только библиотеки внутри папки проекта: пути на
+    // машине разработчика — настройка окружения, а не часть проекта
+    let libraries = project
+        .library_dirs
+        .iter()
+        .filter_map(|d| d.strip_prefix(&project.dir).ok())
+        .map(|d| Json::Str(d.display().to_string().replace('\\', "/")))
+        .collect();
+    let root = object(vec![
+        ("format", Json::Str(FORMAT.into())),
+        ("root", Json::Str(p.root.clone())),
+        ("properties", Json::Array(properties)),
+        ("variables", Json::Array(variables)),
+        ("classes", Json::Array(list)),
+        ("libraries", Json::Array(libraries)),
+    ]);
+    std::fs::write(dir.join(PROJECT_FILE), root.pretty())?;
+
+    let state_path = dir.join("state.json");
+    match &project.state {
+        Some(state) => {
+            let images = state
+                .images
+                .iter()
+                .map(|im| {
+                    object(vec![
+                        ("class", Json::Str(im.class_name.clone())),
+                        ("ref", Json::Number(im.reference as f64)),
+                        ("handle", Json::Number(im.handle as f64)),
+                        ("vars", pairs_json(&im.vars)),
+                    ])
+                })
+                .collect();
+            let j = object(vec![("root", Json::Str(state.root.clone())), ("images", Json::Array(images))]);
+            std::fs::write(state_path, j.pretty())?;
+        }
+        None => {
+            let _ = std::fs::remove_file(state_path);
+        }
+    }
+    Ok(())
+}
+
+fn pairs_json(pairs: &[(String, String)]) -> Json {
+    Json::Array(pairs.iter().map(|(a, b)| Json::Array(vec![Json::Str(a.clone()), Json::Str(b.clone())])).collect())
+}
+
+fn pairs_from(j: Option<&Json>) -> Vec<(String, String)> {
+    j.and_then(Json::as_array)
+        .map(|a| {
+            a.iter()
+                .filter_map(|p| {
+                    let p = p.as_array()?;
+                    Some((p.first()?.as_str()?.to_string(), p.get(1)?.as_str()?.to_string()))
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn save_class(dir: &Path, stem: &str, cls: &Class) -> std::io::Result<()> {
+    let vars = cls
+        .vars
+        .iter()
+        .map(|v| {
+            object(vec![
+                ("name", Json::Str(v.name.clone())),
+                ("type", Json::Str(v.var_type.clone())),
+                ("default", Json::Str(v.default.clone())),
+                ("description", Json::Str(v.description.clone())),
+                ("flags", Json::Number(v.flags as f64)),
+            ])
+        })
+        .collect();
+    let children = cls
+        .children
+        .iter()
+        .map(|c| {
+            object(vec![
+                ("handle", Json::Number(c.handle as f64)),
+                ("class", Json::Str(c.class_name.clone())),
+                ("name", Json::Str(c.name.clone())),
+                ("x", Json::Number(c.x)),
+                ("y", Json::Number(c.y)),
+                ("flags", Json::Number(c.flags as f64)),
+            ])
+        })
+        .collect();
+    let links = cls
+        .links
+        .iter()
+        .map(|l| {
+            object(vec![
+                ("handle", Json::Number(l.handle as f64)),
+                ("source", Json::Number(l.source as f64)),
+                ("target", Json::Number(l.target as f64)),
+                ("flags", Json::Number(l.flags as f64)),
+                ("vars", pairs_json(&l.vars)),
+            ])
+        })
+        .collect();
+    let mut pairs = vec![
+        ("name", Json::Str(cls.name.clone())),
+        ("description", Json::Str(cls.description.clone())),
+        ("vars", Json::Array(vars)),
+        ("children", Json::Array(children)),
+        ("links", Json::Array(links)),
+    ];
+    if let Some(f) = cls.flags {
+        pairs.push(("flags", Json::Number(f as f64)));
+    }
+    if let Some(f) = &cls.icon_file {
+        pairs.push(("iconFile", Json::Str(f.clone())));
+    }
+    if let Some(i) = cls.icon_index {
+        pairs.push(("iconIndex", Json::Number(i as f64)));
+    }
+    if let Some(t) = cls.timestamp {
+        pairs.push(("timestamp", Json::Number(t as f64)));
+    }
+    std::fs::write(dir.join(format!("{stem}.strat.json")), object(pairs).pretty())?;
+
+    // текст — отдельным файлом, чтобы редактировать и смотреть diff как код
+    let text_path = dir.join(format!("{stem}.strat"));
+    if cls.text.is_empty() {
+        let _ = std::fs::remove_file(text_path);
+    } else {
+        std::fs::write(text_path, cls.text.replace("\r\n", "\n"))?;
+    }
+    for (suffix, blob) in [
+        ("icon.vdr", &cls.icon),
+        ("image.vdr", &cls.image),
+        ("scheme.vdr", &cls.scheme),
+        ("eq.bin", &cls.equations),
+    ] {
+        let path = dir.join(format!("{stem}.{suffix}"));
+        match blob {
+            Some(b) => std::fs::write(path, b)?,
+            None => {
+                let _ = std::fs::remove_file(path);
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Читает проект из папки родного формата (без библиотек — их подключает
+/// `load_project`).
+pub fn load(dir: &Path) -> std::io::Result<Result<LoadedProject, FormatError>> {
+    let dir = if dir.is_dir() { dir.to_path_buf() } else { dir.parent().unwrap_or(Path::new(".")).to_path_buf() };
+    let path = dir.join(PROJECT_FILE);
+    let text = std::fs::read_to_string(&path)?;
+    let fail = |message: String| FormatError { path: path.display().to_string(), offset: 0, message };
+    let root = match json::parse(&text) {
+        Ok(j) => j,
+        Err(e) => return Ok(Err(fail(e))),
+    };
+    if root.get("format").and_then(Json::as_str) != Some(FORMAT) {
+        return Ok(Err(fail(format!("ожидался формат {FORMAT}"))));
+    }
+    let mut project = Project { root: root.str_or("root", ""), ..Default::default() };
+    for p in root.get("properties").and_then(Json::as_array).into_iter().flatten() {
+        let key = p.str_or("key", "");
+        let value = match p.get("int").and_then(Json::as_f64) {
+            Some(i) => PropertyValue::Int(i as u32),
+            None => PropertyValue::Text(p.str_or("text", "")),
+        };
+        project.properties.push(Property { key, value });
+    }
+    for v in root.get("variables").and_then(Json::as_array).into_iter().flatten() {
+        project.variables.push(ProjectVariable {
+            kind: v.num_or("kind", 0.0) as u16,
+            flags: v.num_or("flags", 0.0) as u16,
+            handle: v.get("handle").and_then(Json::as_f64).map(|h| h as u16),
+            name: v.str_or("name", ""),
+            description: v.str_or("description", ""),
+        });
+    }
+
+    let classes_dir = dir.join("classes");
+    let mut classes = Vec::new();
+    for entry in root.get("classes").and_then(Json::as_array).into_iter().flatten() {
+        let stem = entry.str_or("file", "");
+        match load_class(&classes_dir, &stem)? {
+            Ok(c) => classes.push(c),
+            Err(e) => return Ok(Err(e)),
+        }
+    }
+
+    let library_dirs: Vec<PathBuf> = root
+        .get("libraries")
+        .and_then(Json::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|l| l.as_str().map(PathBuf::from))
+        .collect();
+
+    let mut state = None;
+    let state_path = dir.join("state.json");
+    if state_path.is_file() {
+        let text = std::fs::read_to_string(&state_path)?;
+        if let Ok(j) = json::parse(&text) {
+            let images = j
+                .get("images")
+                .and_then(Json::as_array)
+                .into_iter()
+                .flatten()
+                .map(|im| StateImage {
+                    class_name: im.str_or("class", ""),
+                    reference: im.num_or("ref", 0.0) as u32,
+                    handle: im.num_or("handle", 0.0) as u16,
+                    vars: pairs_from(im.get("vars")),
+                })
+                .collect();
+            state = Some(State { root: j.str_or("root", ""), images });
+        }
+    }
+
+    Ok(Ok(LoadedProject { dir, project, own_classes: classes.len(), classes, state, library_dirs }))
+}
+
+fn load_class(dir: &Path, stem: &str) -> std::io::Result<Result<Class, FormatError>> {
+    let meta_path = dir.join(format!("{stem}.strat.json"));
+    let text = std::fs::read_to_string(&meta_path)?;
+    let j = match json::parse(&text) {
+        Ok(j) => j,
+        Err(e) => return Ok(Err(FormatError { path: meta_path.display().to_string(), offset: 0, message: e })),
+    };
+    let read_opt = |suffix: &str| -> std::io::Result<Option<Vec<u8>>> {
+        let p = dir.join(format!("{stem}.{suffix}"));
+        if p.is_file() { std::fs::read(p).map(Some) } else { Ok(None) }
+    };
+    let source_path = dir.join(format!("{stem}.strat"));
+    let source = if source_path.is_file() { std::fs::read_to_string(&source_path)? } else { String::new() };
+
+    let vars = j
+        .get("vars")
+        .and_then(Json::as_array)
+        .into_iter()
+        .flatten()
+        .map(|v| Variable {
+            name: v.str_or("name", ""),
+            var_type: v.str_or("type", "FLOAT"),
+            default: v.str_or("default", ""),
+            description: v.str_or("description", ""),
+            flags: v.num_or("flags", 0.0) as u32,
+        })
+        .collect();
+    let children = j
+        .get("children")
+        .and_then(Json::as_array)
+        .into_iter()
+        .flatten()
+        .map(|c| Child {
+            handle: c.num_or("handle", 0.0) as u16,
+            class_name: c.str_or("class", ""),
+            name: c.str_or("name", ""),
+            x: c.num_or("x", 0.0),
+            y: c.num_or("y", 0.0),
+            flags: c.num_or("flags", 0.0) as u8,
+        })
+        .collect();
+    let links = j
+        .get("links")
+        .and_then(Json::as_array)
+        .into_iter()
+        .flatten()
+        .map(|l| Link {
+            handle: l.num_or("handle", 0.0) as u16,
+            source: l.num_or("source", 0.0) as u16,
+            target: l.num_or("target", 0.0) as u16,
+            flags: l.num_or("flags", 0.0) as u32,
+            vars: pairs_from(l.get("vars")),
+        })
+        .collect();
+
+    Ok(Ok(Class {
+        name: j.str_or("name", stem),
+        source: meta_path.display().to_string(),
+        version: 0x3003,
+        description: j.str_or("description", ""),
+        vars,
+        text: source,
+        children,
+        links,
+        icon_file: j.get("iconFile").and_then(Json::as_str).map(str::to_string),
+        icon_index: j.get("iconIndex").and_then(Json::as_f64).map(|i| i as u16),
+        icon: read_opt("icon.vdr")?,
+        image: read_opt("image.vdr")?,
+        scheme: read_opt("scheme.vdr")?,
+        bytecode: None,
+        equations: read_opt("eq.bin")?,
+        timestamp: j.get("timestamp").and_then(Json::as_f64).map(|t| t as u32),
+        flags: j.get("flags").and_then(Json::as_f64).map(|f| f as u32),
+    }))
+}
+
+/// Экспорт в формат Stratum 2000: `project.spj` и `.cls` рядом.
+pub fn export_stratum2000(dir: &Path, project: &LoadedProject) -> std::io::Result<()> {
+    std::fs::create_dir_all(dir)?;
+    std::fs::write(dir.join("project.spj"), super::project::write_project(&project.project))?;
+    if let Some(state) = &project.state {
+        std::fs::write(dir.join("_preload.stt"), super::project::write_state(state))?;
+    }
+    for (cls, stem) in project.classes[..project.own_classes].iter().zip(unique_stems(project, "")) {
+        std::fs::write(dir.join(format!("{stem}.cls")), super::cls::write(cls))?;
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn file_names_are_safe() {
+        assert_eq!(file_stem("Root2787"), "Root2787");
+        assert_eq!(file_stem("a/b:c?"), "a_b_c_");
+        assert_eq!(file_stem("..."), "image");
+    }
+}

@@ -21,6 +21,7 @@ fn main() -> ExitCode {
         Some("check") => cmd_check(&args[1..]),
         Some("render") => cmd_render(&args[1..]),
         Some("play") => cmd_play(&args[1..]),
+        Some("convert") => cmd_convert(&args[1..]),
         Some("--help") | Some("-h") | None => {
             usage();
             Ok(())
@@ -49,8 +50,51 @@ fn usage() {
          render PROJECT [--ticks N] [--out ПАПКА] [--lib ПАПКА]\n      \
          просчитать N тактов и записать окна модели в SVG\n  \
          play PROJECT [--port 8765] [--lib ПАПКА]\n      \
-         открыть плеер в браузере: транспорт, окно модели, мышь и клавиатура"
+         открыть плеер в браузере: транспорт, окно модели, мышь и клавиатура\n  \
+         convert ИСТОЧНИК ПАПКА [--to stratum2000] [--lib ПАПКА]\n      \
+         импорт проекта Stratum 2000 в родной текстовый формат (project.json)\n      \
+         или экспорт обратно в .spj/.cls с ключом --to stratum2000"
     );
+}
+
+fn cmd_convert(args: &[String]) -> Result<(), String> {
+    let mut paths = Vec::new();
+    let mut to_stratum2000 = false;
+    let mut libraries = Vec::new();
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--to" => {
+                i += 1;
+                match args.get(i).map(String::as_str) {
+                    Some("stratum2000") => to_stratum2000 = true,
+                    Some("native") => {}
+                    other => return Err(format!("--to: ожидалось native или stratum2000, а не {other:?}")),
+                }
+            }
+            "--lib" => {
+                i += 1;
+                libraries.push(PathBuf::from(args.get(i).ok_or("--lib без папки")?));
+            }
+            other if other.starts_with("--") => return Err(format!("неизвестный ключ {other}")),
+            other => paths.push(PathBuf::from(other)),
+        }
+        i += 1;
+    }
+    let [src, dest] = paths.as_slice() else { return Err("нужно два пути: источник и папка назначения".into()) };
+    if libraries.is_empty() {
+        libraries = formats::default_library_dirs();
+    }
+    let loaded = formats::load_project(src, &libraries).map_err(|e| e.to_string())?.map_err(|e| e.to_string())?;
+    if to_stratum2000 {
+        formats::native::export_stratum2000(dest, &loaded).map_err(|e| e.to_string())?;
+        println!("экспортировано в Stratum 2000: {} имиджей → {}", loaded.own_classes, dest.display());
+    } else {
+        std::fs::create_dir_all(dest).map_err(|e| e.to_string())?;
+        formats::native::save(dest, &loaded).map_err(|e| e.to_string())?;
+        println!("сохранено: {} имиджей → {}", loaded.own_classes, dest.join("project.json").display());
+    }
+    Ok(())
 }
 
 struct RunOptions {

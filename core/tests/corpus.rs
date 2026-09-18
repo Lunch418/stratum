@@ -174,3 +174,126 @@ fn walk_ext(dir: &Path, ext: &str) -> Vec<PathBuf> {
     go(dir, ext, &mut out);
     out
 }
+
+fn same_class(a: &cls::Class, b: &cls::Class, what: &str) -> Result<(), String> {
+    let check = |ok: bool, field: &str| if ok { Ok(()) } else { Err(format!("{what} [{}]: расходится {field}", a.name)) };
+    check(a.name == b.name, "имя")?;
+    check(a.description == b.description, "описание")?;
+    check(a.text.replace("\r\n", "\n") == b.text.replace("\r\n", "\n"), "текст")?;
+    check(a.vars.len() == b.vars.len(), "число переменных")?;
+    for (x, y) in a.vars.iter().zip(&b.vars) {
+        check(x.name == y.name && x.var_type == y.var_type && x.default == y.default && x.description == y.description && x.flags == y.flags, "переменная")?;
+    }
+    check(a.children.len() == b.children.len(), "число детей")?;
+    for (x, y) in a.children.iter().zip(&b.children) {
+        check(x.class_name == y.class_name && x.handle == y.handle && x.name == y.name && x.x == y.x && x.y == y.y && x.flags == y.flags, "ребёнок")?;
+    }
+    check(a.links.len() == b.links.len(), "число связей")?;
+    for (x, y) in a.links.iter().zip(&b.links) {
+        check(x.source == y.source && x.target == y.target && x.handle == y.handle && x.flags == y.flags && x.vars == y.vars, "связь")?;
+    }
+    check(a.icon == b.icon, "иконка")?;
+    check(a.image == b.image, "рисунок")?;
+    check(a.scheme == b.scheme, "схема")?;
+    check(a.equations == b.equations, "уравнения")?;
+    check(a.icon_file == b.icon_file && a.icon_index == b.icon_index, "ссылка на иконку")?;
+    check(a.flags == b.flags && a.timestamp == b.timestamp, "флаги/время")
+}
+
+/// Критерий приёмки этапа 3: каждый `.cls` корпуса переживает запись и
+/// повторное чтение без потерь (кроме байт-кода, который мы не храним).
+#[test]
+fn every_class_survives_cls_round_trip() {
+    let Some(root) = fixtures() else { return };
+    let mut files = Vec::new();
+    collect(&root, &mut files);
+    let mut failures = Vec::new();
+    let mut count = 0;
+    for file in &files {
+        let data = std::fs::read(file).unwrap();
+        let Ok(a) = cls::parse(&data, &file.display().to_string()) else { continue };
+        count += 1;
+        let again = cls::write(&a);
+        match cls::parse(&again, "again") {
+            Ok(b) => {
+                if let Err(e) = same_class(&a, &b, &file.display().to_string()) {
+                    failures.push(e);
+                }
+            }
+            Err(e) => failures.push(format!("{}: {e}", file.display())),
+        }
+    }
+    assert!(count > 600, "разобрано только {count} имиджей");
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// Импорт всех примеров в родной формат и экспорт обратно в Stratum 2000:
+/// после двух преобразований проект читается и совпадает с исходным.
+#[test]
+fn every_sample_project_survives_import_export() {
+    let Some(root) = fixtures() else { return };
+    let libs = libraries(&root);
+    let work = Path::new(env!("CARGO_MANIFEST_DIR")).join("target/roundtrip");
+    let _ = std::fs::remove_dir_all(&work);
+    let mut failures = Vec::new();
+    let mut count = 0;
+    let mut dirs: Vec<PathBuf> = std::fs::read_dir(root.join("PROJECTS/samples")).unwrap().map(|e| e.unwrap().path()).collect();
+    dirs.push(root.join("user/solar_system"));
+    for dir in dirs {
+        if !dir.is_dir() {
+            continue;
+        }
+        let Some(spj) = std::fs::read_dir(&dir).unwrap().filter_map(|e| e.ok().map(|e| e.path())).find(|p| {
+            p.extension().is_some_and(|e| e.eq_ignore_ascii_case("spj"))
+                && std::fs::read(p).map(|d| d.starts_with(b"Ih")).unwrap_or(false)
+        }) else {
+            continue;
+        };
+        let name = dir.file_name().unwrap().to_string_lossy().to_string();
+        let Ok(original) = formats::load_project(&spj, &libs).unwrap() else { continue };
+        count += 1;
+        let native_dir = work.join(&name).join("native");
+        let back_dir = work.join(&name).join("stratum2000");
+        std::fs::create_dir_all(&native_dir).unwrap();
+        formats::native::save(&native_dir, &original).unwrap();
+        let imported = match formats::load_project(&native_dir, &libs).unwrap() {
+            Ok(p) => p,
+            Err(e) => {
+                failures.push(format!("{name}: импорт: {e}"));
+                continue;
+            }
+        };
+        formats::native::export_stratum2000(&back_dir, &imported).unwrap();
+        let exported = match formats::load_project(&back_dir, &libs).unwrap() {
+            Ok(p) => p,
+            Err(e) => {
+                failures.push(format!("{name}: экспорт: {e}"));
+                continue;
+            }
+        };
+        for (which, p) in [("родной", &imported), ("экспорт", &exported)] {
+            if p.project.root != original.project.root || p.own_classes != original.own_classes {
+                failures.push(format!("{name}: {which}: корень или число имиджей"));
+                continue;
+            }
+            if p.project.properties.len() != original.project.properties.len() || p.project.variables.len() != original.project.variables.len() {
+                failures.push(format!("{name}: {which}: свойства проекта"));
+            }
+            if which == "родной" && p.state.as_ref().map(|s| s.images.len()) != original.state.as_ref().map(|s| s.images.len()) {
+                failures.push(format!("{name}: {which}: снимок состояния"));
+            }
+            for a in &original.classes[..original.own_classes] {
+                match p.class(&a.name) {
+                    Some(b) => {
+                        if let Err(e) = same_class(a, b, &format!("{name}: {which}")) {
+                            failures.push(e);
+                        }
+                    }
+                    None => failures.push(format!("{name}: {which}: нет имиджа {}", a.name)),
+                }
+            }
+        }
+    }
+    assert!(count >= 40, "проверено только {count} проектов");
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}

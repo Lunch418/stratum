@@ -4,9 +4,12 @@
 
 pub mod cls;
 pub mod cp1251;
+pub mod json;
+pub mod native;
 pub mod project;
 pub mod reader;
 pub mod vdr;
+pub mod writer;
 
 pub use cls::{Child, Class, Link, Variable};
 pub use project::{Project, State};
@@ -47,6 +50,26 @@ pub fn load_project(
     path: &Path,
     libraries: &[PathBuf],
 ) -> std::io::Result<std::result::Result<LoadedProject, FormatError>> {
+    if native::is_native(path) {
+        let mut loaded = match native::load(path)? {
+            Ok(p) => p,
+            Err(e) => return Ok(Err(e)),
+        };
+        // библиотеки из project.json — относительно папки проекта
+        let mut dirs: Vec<PathBuf> = loaded
+            .library_dirs
+            .iter()
+            .map(|d| if d.is_absolute() { d.clone() } else { loaded.dir.join(d) })
+            .collect();
+        dirs.extend(libraries.iter().cloned());
+        loaded.library_dirs = dirs.clone();
+        for lib in &dirs {
+            if let Err(e) = attach_library(lib, &mut loaded)? {
+                return Ok(Err(e));
+            }
+        }
+        return Ok(Ok(loaded));
+    }
     let (dir, spj) = if path.is_dir() {
         let spj = std::fs::read_dir(path)?
             .filter_map(|e| e.ok().map(|e| e.path()))
@@ -80,17 +103,8 @@ pub fn load_project(
     }
     loaded.own_classes = loaded.classes.len();
     for lib in libraries {
-        if !lib.is_dir() {
-            continue;
-        }
-        let mut found = Vec::new();
-        if let Err(e) = load_classes(lib, &mut found)? {
+        if let Err(e) = attach_library(lib, &mut loaded)? {
             return Ok(Err(e));
-        }
-        for c in found {
-            if loaded.class(&c.name).is_none() {
-                loaded.classes.push(c);
-            }
         }
     }
 
@@ -105,6 +119,23 @@ pub fn load_project(
         }
     }
     Ok(Ok(loaded))
+}
+
+/// Подключает имиджи библиотеки; одноимённые с уже загруженными пропускаются.
+fn attach_library(lib: &Path, loaded: &mut LoadedProject) -> std::io::Result<std::result::Result<(), FormatError>> {
+    if !lib.is_dir() {
+        return Ok(Ok(()));
+    }
+    let mut found = Vec::new();
+    if let Err(e) = load_classes(lib, &mut found)? {
+        return Ok(Err(e));
+    }
+    for c in found {
+        if loaded.class(&c.name).is_none() {
+            loaded.classes.push(c);
+        }
+    }
+    Ok(Ok(()))
 }
 
 fn load_classes(dir: &Path, out: &mut Vec<Class>) -> std::io::Result<std::result::Result<(), FormatError>> {

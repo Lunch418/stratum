@@ -112,6 +112,76 @@ fn read_properties(r: &mut Reader, count: u16, project: &mut Project) -> Result<
     Ok(())
 }
 
+/// Собирает `project.spj` вида `d` — так пишет сама Stratum 2000 v3.
+pub fn write_project(project: &Project) -> Vec<u8> {
+    use super::writer::Writer;
+    let mut w = Writer::new();
+    w.bytes(b"Ihd\0");
+    w.string(&project.root);
+    if !project.properties.is_empty() {
+        w.u8(b'f');
+        w.u8(0);
+        w.u16(project.properties.len() as u16);
+        for p in &project.properties {
+            let mut key = cp1251::encode(&p.key);
+            key.push(0);
+            let (ptype, value): (u8, Vec<u8>) = match &p.value {
+                PropertyValue::Int(i) => (0, i.to_le_bytes().to_vec()),
+                PropertyValue::Text(t) => {
+                    let mut v = cp1251::encode(t);
+                    v.push(0);
+                    (2, v)
+                }
+            };
+            w.u16((2 + key.len() + value.len()) as u16);
+            w.u8(ptype);
+            w.u8(key.len() as u8);
+            w.bytes(&key);
+            w.bytes(&value);
+        }
+    }
+    if !project.variables.is_empty() {
+        w.u8(b'g');
+        w.u8(0);
+        w.u16(project.variables.len() as u16);
+        for v in &project.variables {
+            w.u16(v.kind);
+            w.u16(v.flags);
+            if v.kind == 2 {
+                w.u16(v.handle.unwrap_or(0));
+            }
+            w.string(&v.name);
+            w.string(&v.description);
+        }
+    }
+    w.u8(0);
+    w.data
+}
+
+/// Собирает `_preload.stt` в новой редакции (переменные по именам).
+pub fn write_state(state: &State) -> Vec<u8> {
+    use super::writer::Writer;
+    let mut w = Writer::new();
+    w.string("SC Scheme Variables");
+    w.string(&state.root);
+    w.u16(0x28);
+    w.u16(2);
+    w.u16(0x03ea);
+    for im in &state.images {
+        w.u32(im.reference);
+        w.u16(im.handle);
+        w.string(&im.class_name);
+        w.u32(0);
+        w.u16(im.vars.len() as u16);
+        for (name, value) in &im.vars {
+            w.string(name);
+            w.string(value);
+        }
+    }
+    w.u16(0);
+    w.data
+}
+
 fn split_nul(bytes: &[u8]) -> &[u8] {
     match bytes.iter().position(|&b| b == 0) {
         Some(i) => &bytes[..i],

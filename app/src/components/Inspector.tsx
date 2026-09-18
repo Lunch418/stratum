@@ -48,6 +48,7 @@ export function Inspector() {
     const next = klass.vars.map((v, i) => i === index ? { ...v, [field]: value } : v);
     updateClass({ ...klass, vars: next });
     await api.setVars(klass.name, next);
+    useStore.getState().markUnsaved();
     showToast('Переменная изменена');
   }
 

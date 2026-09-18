@@ -207,8 +207,11 @@ fn read_section(
         }
         section::EQUATIONS => {
             // секция всегда последняя в теле; за ней может идти отметка времени
+            // варианты хвоста: `15 00 <u32>` либо `15 00 <u32> 00 00`
             let mut end = index_at;
-            if index_at >= 8 && r.peek_u16(index_at - 8) == Some(section::TIMESTAMP) {
+            if index_at >= 10 && r.peek_u16(index_at - 10) == Some(section::TIMESTAMP) && r.peek_u16(index_at - 2) == Some(section::END) {
+                end = index_at - 10;
+            } else if index_at >= 8 && r.peek_u16(index_at - 8) == Some(section::TIMESTAMP) {
                 end = index_at - 8;
             }
             let n = end.saturating_sub(r.pos);
@@ -219,9 +222,148 @@ fn read_section(
     Ok(())
 }
 
+/// Собирает файл `.cls` из структуры. Версии ниже 3.002 повышаются до 3.003
+/// (координаты детей — f64). Байт-код не пишется: оригинальная среда
+/// перекомпилирует текст при открытии.
+pub fn write(cls: &Class) -> Vec<u8> {
+    use super::writer::Writer;
+    let version = if cls.version >= 0x3002 { cls.version } else { 0x3003 };
+    let mut w = Writer::new();
+    w.bytes(b"SB");
+    w.u32(version);
+    let body_end_at = w.pos();
+    w.u32(0);
+    let index_size_at = w.pos();
+    w.u32(0);
+    w.string(&cls.name);
+
+    // (id, смещение секции от байта 6) — для оглавления
+    let mut index: Vec<(u16, u32)> = Vec::new();
+    let mut begin = |w: &mut Writer, id: u16, indexed: bool| {
+        if indexed {
+            index.push((id, (w.pos() - INDEX_BASE) as u32));
+        }
+        w.u16(id);
+    };
+
+    if let Some(flags) = cls.flags {
+        begin(&mut w, section::FLAGS, false);
+        w.u32(flags);
+    }
+    if !cls.description.is_empty() {
+        begin(&mut w, section::DESCRIPTION, false);
+        w.string(&cls.description);
+    }
+    if !cls.vars.is_empty() {
+        begin(&mut w, section::VARS, false);
+        w.u16(cls.vars.len() as u16);
+        for v in &cls.vars {
+            w.string(&v.name);
+            w.string(&v.description);
+            w.string(&v.default);
+            w.string(&v.var_type);
+            w.u32(v.flags);
+        }
+    }
+    if !cls.text.is_empty() {
+        begin(&mut w, section::TEXT, true);
+        w.string(&cls.text);
+    }
+    if !cls.children.is_empty() {
+        begin(&mut w, section::CHILDREN, false);
+        w.u16(cls.children.len() as u16);
+        for c in &cls.children {
+            w.string(&c.class_name);
+            w.u16(c.handle);
+            w.string(&c.name);
+            w.f64(c.x);
+            w.f64(c.y);
+            w.u8(c.flags);
+        }
+    }
+    if !cls.links.is_empty() {
+        begin(&mut w, section::LINKS, false);
+        w.u16(cls.links.len() as u16);
+        for l in &cls.links {
+            w.u16(l.source);
+            w.u16(l.target);
+            w.u16(l.handle);
+            w.u32(l.flags);
+            w.u16(l.vars.len() as u16);
+            w.u16(0);
+            for (a, b) in &l.vars {
+                w.string(a);
+                w.string(b);
+            }
+        }
+    }
+    for (id, blob) in [(section::ICON, &cls.icon), (section::IMAGE, &cls.image), (section::SCHEME, &cls.scheme)] {
+        if let Some(body) = blob {
+            begin(&mut w, id, true);
+            w.u32(body.len() as u32 + 4);
+            w.bytes(body);
+        }
+    }
+    if let Some(file) = &cls.icon_file {
+        begin(&mut w, section::ICON_FILE, false);
+        w.string(file);
+    }
+    if let Some(i) = cls.icon_index {
+        begin(&mut w, section::ICON_INDEX, false);
+        w.u16(i);
+    }
+    if let Some(eq) = &cls.equations {
+        begin(&mut w, section::EQUATIONS, false);
+        w.bytes(eq);
+    }
+    if let Some(t) = cls.timestamp {
+        begin(&mut w, section::TIMESTAMP, false);
+        w.u32(t);
+    }
+    // блок уравнений читается «до конца тела» и уже содержит свой хвост;
+    // маркер конца после него нужен только чтобы отделить отметку времени
+    if cls.equations.is_none() || cls.timestamp.is_some() {
+        w.u16(section::END);
+    }
+    let body_end = w.pos() - INDEX_BASE;
+    w.patch_u32(body_end_at, body_end as u32);
+    w.patch_u32(index_size_at, (index.len() * 6) as u32);
+    for (id, off) in index {
+        w.u32(off);
+        w.u16(id);
+    }
+    w.data
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn write_then_read_keeps_everything() {
+        let cls = Class {
+            name: "Планета".into(),
+            version: 0x3003,
+            description: "описание".into(),
+            vars: vec![Variable { name: "x".into(), description: String::new(), default: "1.5".into(), var_type: "FLOAT".into(), flags: 0x100 }],
+            text: "x := ~x + 1".into(),
+            children: vec![Child { class_name: "Луна".into(), handle: 3, name: String::new(), x: -12.0, y: 48.5, flags: 0 }],
+            links: vec![Link { source: 0, target: 3, handle: 1, flags: 0, vars: vec![("x".into(), "y".into())] }],
+            icon: Some(vec![1, 2, 3]),
+            timestamp: Some(7),
+            flags: Some(0x200),
+            ..Default::default()
+        };
+        let back = parse(&write(&cls), "mem").unwrap();
+        assert_eq!(back.name, cls.name);
+        assert_eq!(back.text, cls.text);
+        assert_eq!(back.vars.len(), 1);
+        assert_eq!(back.children[0].y, 48.5);
+        assert_eq!(back.links[0].vars, cls.links[0].vars);
+        assert_eq!(back.icon, cls.icon);
+        assert_eq!(back.timestamp, Some(7));
+        assert_eq!(back.flags, Some(0x200));
+    }
 
     fn fixture(rel: &str) -> Option<Vec<u8>> {
         let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../fixtures/");

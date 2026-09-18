@@ -44,6 +44,8 @@ pub struct Shared {
     pub models: HashMap<String, lang::Model>,
     /// Есть несохранённые правки.
     pub dirty: bool,
+    /// Есть правки, не записанные на диск.
+    pub unsaved: bool,
 }
 
 pub struct Options {
@@ -85,6 +87,7 @@ pub fn serve_with(opts: Options, on_ready: impl FnOnce(u16)) -> Result<(), Strin
         project,
         models,
         dirty: false,
+        unsaved: false,
     }));
     let static_dir = opts.static_dir.clone();
 

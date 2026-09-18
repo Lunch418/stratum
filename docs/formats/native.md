@@ -1,0 +1,88 @@
+# Родной формат проекта Stratum Modern
+
+Проект — папка с текстовыми файлами, которые удобно читать, править руками и
+хранить в git. Двоичными остаются только векторные рисунки (`.vdr`), их
+формат описан в [vdr.md](vdr.md). Реализация — `core/src/formats/native.rs`.
+
+```text
+Проект/
+  project.json                корень, свойства, переменные проекта, список имиджей
+  state.json                  стартовые значения переменных (бывший _preload.stt)
+  classes/
+    Планета.strat.json        описание имиджа: переменные, дети на схеме, связи
+    Планета.strat             текст имиджа (язык Stratum)
+    Планета.icon.vdr          иконка (32×32), если своя
+    Планета.image.vdr         рисунок имиджа
+    Планета.scheme.vdr        графика листа схемы
+    Планета.eq.bin            уравнения (библиотеки цепей), как есть
+```
+
+Файлы имиджа называются по имени имиджа; символы `<>:"/\|?*` заменяются на
+`_`, совпадения без учёта регистра получают суффикс `~2`, `~3`… Настоящее
+имя всегда лежит в `name` внутри `.strat.json`, а соответствие «имя → файл» —
+в `project.json`.
+
+## `project.json`
+
+```json
+{
+  "format": "stratum-modern/1",
+  "root": "Root_e2c115d_b1a",
+  "properties": [{ "key": "MathMode", "int": 3 }, { "key": "user_name", "text": "…" }],
+  "variables": [{ "kind": 2, "flags": 0, "handle": 3, "name": "State", "description": "…" }],
+  "classes": [{ "name": "Планета", "file": "Планета" }],
+  "libraries": []
+}
+```
+
+`properties` и `variables` — свойства и переменные проекта из `project.spj`
+без изменений. `libraries` — папки библиотек **внутри** проекта
+(относительные пути); библиотеки на машине разработчика (`--lib`,
+`$STRATUM_LIBRARY`, установленный Stratum) в файл не попадают, это настройка
+окружения.
+
+## `classes/Имя.strat.json`
+
+```json
+{
+  "name": "Планета",
+  "description": "",
+  "flags": 512,
+  "iconFile": "system.dbm", "iconIndex": 7,
+  "timestamp": 932034298,
+  "vars": [{ "name": "x", "type": "FLOAT", "default": "0", "description": "", "flags": 131328 }],
+  "children": [{ "handle": 3, "class": "Луна", "name": "", "x": -544, "y": 48, "flags": 0 }],
+  "links": [{ "handle": 1, "source": 0, "target": 3, "flags": 0, "vars": [["x", "x0"]] }]
+}
+```
+
+Поля соответствуют секциям `.cls` (см. [cls.md](cls.md)): `flags` имиджа —
+секция `0x04`, флаги переменной — `u32` из секции `0x0f`, `handle` ребёнка и
+`source`/`target` связи — те же дескрипторы, что на схеме оригинала; `0` в
+связи — сам имидж. Байт-код (`0x0d`) не хранится: текст компилируется заново.
+
+Текст имиджа лежит отдельно в `Имя.strat` с переводами строк `\n`.
+
+## `state.json`
+
+```json
+{ "root": "Root_e2c115d_b1a",
+  "images": [{ "class": "NumberView", "ref": 169, "handle": 18, "vars": [["size", "0"]] }] }
+```
+
+## Импорт и экспорт
+
+```sh
+stratum convert fixtures/user/solar_system ~/проекты/solar        # .spj → project.json
+stratum convert ~/проекты/solar /tmp/solar-2000 --to stratum2000  # обратно: .spj, .cls, _preload.stt
+```
+
+В IDE: «Сохранить» (Ctrl+S вне редактора кода, Ctrl+Shift+S всегда),
+«Сохранить как…», «Экспорт…». Проект, открытый из `.spj`, при первом
+сохранении просит новую папку — исходники Stratum 2000 не перезаписываются.
+
+Тест `every_sample_project_survives_import_export` прогоняет все примеры
+корпуса через `.spj → project.json → .spj` и сверяет имиджи поле за полем;
+`every_class_survives_cls_round_trip` делает то же для каждого из 660 `.cls`.
+Симуляция «Солнечной системы» после обоих преобразований даёт побайтно тот же
+дамп на такте 100.

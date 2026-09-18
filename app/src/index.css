@@ -145,6 +145,15 @@ table.vars input:focus { border-color: var(--accent); background: var(--bg-surfa
 .messages .row.error { color: var(--state-error); }
 .messages .row .where { color: var(--text-muted); min-width: 160px; }
 
+/* модальные окна */
+.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; z-index: 20; }
+.modal { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 6px; width: min(560px, 92vw); box-shadow: 0 12px 40px rgba(0,0,0,.3); }
+.modal-body { padding: 12px 14px; }
+.modal-body input { width: 100%; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--border); }
+.topbar .sep { width: 1px; height: 22px; background: var(--border); margin: 0 4px; }
+button.attention { border-color: var(--state-pause); }
+
 /* тосты */
 .toast { position: fixed; left: 50%; bottom: 36px; transform: translateX(-50%); background: var(--text-primary); color: var(--bg-surface); padding: 6px 14px; border-radius: var(--radius); font-size: 12px; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
 

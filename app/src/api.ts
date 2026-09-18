@@ -10,7 +10,7 @@ export interface ClassInfo {
   declared: { name: string; type: string }[]; text: string; children: Child[]; links: Link[];
   hasIcon: boolean; hasScheme: boolean; hasImage: boolean; source: string;
 }
-export interface Project { root: string; dir: string; classes: ClassInfo[] }
+export interface Project { root: string; dir: string; native: boolean; unsaved: boolean; classes: ClassInfo[] }
 export interface Instance { index: number; path: string; name: string; class: string; parent: number | null; handle: number }
 export interface Frame {
   tick: number; running: boolean; stopped: boolean;
@@ -45,6 +45,19 @@ export const api = {
   },
   moveChild: (klass: string, handle: number, x: number, y: number) =>
     fetch(`/api/child/move?class=${encodeURIComponent(klass)}&handle=${handle}&x=${x}&y=${y}`, { method: 'POST' }),
+  // сохранить проект в родном формате (project.json); dir — новая папка
+  save: async (dir?: string) => {
+    const r = await fetch('/api/save' + (dir ? '?dir=' + encodeURIComponent(dir) : ''), { method: 'POST' });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error ?? r.statusText);
+    return j as { ok: boolean; dir: string };
+  },
+  exportProject: async (dir: string) => {
+    const r = await fetch('/api/export?dir=' + encodeURIComponent(dir), { method: 'POST' });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error ?? r.statusText);
+    return j as { ok: boolean; dir: string; classes: number };
+  },
   setValue: (index: number, name: string, value: string) =>
     fetch(`/api/set/${index}?var=${encodeURIComponent(name)}&value=${encodeURIComponent(value)}`, { method: 'POST' }),
 };
