@@ -473,10 +473,15 @@ fn binop(op: &str) -> Option<(BinOp, u8)> {
 mod tests {
     use super::*;
 
+    /// Операторы без меток строк — тестам важна структура.
+    fn body(src: &str) -> Vec<Stmt> {
+        parse(src).unwrap().body.into_iter().filter(|s| !matches!(s, Stmt::At(_))).collect()
+    }
+
     fn one(src: &str) -> Stmt {
-        let m = parse(src).unwrap();
-        assert_eq!(m.body.len(), 1, "{:?}", m.body);
-        m.body.into_iter().next().unwrap()
+        let b = body(src);
+        assert_eq!(b.len(), 1, "{:?}", b);
+        b.into_iter().next().unwrap()
     }
 
     #[test]
@@ -539,36 +544,37 @@ mod tests {
 
     #[test]
     fn if_else_endif() {
-        let m = parse("if (a > 1)\n b := 2\nelse\n b := 3\nendif").unwrap();
-        let Stmt::If { then_body, else_body, .. } = &m.body[0] else { panic!() };
-        assert_eq!(then_body.len(), 1);
-        assert_eq!(else_body.len(), 1);
+        let m_body = body("if (a > 1)\n b := 2\nelse\n b := 3\nendif");
+        let Stmt::If { then_body, else_body, .. } = &m_body[0] else { panic!() };
+        let real = |b: &Vec<Stmt>| b.iter().filter(|s| !matches!(s, Stmt::At(_))).count();
+        assert_eq!(real(then_body), 1);
+        assert_eq!(real(else_body), 1);
     }
 
     #[test]
     fn switch_with_cases() {
-        let m = parse("switch\n case (~msg == 1); a := 1\n case (~msg == 2); a := 2\n default;\nendswitch").unwrap();
-        let Stmt::Switch { arms, default } = &m.body[0] else { panic!() };
+        let m_body = body("switch\n case (~msg == 1); a := 1\n case (~msg == 2); a := 2\n default;\nendswitch");
+        let Stmt::Switch { arms, default } = &m_body[0] else { panic!() };
         assert_eq!(arms.len(), 2);
         assert!(default.is_empty());
     }
 
     #[test]
     fn chained_assignment() {
-        let m = parse("s := r := a * 2").unwrap();
-        assert_eq!(m.body.len(), 2);
+        let m_body = body("s := r := a * 2");
+        assert_eq!(m_body.len(), 2);
     }
 
     #[test]
     fn equation_and_unknowns() {
-        let m = parse("x + y = 10\n? x, y").unwrap();
-        assert!(matches!(m.body[0], Stmt::Equation { .. }));
-        assert_eq!(m.body[1], Stmt::Unknowns(vec!["x".into(), "y".into()]));
+        let m_body = body("x + y = 10\n? x, y");
+        assert!(matches!(m_body[0], Stmt::Equation { .. }));
+        assert_eq!(m_body[1], Stmt::Unknowns(vec!["x".into(), "y".into()]));
     }
 
     #[test]
     fn call_without_assignment() {
-        let m = parse("exit()").unwrap();
-        assert_eq!(m.body[0], Stmt::Expr(Expr::Call("exit".into(), vec![])));
+        let m_body = body("exit()");
+        assert_eq!(m_body[0], Stmt::Expr(Expr::Call("exit".into(), vec![])));
     }
 }
