@@ -415,6 +415,48 @@ impl Simulation {
         }
     }
 
+    /// Текущие значения всех переменных как снимок `_preload.stt`.
+    pub fn snapshot_state(&self, root: &str) -> crate::formats::State {
+        let images = self
+            .instances
+            .iter()
+            .enumerate()
+            .map(|(i, inst)| crate::formats::project::StateImage {
+                class_name: inst.class_name.clone(),
+                reference: i as u32,
+                handle: inst.handle,
+                vars: inst.order.iter().filter_map(|n| self.value(i, n).map(|v| (n.clone(), v.to_string()))).collect(),
+            })
+            .collect();
+        crate::formats::State { root: root.to_string(), images }
+    }
+
+    /// Загружает снимок в работающую модель (по классу и handle на схеме).
+    pub fn load_state(&mut self, state: &crate::formats::State) {
+        for image in &state.images {
+            let Some(index) = self.instances.iter().position(|i| i.class_name.eq_ignore_ascii_case(&image.class_name) && (i.handle == image.handle || i.parent.is_none())) else { continue };
+            for (name, text) in &image.vars {
+                let Some(&cell) = self.instances[index].vars.get(&name.to_ascii_lowercase()) else { continue };
+                self.cells[cell] = Value::parse_default(text, self.types[cell]);
+                self.old[cell] = self.cells[cell].clone();
+            }
+        }
+    }
+
+    /// Переменные всех экземпляров — в значения по умолчанию из описаний имиджей.
+    pub fn reset_to_defaults(&mut self) {
+        for i in 0..self.instances.len() {
+            let class = self.instances[i].class;
+            let Some(meta) = self.class_meta.get(class).cloned() else { continue };
+            for v in &meta.vars {
+                if let Some(&c) = self.instances[i].vars.get(&v.name.to_ascii_lowercase()) {
+                    self.cells[c] = Value::parse_default(&v.default, self.types[c]);
+                    self.old[c] = self.cells[c].clone();
+                }
+            }
+        }
+    }
+
     /// Стартовые значения из `_preload.stt`.
     fn apply_state(&mut self, project: &LoadedProject) {
         let Some(state) = &project.state else { return };

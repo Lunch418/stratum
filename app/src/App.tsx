@@ -13,14 +13,15 @@ import { Graph } from './components/Graph';
 import { PictureEditor } from './components/PictureEditor';
 import { Debug } from './components/Debug';
 import { Help } from './components/Help';
+import { Search } from './components/Search';
 import { OpenDialog } from './components/OpenDialog';
 import { Palette, type Command } from './components/Palette';
 
 export default function App() {
   const s = useStore();
   const frame = s.frame;
-  const [dialog, setDialog] = useState<'saveAs' | 'export' | 'open' | null>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [dialog, setDialog] = useState<'saveAs' | 'export' | 'open' | 'stateSave' | 'stateLoad' | null>(null);
+  const [menuOpen, setMenuOpen] = useState<'project' | 'model' | null>(null);
   const [layout, setLayout] = useState<{ left: number; right: number; bottom: number }>(() => {
     const def = { left: 260, right: 300, bottom: 160 };
     try { return { ...def, ...JSON.parse(localStorage.getItem('layout') ?? '{}') as Partial<typeof def> }; }
@@ -99,6 +100,7 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() === 's' && e.ctrlKey && e.shiftKey) { e.preventDefault(); save(); }
       else if ((e.key.toLowerCase() === 'p' && e.ctrlKey && e.shiftKey) || (e.key.toLowerCase() === 'k' && e.ctrlKey)) { e.preventDefault(); s.setPaletteOpen(true); }
+      else if (e.key.toLowerCase() === 'f' && e.ctrlKey && e.shiftKey) { e.preventDefault(); s.setBottomTab('search'); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -125,7 +127,12 @@ export default function App() {
     { id: 'run', title: running ? 'Пауза' : 'Пуск', hint: 'F5', group: 'модель', run: () => api.event(running ? 'type=pause' : 'type=run') },
     { id: 'step', title: 'Шаг', hint: 'F10', group: 'модель', run: () => api.event('type=step') },
     { id: 'back', title: 'Такт назад', hint: 'Shift+F10', group: 'модель', run: () => api.event('type=back') },
+    { id: 'default', title: 'Переменные по умолчанию', group: 'модель', run: () => api.stateAction('default') },
+    { id: 'keep', title: 'Запомнить как стартовое состояние', group: 'модель', run: () => api.stateAction('keep').then(() => s.markUnsaved()) },
+    { id: 'statesave', title: 'Сохранить состояние в .stt…', group: 'модель', run: () => setDialog('stateSave') },
+    { id: 'stateload', title: 'Загрузить состояние из .stt…', group: 'модель', run: () => setDialog('stateLoad') },
     { id: 'bottom-debug', title: 'Панель: Отладка', group: 'вид', run: () => s.setBottomTab('debug') },
+    { id: 'search', title: 'Поиск по проекту', hint: 'Ctrl+Shift+F', group: 'правка', run: () => s.setBottomTab('search') },
     { id: 'reset', title: 'Сброс', hint: 'Shift+F5', group: 'модель', run: () => api.event('type=reset').then(() => s.refreshInstances()) },
     { id: 'open', title: 'Открыть проект…', hint: 'Ctrl+O', group: 'проект', run: () => setDialog('open') },
     { id: 'newproj', title: 'Новый проект', group: 'проект', run: async () => { await api.newProject(); await s.load(); } },
@@ -167,13 +174,24 @@ export default function App() {
         <button className="ghost" onClick={s.redo} disabled={!s.project?.canRedo} title="Ctrl+Shift+Z">Повторить</button>
         <button onClick={save} title="Ctrl+S — сохранить проект в текстовом формате" className={s.unsaved ? 'attention' : ''}>Сохранить{s.unsaved ? ' •' : ''}</button>
         <div className="menu-host">
-          <button className="ghost" onClick={() => setMenuOpen(o => !o)}>Проект ▾</button>
-          {menuOpen && (
-            <div className="context menu" onMouseLeave={() => setMenuOpen(false)}>
-              <button onClick={() => { setMenuOpen(false); setDialog('open'); }}>Открыть… <span className="muted">Ctrl+O</span></button>
-              <button onClick={async () => { setMenuOpen(false); await api.newProject(); await s.load(); }}>Новый проект</button>
-              <button onClick={() => { setMenuOpen(false); setDialog('saveAs'); }}>Сохранить как…</button>
-              <button onClick={() => { setMenuOpen(false); setDialog('export'); }}>Экспорт в Stratum 2000…</button>
+          <button className="ghost" onClick={() => setMenuOpen(o => o === 'project' ? null : 'project')}>Проект ▾</button>
+          {menuOpen === 'project' && (
+            <div className="context menu" onMouseLeave={() => setMenuOpen(null)}>
+              <button onClick={() => { setMenuOpen(null); setDialog('open'); }}>Открыть… <span className="muted">Ctrl+O</span></button>
+              <button onClick={async () => { setMenuOpen(null); await api.newProject(); await s.load(); }}>Новый проект</button>
+              <button onClick={() => { setMenuOpen(null); setDialog('saveAs'); }}>Сохранить как…</button>
+              <button onClick={() => { setMenuOpen(null); setDialog('export'); }}>Экспорт в Stratum 2000…</button>
+            </div>
+          )}
+        </div>
+        <div className="menu-host">
+          <button className="ghost" onClick={() => setMenuOpen(o => o === 'model' ? null : 'model')}>Модель ▾</button>
+          {menuOpen === 'model' && (
+            <div className="context menu" onMouseLeave={() => setMenuOpen(null)}>
+              <button onClick={() => { setMenuOpen(null); api.stateAction('default').then(() => s.showToast('Переменные — по умолчанию')); }}>Переменные по умолчанию</button>
+              <button onClick={() => { setMenuOpen(null); api.stateAction('keep').then(() => { s.markUnsaved(); s.showToast('Текущее состояние стало стартовым'); }); }}>Запомнить как стартовое состояние</button>
+              <button onClick={() => { setMenuOpen(null); setDialog('stateSave'); }}>Сохранить состояние в .stt…</button>
+              <button onClick={() => { setMenuOpen(null); setDialog('stateLoad'); }}>Загрузить состояние из .stt…</button>
             </div>
           )}
         </div>
@@ -187,6 +205,13 @@ export default function App() {
           hint="Папка получит project.json и classes/ — текстовый формат Stratum Modern."
           onClose={() => setDialog(null)}
           onSubmit={dir => { setDialog(null); s.saveProject(dir).catch(e => s.say({ level: 'error', where: 'проект', text: String(e) })); }} />
+      )}
+      {(dialog === 'stateSave' || dialog === 'stateLoad') && s.project && (
+        <PathDialog title={dialog === 'stateSave' ? 'Сохранить состояние' : 'Загрузить состояние'} action={dialog === 'stateSave' ? 'Сохранить' : 'Загрузить'}
+          initial={(s.project.dir || '.').replace(/[\\/]+$/, '') + '/state.stt'}
+          hint="Файл .stt в новой редакции (переменные по именам), как _preload.stt."
+          onClose={() => setDialog(null)}
+          onSubmit={p => { setDialog(null); api.stateAction(dialog === 'stateSave' ? 'save' : 'load', p).then(r => s.showToast(`${dialog === 'stateSave' ? 'Сохранено' : 'Загружено'}: ${r.images} имиджей`)).catch(e => s.say({ level: 'error', where: 'состояние', text: String(e) })); }} />
       )}
       {dialog === 'export' && s.project && (
         <PathDialog title="Экспорт в Stratum 2000" action="Экспортировать" initial={s.project.dir.replace(/[\\/]+$/, '') + '-export'}
@@ -239,9 +264,10 @@ export default function App() {
             <button className={s.bottomTab === 'messages' ? 'active' : ''} onClick={() => s.setBottomTab('messages')}>Сообщения</button>
             <button className={s.bottomTab === 'graphs' ? 'active' : ''} onClick={() => s.setBottomTab('graphs')}>Графики{s.traceCount ? ` (${s.traceCount})` : ''}</button>
             <button className={s.bottomTab === 'debug' ? 'active' : ''} onClick={() => s.setBottomTab('debug')}>Отладка</button>
+            <button className={s.bottomTab === 'search' ? 'active' : ''} onClick={() => s.setBottomTab('search')}>Поиск</button>
           </div>
           <div className="tab-body" style={{ display: 'flex', flexDirection: 'column' }}>
-            {s.bottomTab === 'messages' ? <Messages /> : s.bottomTab === 'graphs' ? <Graphs /> : <Debug />}
+            {s.bottomTab === 'messages' ? <Messages /> : s.bottomTab === 'graphs' ? <Graphs /> : s.bottomTab === 'debug' ? <Debug /> : <Search />}
           </div>
         </section>
       </div>

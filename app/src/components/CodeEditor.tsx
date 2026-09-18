@@ -119,6 +119,16 @@ export function CodeEditor() {
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
   const monacoRef = useRef<Monaco | null>(null);
   const halt = useStore(s => s.frame?.halt);
+  const gotoLine = useStore(s => s.gotoLine);
+  const setGotoLine = useStore(s => s.setGotoLine);
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor || !gotoLine || !klass || gotoLine.class.toLowerCase() !== klass.name.toLowerCase()) return;
+    editor.revealLineInCenter(gotoLine.line);
+    editor.setPosition({ lineNumber: gotoLine.line, column: 1 });
+    editor.focus();
+    setGotoLine(null);
+  }, [gotoLine, klass?.name, text]);
   const decorations = useRef<string[]>([]);
 
   // подсветка строки ошибки времени выполнения в тексте этого имиджа

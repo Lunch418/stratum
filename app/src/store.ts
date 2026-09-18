@@ -28,8 +28,13 @@ interface State {
   say: (m: Message) => void;
   showToast: (t: string) => void;
   toggleTheme: () => void;
-  bottomTab: 'messages' | 'graphs' | 'debug';
-  setBottomTab: (t: 'messages' | 'graphs' | 'debug') => void;
+  bottomTab: 'messages' | 'graphs' | 'debug' | 'search';
+  setBottomTab: (t: 'messages' | 'graphs' | 'debug' | 'search') => void;
+  searchQuery: string;
+  setSearchQuery: (q: string) => void;
+  /// перейти к строке в редакторе кода после выбора имиджа
+  gotoLine: { class: string; line: number } | null;
+  setGotoLine: (g: { class: string; line: number } | null) => void;
   paletteOpen: boolean;
   setPaletteOpen: (v: boolean) => void;
   traceCount: number;
@@ -38,6 +43,9 @@ interface State {
   /// выбранный графический объект окна модели
   pickedObject: { win: string; handle: number } | null;
   pickObject: (p: { win: string; handle: number } | null) => void;
+  /// буфер обмена схемы: экземпляры (класс, имя, смещение)
+  schemeClipboard: { class: string; name: string; x: number; y: number }[];
+  setSchemeClipboard: (c: { class: string; name: string; x: number; y: number }[]) => void;
   helpTopic: string | null;
   setHelpTopic: (t: string | null) => void;
   unsaved: boolean;
@@ -77,6 +85,10 @@ export const useStore = create<State>((set, get) => ({
   unsaved: false,
   bottomTab: 'messages',
   setBottomTab: bottomTab => set({ bottomTab }),
+  searchQuery: '',
+  setSearchQuery: searchQuery => set({ searchQuery }),
+  gotoLine: null,
+  setGotoLine: gotoLine => set({ gotoLine }),
   paletteOpen: false,
   setPaletteOpen: paletteOpen => set({ paletteOpen }),
   traceCount: 0,
@@ -90,6 +102,8 @@ export const useStore = create<State>((set, get) => ({
   },
   pickedObject: null,
   pickObject: pickedObject => set({ pickedObject }),
+  schemeClipboard: [],
+  setSchemeClipboard: schemeClipboard => set({ schemeClipboard }),
   helpTopic: null,
   setHelpTopic: helpTopic => set({ helpTopic }),
   markUnsaved: () => set(s => ({ unsaved: true, project: s.project ? { ...s.project, canUndo: true, canRedo: false } : s.project })),

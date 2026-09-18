@@ -746,6 +746,83 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
                 Err((status, msg)) => error(status, &msg),
             }
         }
+        // состояние модели: файл .stt, стартовое состояние проекта, по умолчанию
+        ("POST", ["state", action]) => {
+            let path = super::param(query, "path").map(super::url_decode).unwrap_or_default();
+            let mut s = shared.lock().unwrap();
+            let root = s.project.project.root.clone();
+            match *action {
+                "save" => {
+                    if path.is_empty() {
+                        return error("400 Bad Request", "нужен путь path");
+                    }
+                    let st = s.sim.snapshot_state(&root);
+                    match std::fs::write(&path, crate::formats::project::write_state(&st)) {
+                        Ok(()) => json(format!("{{\"ok\":true,\"images\":{}}}", st.images.len())),
+                        Err(e) => error("500 Internal Server Error", &e.to_string()),
+                    }
+                }
+                "load" => {
+                    if path.is_empty() {
+                        return error("400 Bad Request", "нужен путь path");
+                    }
+                    let Ok(data) = std::fs::read(&path) else { return error("404 Not Found", "файл не читается") };
+                    match crate::formats::project::parse_state(&data, &path) {
+                        Ok(st) => {
+                            s.sim.load_state(&st);
+                            json(format!("{{\"ok\":true,\"images\":{}}}", st.images.len()))
+                        }
+                        Err(e) => error("400 Bad Request", &e.to_string()),
+                    }
+                }
+                // текущие значения становятся стартовыми (state.json / _preload.stt при сохранении)
+                "keep" => {
+                    let st = s.sim.snapshot_state(&root);
+                    s.remember();
+                    s.project.state = Some(st);
+                    json("{\"ok\":true}".into())
+                }
+                "default" => {
+                    s.sim.reset_to_defaults();
+                    s.running = false;
+                    json("{\"ok\":true}".into())
+                }
+                _ => error("404 Not Found", "нет такого действия"),
+            }
+        }
+        // поиск по текстам и переменным всех имиджей проекта
+        ("GET", ["search"]) => {
+            let q = super::param(query, "q").map(super::url_decode).unwrap_or_default();
+            let q_low = q.to_lowercase();
+            if q_low.trim().is_empty() {
+                return json("[]".into());
+            }
+            let libs = super::param(query, "libs").is_some_and(|v| v == "1");
+            let s = shared.lock().unwrap();
+            let mut hits: Vec<String> = Vec::new();
+            for (i, c) in s.project.classes.iter().enumerate() {
+                if i >= s.project.own_classes && !libs {
+                    break;
+                }
+                for (n, line) in c.text.lines().enumerate() {
+                    if line.to_lowercase().contains(&q_low) {
+                        hits.push(format!("{{\"class\":{},\"line\":{},\"text\":{},\"kind\":\"text\"}}", json_string(&c.name), n + 1, json_string(line.trim())));
+                        if hits.len() > 500 {
+                            break;
+                        }
+                    }
+                }
+                for v in &c.vars {
+                    if v.name.to_lowercase().contains(&q_low) || v.description.to_lowercase().contains(&q_low) {
+                        hits.push(format!("{{\"class\":{},\"line\":0,\"text\":{},\"kind\":\"var\"}}", json_string(&c.name), json_string(&format!("{} {} = {} {}", v.var_type, v.name, v.default, v.description))));
+                    }
+                }
+                if c.name.to_lowercase().contains(&q_low) {
+                    hits.push(format!("{{\"class\":{},\"line\":0,\"text\":\"имидж\",\"kind\":\"class\"}}", json_string(&c.name)));
+                }
+            }
+            json(format!("[{}]", hits.join(",")))
+        }
         ("POST", ["undo"]) | ("POST", ["redo"]) => {
             let mut s = shared.lock().unwrap();
             let done = if parts[0] == "undo" { s.undo() } else { s.redo() };

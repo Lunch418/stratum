@@ -34,6 +34,8 @@ export function SchemeCanvas() {
   const reload = useStore(s => s.reload);
   const setTab = useStore(s => s.setTab);
   const say = useStore(s => s.say);
+  const clipboard = useStore(s => s.schemeClipboard);
+  const setClipboard = useStore(s => s.setSchemeClipboard);
   const klass = classByName(project, path[path.length - 1]);
   const editable = !!klass && !klass.library;
   const [view, setView] = useState<View>({ x: 0, y: 0, k: 1 });
@@ -100,6 +102,19 @@ export function SchemeCanvas() {
       if ((e.key === 'Delete' || e.key === 'Backspace') && editable && klass) {
         if (selNode !== null && selNode !== SELF) { e.preventDefault(); removeChild(selNode); }
         else if (selLink !== null) { e.preventDefault(); removeLink(selLink); }
+      }
+      // буфер обмена схемы: копировать/вырезать/вставить/дублировать блок
+      if (e.ctrlKey && klass && selNode !== null && selNode !== SELF && ['c', 'x', 'd'].includes(e.key.toLowerCase())) {
+        const c = klass.children.find(x => x.handle === selNode);
+        if (!c) return;
+        e.preventDefault();
+        if (e.key.toLowerCase() === 'd') { if (editable) pasteBlocks([{ class: c.class, name: c.name, x: c.x, y: c.y }]); return; }
+        setClipboard([{ class: c.class, name: c.name, x: c.x, y: c.y }]);
+        showToast(e.key.toLowerCase() === 'x' ? 'Вырезано' : 'Скопировано');
+        if (e.key.toLowerCase() === 'x' && editable) removeChild(selNode);
+      } else if (e.ctrlKey && e.key.toLowerCase() === 'v' && editable && clipboard.length) {
+        e.preventDefault();
+        pasteBlocks(clipboard);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -180,6 +195,18 @@ export function SchemeCanvas() {
       setSelNode(r.handle);
       showToast(`Добавлен ${name}`);
     } catch (err) { say({ level: 'error', where: klass.name, text: String(err) }); }
+  }
+
+  async function pasteBlocks(items: { class: string; name: string; x: number; y: number }[]) {
+    if (!klass) return;
+    let last = 0;
+    for (const it of items) {
+      const r = await api.addChild(klass.name, it.class, it.x + 16, it.y + 16, it.name ? it.name + '_копия' : '');
+      last = r.handle;
+    }
+    await reload();
+    setSelNode(last);
+    showToast('Вставлено');
   }
 
   async function removeChild(handle: number) {
@@ -297,6 +324,8 @@ export function SchemeCanvas() {
         <div className="context" style={{ left: menu.x, top: menu.y }} onMouseDown={e => e.stopPropagation()}>
           <button onClick={() => { const n = nodes.find(n => n.handle === menu.handle); setMenu(null); select(n?.class ?? null); setTab('code'); }}>Открыть код</button>
           {menu.handle !== SELF && <button onClick={() => { const n = klass.children.find(n => n.handle === menu.handle); setMenu(null); setRenaming({ handle: menu.handle, value: n?.name ?? '' }); }}>Переименовать…</button>}
+          {menu.handle !== SELF && <button onClick={() => { const c = klass.children.find(n => n.handle === menu.handle); setMenu(null); if (c) { setClipboard([{ class: c.class, name: c.name, x: c.x, y: c.y }]); showToast('Скопировано'); } }}>Копировать <span className="muted">Ctrl+C</span></button>}
+          {menu.handle !== SELF && <button onClick={() => { const c = klass.children.find(n => n.handle === menu.handle); setMenu(null); if (c) pasteBlocks([{ class: c.class, name: c.name, x: c.x, y: c.y }]); }}>Дублировать <span className="muted">Ctrl+D</span></button>}
           {menu.handle !== SELF && <button onClick={() => { setMenu(null); removeChild(menu.handle); }}>Удалить <span className="muted">Del</span></button>}
         </div>
       )}

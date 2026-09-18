@@ -124,6 +124,12 @@ export const api = {
   object: (win: string, handle: number) => get<ObjectProps | null>(`/api/object?win=${encodeURIComponent(win)}&handle=${handle}`),
   objectSet: (win: string, handle: number, field: string, value: string | number) =>
     fetch(`/api/object/set?win=${encodeURIComponent(win)}&handle=${handle}&field=${field}&value=${encodeURIComponent(String(value))}`, { method: 'POST' }),
+  stateAction: async (action: 'save' | 'load' | 'keep' | 'default', path = '') => {
+    const r = await fetch(`/api/state/${action}?path=${encodeURIComponent(path)}`, { method: 'POST' });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error ?? r.statusText);
+    return j as { ok: boolean; images?: number };
+  },
   undo: () => fetch('/api/undo', { method: 'POST' }).then(r => r.json() as Promise<{ ok: boolean; canUndo: boolean; canRedo: boolean }>),
   redo: () => fetch('/api/redo', { method: 'POST' }).then(r => r.json() as Promise<{ ok: boolean; canUndo: boolean; canRedo: boolean }>),
   setValue: (index: number, name: string, value: string) =>
