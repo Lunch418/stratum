@@ -57,6 +57,7 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 2
 button.primary { background: var(--state-run); border-color: transparent; color: #fff; font-weight: 600; min-width: 96px; }
 button.primary.paused { background: var(--state-pause); }
 button.ghost { border-color: transparent; background: transparent; color: var(--text-muted); }
+button:disabled { opacity: .45; cursor: default; }
 button.ghost:hover { color: var(--text-primary); background: var(--accent-soft); }
 button.small { padding: 2px 7px; font-size: 12px; }
 input[type="text"], input[type="search"], select {
@@ -126,8 +127,18 @@ table.vars input:focus { border-color: var(--accent); background: var(--bg-surfa
 .scheme .node rect.box { fill: var(--bg-surface); stroke: var(--border); rx: 4; }
 .scheme .node.selected rect.box { stroke: var(--accent); stroke-width: 2; }
 .scheme .node text { font-size: 12px; font-weight: 500; fill: var(--text-primary); }
-.scheme .link { stroke: var(--type-float); stroke-width: 1.5; fill: none; }
-.scheme .link:hover { stroke-width: 2.5; }
+.scheme .link .wire { stroke: var(--type-float); stroke-width: 1.5; fill: none; pointer-events: none; }
+.scheme .link .hit { stroke: transparent; stroke-width: 12; fill: none; cursor: pointer; }
+.scheme .link:hover .wire { stroke-width: 2.5; }
+.scheme .link.selected .wire { stroke: var(--accent); stroke-width: 2.5; }
+.scheme .link.drawing { stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 4 3; fill: none; pointer-events: none; }
+.scheme .port { cursor: crosshair; }
+.scheme .port:hover { r: 6; }
+.scheme .node.self rect.box { stroke-dasharray: 4 3; fill: var(--bg-canvas); }
+.scheme .hint { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); font-size: 12px; pointer-events: none; }
+.context { position: fixed; z-index: 30; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 6px 20px rgba(0,0,0,.2); padding: 4px; min-width: 160px; display: flex; flex-direction: column; }
+.context button { border: 0; background: transparent; text-align: left; padding: 6px 10px; border-radius: 3px; display: flex; justify-content: space-between; gap: 12px; }
+.context button:hover { background: var(--accent-soft); }
 .scheme .grid { stroke: var(--border); stroke-width: 0.5; opacity: 0.5; }
 .scheme .toolbar { position: absolute; right: 10px; top: 10px; display: flex; gap: 4px; }
 .breadcrumbs { display: flex; gap: 4px; padding: 4px 10px; font-size: 12px; color: var(--text-muted); border-bottom: 1px solid var(--border); background: var(--bg-surface); }

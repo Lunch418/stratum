@@ -1,6 +1,7 @@
 // Иерархия проекта: дерево экземпляров с фильтром; выбор синхронен со
 // схемой и инспектором. Ниже — библиотечные имиджи.
 import { useMemo, useState } from 'react';
+import { DRAG_CLASS } from './SchemeCanvas';
 import { api } from '../api';
 import { useStore } from '../store';
 
@@ -13,6 +14,18 @@ export function Hierarchy() {
   const [filter, setFilter] = useState('');
   const [collapsed, setCollapsed] = useState<Set<number>>(new Set());
   const [libOpen, setLibOpen] = useState(false);
+  const [ownOpen, setOwnOpen] = useState(true);
+  const reload = useStore(s => s.reload);
+  const say = useStore(s => s.say);
+  const own = project?.classes.filter(c => !c.library) ?? [];
+
+  async function newClass() {
+    // имя формируется автоматически; переименование — позже, через инспектор
+    let n = 1;
+    while (project?.classes.some(c => c.name.toLowerCase() === `имидж${n}`)) n++;
+    try { await api.newClass(`Имидж${n}`); await reload(); select(`Имидж${n}`, null); setTab('code'); }
+    catch (e) { say({ level: 'error', where: 'проект', text: String(e) }); }
+  }
 
   const children = useMemo(() => {
     const m = new Map<number | null, typeof instances>();
@@ -64,6 +77,23 @@ export function Hierarchy() {
             );
           })}
         </div>
+        <div className="panel-title" style={{ cursor: 'pointer' }} onClick={() => setOwnOpen(o => !o)}>
+          Имиджи проекта <span className="spacer" />
+          <button className="small ghost" onClick={e => { e.stopPropagation(); newClass(); }} title="Создать пустой имидж">+ новый</button>
+          <span className="muted">{own.length}</span>
+        </div>
+        {ownOpen && (
+          <div className="tree">
+            {own.filter(c => !f || c.name.toLowerCase().includes(f)).map(c => (
+              <div key={c.name} className="tree-row" style={{ paddingLeft: 22 }} draggable
+                onDragStart={e => { e.dataTransfer.setData(DRAG_CLASS, c.name); e.dataTransfer.effectAllowed = 'copy'; }}
+                onClick={() => select(c.name, null)} onDoubleClick={() => setTab('code')} title="Перетащите на схему, чтобы добавить экземпляр">
+                <img src={api.iconUrl(c.name)} alt="" /><span className="name">{c.name}</span>
+                {c.children.length > 0 && <span className="count">{c.children.length}</span>}
+              </div>
+            ))}
+          </div>
+        )}
         <div className="panel-title" style={{ cursor: 'pointer' }} onClick={() => setLibOpen(o => !o)}>
           Библиотеки <span className="spacer" /><span className="muted">{libs.length}</span>
         </div>
@@ -71,7 +101,9 @@ export function Hierarchy() {
           <div key={g} className="tree">
             <div className="tree-row muted" style={{ paddingLeft: 8 }}>{g}</div>
             {list.filter(c => !f || c.name.toLowerCase().includes(f)).map(c => (
-              <div key={c.name} className="tree-row" style={{ paddingLeft: 22 }} onClick={() => select(c.name, null)} onDoubleClick={() => setTab('code')} title={c.description}>
+              <div key={c.name} className="tree-row" style={{ paddingLeft: 22 }} draggable
+                onDragStart={e => { e.dataTransfer.setData(DRAG_CLASS, c.name); e.dataTransfer.effectAllowed = 'copy'; }}
+                onClick={() => select(c.name, null)} onDoubleClick={() => setTab('code')} title={c.description || 'Перетащите на схему'}>
                 <img src={api.iconUrl(c.name)} alt="" /><span className="name">{c.name}</span>
               </div>
             ))}

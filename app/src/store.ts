@@ -30,6 +30,10 @@ interface State {
   toggleTheme: () => void;
   unsaved: boolean;
   markUnsaved: () => void;
+  /// перечитать проект с сервера, сохранив выбор и путь по схемам
+  reload: () => Promise<void>;
+  undo: () => Promise<void>;
+  redo: () => Promise<void>;
   saveProject: (dir?: string) => Promise<void>;
 }
 
@@ -59,7 +63,18 @@ export const useStore = create<State>((set, get) => ({
   say: m => set(s => ({ messages: [...s.messages.slice(-199), m] })),
   showToast: t => { set({ toast: t }); setTimeout(() => set({ toast: null }), 1800); },
   unsaved: false,
-  markUnsaved: () => set({ unsaved: true }),
+  markUnsaved: () => set(s => ({ unsaved: true, project: s.project ? { ...s.project, canUndo: true, canRedo: false } : s.project })),
+  reload: async () => {
+    const project = await api.project();
+    set(s => {
+      const names = new Set(project.classes.map(c => c.name.toLowerCase()));
+      const schemePath = s.schemePath.filter(p => names.has(p.toLowerCase()));
+      const selectedClass = s.selectedClass && names.has(s.selectedClass.toLowerCase()) ? s.selectedClass : project.root;
+      return { project, unsaved: project.unsaved, schemePath: schemePath.length ? schemePath : [project.root], selectedClass };
+    });
+  },
+  undo: async () => { const r = await api.undo(); if (r.ok) { await get().reload(); get().showToast('Отменено'); } },
+  redo: async () => { const r = await api.redo(); if (r.ok) { await get().reload(); get().showToast('Повторено'); } },
   saveProject: async dir => {
     const r = await api.save(dir);
     set(s => ({ unsaved: false, project: s.project ? { ...s.project, dir: r.dir, native: true } : s.project }));

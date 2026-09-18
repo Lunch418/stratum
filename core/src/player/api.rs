@@ -143,11 +143,13 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
                 .map(|(i, c)| class_json(c, i >= p.own_classes, s.models.get(&c.name.to_lowercase())))
                 .collect();
             json(format!(
-                "{{\"root\":{},\"dir\":{},\"native\":{},\"unsaved\":{},\"classes\":[{}]}}",
+                "{{\"root\":{},\"dir\":{},\"native\":{},\"unsaved\":{},\"canUndo\":{},\"canRedo\":{},\"classes\":[{}]}}",
                 json_string(&p.project.root),
                 json_string(&p.dir.display().to_string()),
                 crate::formats::native::is_native(&p.dir),
                 s.unsaved,
+                !s.history.is_empty(),
+                !s.future.is_empty(),
                 classes.join(",")
             ))
         }
@@ -205,9 +207,8 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
             let Some(i) = s.project.classes.iter().position(|c| c.name.eq_ignore_ascii_case(&name)) else {
                 return error("404 Not Found", "нет такого имиджа");
             };
+            s.remember();
             s.project.classes[i].text = body.to_string();
-            s.dirty = true;
-            s.unsaved = true;
             match lang::parse(body) {
                 Ok(m) => {
                     s.models.insert(name.to_lowercase(), m);
@@ -234,9 +235,8 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
                     flags: f.get(4).and_then(|v| v.parse().ok()).unwrap_or(0x20000),
                 });
             }
+            s.remember();
             s.project.classes[i].vars = vars;
-            s.dirty = true;
-            s.unsaved = true;
             json("{\"ok\":true}".into())
         }
         ("POST", ["child", "move"]) => {
@@ -250,13 +250,157 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
                 return error("404 Not Found", "нет такого имиджа");
             };
             let h: u16 = h.parse().unwrap_or(0);
-            if let Some(ch) = s.project.classes[i].children.iter_mut().find(|c| c.handle == h) {
+            if s.project.classes[i].children.iter().any(|c| c.handle == h) {
+                s.remember();
+                let ch = s.project.classes[i].children.iter_mut().find(|c| c.handle == h).unwrap();
                 ch.x = x.parse().unwrap_or(ch.x);
                 ch.y = y.parse().unwrap_or(ch.y);
-                s.dirty = true;
-            s.unsaved = true;
             }
             json("{\"ok\":true}".into())
+        }
+        // добавить имидж на схему: class (схема), child (класс), x, y, name
+        ("POST", ["child", "add"]) => {
+            let get = |k: &str| super::param(query, k).map(super::url_decode);
+            let (Some(class), Some(child)) = (get("class"), get("child")) else {
+                return error("400 Bad Request", "нужны class и child");
+            };
+            let mut s = shared.lock().unwrap();
+            let Some(i) = s.project.classes.iter().position(|c| c.name.eq_ignore_ascii_case(&class)) else {
+                return error("404 Not Found", "нет такого имиджа");
+            };
+            if s.project.classes.iter().all(|c| !c.name.eq_ignore_ascii_case(&child)) {
+                return error("404 Not Found", "нет такого класса для вставки");
+            }
+            if i >= s.project.own_classes {
+                return error("403 Forbidden", "библиотечный имидж не редактируется");
+            }
+            s.remember();
+            let cls = &mut s.project.classes[i];
+            let handle = cls.children.iter().map(|c| c.handle).max().unwrap_or(0) + 1;
+            cls.children.push(cls::Child {
+                class_name: child,
+                handle,
+                name: get("name").unwrap_or_default(),
+                x: get("x").and_then(|v| v.parse().ok()).unwrap_or(0.0),
+                y: get("y").and_then(|v| v.parse().ok()).unwrap_or(0.0),
+                flags: 0,
+            });
+            json(format!("{{\"ok\":true,\"handle\":{handle}}}"))
+        }
+        ("POST", ["child", "remove"]) => {
+            let get = |k: &str| super::param(query, k).map(super::url_decode);
+            let (Some(class), Some(h)) = (get("class"), get("handle")) else {
+                return error("400 Bad Request", "нужны class и handle");
+            };
+            let h: u16 = h.parse().unwrap_or(0);
+            let mut s = shared.lock().unwrap();
+            let Some(i) = s.project.classes.iter().position(|c| c.name.eq_ignore_ascii_case(&class)) else {
+                return error("404 Not Found", "нет такого имиджа");
+            };
+            s.remember();
+            let cls = &mut s.project.classes[i];
+            cls.children.retain(|c| c.handle != h);
+            // связи с удалённым экземпляром теряют смысл
+            cls.links.retain(|l| l.source != h && l.target != h);
+            json("{\"ok\":true}".into())
+        }
+        ("POST", ["child", "rename"]) => {
+            let get = |k: &str| super::param(query, k).map(super::url_decode);
+            let (Some(class), Some(h)) = (get("class"), get("handle")) else {
+                return error("400 Bad Request", "нужны class и handle");
+            };
+            let h: u16 = h.parse().unwrap_or(0);
+            let mut s = shared.lock().unwrap();
+            let Some(i) = s.project.classes.iter().position(|c| c.name.eq_ignore_ascii_case(&class)) else {
+                return error("404 Not Found", "нет такого имиджа");
+            };
+            s.remember();
+            if let Some(ch) = s.project.classes[i].children.iter_mut().find(|c| c.handle == h) {
+                ch.name = get("name").unwrap_or_default();
+            }
+            json("{\"ok\":true}".into())
+        }
+        // связь: class, source, target, handle (0 — новая); тело — пары «a\tb» построчно;
+        // без пар связь удаляется
+        ("POST", ["link", "set"]) => {
+            let get = |k: &str| super::param(query, k).map(super::url_decode);
+            let (Some(class), Some(src), Some(dst)) = (get("class"), get("source"), get("target")) else {
+                return error("400 Bad Request", "нужны class, source, target");
+            };
+            let source: u16 = src.parse().unwrap_or(0);
+            let target: u16 = dst.parse().unwrap_or(0);
+            let handle: u16 = get("handle").and_then(|v| v.parse().ok()).unwrap_or(0);
+            let vars: Vec<(String, String)> = body
+                .lines()
+                .filter_map(|l| {
+                    let (a, b) = l.split_once('\t')?;
+                    (!a.trim().is_empty() && !b.trim().is_empty()).then(|| (a.trim().to_string(), b.trim().to_string()))
+                })
+                .collect();
+            let mut s = shared.lock().unwrap();
+            let Some(i) = s.project.classes.iter().position(|c| c.name.eq_ignore_ascii_case(&class)) else {
+                return error("404 Not Found", "нет такого имиджа");
+            };
+            s.remember();
+            let cls = &mut s.project.classes[i];
+            let existing = cls.links.iter().position(|l| l.handle == handle && handle != 0);
+            let result_handle = match (existing, vars.is_empty()) {
+                (Some(k), true) => {
+                    cls.links.remove(k);
+                    0
+                }
+                (Some(k), false) => {
+                    cls.links[k].source = source;
+                    cls.links[k].target = target;
+                    cls.links[k].vars = vars;
+                    handle
+                }
+                (None, true) => 0,
+                (None, false) => {
+                    let h = cls.links.iter().map(|l| l.handle).max().unwrap_or(0) + 1;
+                    cls.links.push(cls::Link { source, target, handle: h, flags: 0, vars });
+                    h
+                }
+            };
+            json(format!("{{\"ok\":true,\"handle\":{result_handle}}}"))
+        }
+        ("POST", ["link", "remove"]) => {
+            let get = |k: &str| super::param(query, k).map(super::url_decode);
+            let (Some(class), Some(h)) = (get("class"), get("handle")) else {
+                return error("400 Bad Request", "нужны class и handle");
+            };
+            let h: u16 = h.parse().unwrap_or(0);
+            let mut s = shared.lock().unwrap();
+            let Some(i) = s.project.classes.iter().position(|c| c.name.eq_ignore_ascii_case(&class)) else {
+                return error("404 Not Found", "нет такого имиджа");
+            };
+            s.remember();
+            s.project.classes[i].links.retain(|l| l.handle != h);
+            json("{\"ok\":true}".into())
+        }
+        // новый пустой имидж проекта
+        ("POST", ["class", "new"]) => {
+            let Some(name) = super::param(query, "name").map(super::url_decode).filter(|n| !n.trim().is_empty()) else {
+                return error("400 Bad Request", "нужно имя");
+            };
+            let name = name.trim().to_string();
+            let mut s = shared.lock().unwrap();
+            if s.project.classes.iter().any(|c| c.name.eq_ignore_ascii_case(&name)) {
+                return error("409 Conflict", "имидж с таким именем уже есть");
+            }
+            s.remember();
+            let n = s.project.own_classes;
+            s.project.classes.insert(n, cls::Class { name: name.clone(), version: 0x3003, ..Default::default() });
+            s.project.own_classes += 1;
+            if let Ok(m) = lang::parse("") {
+                s.models.insert(name.to_lowercase(), m);
+            }
+            json("{\"ok\":true}".into())
+        }
+        ("POST", ["undo"]) | ("POST", ["redo"]) => {
+            let mut s = shared.lock().unwrap();
+            let done = if parts[0] == "undo" { s.undo() } else { s.redo() };
+            json(format!("{{\"ok\":{done},\"canUndo\":{},\"canRedo\":{}}}", !s.history.is_empty(), !s.future.is_empty()))
         }
         // сохранить проект в родном формате: в его папку или в ?dir=
         ("POST", ["save"]) => {

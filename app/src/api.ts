@@ -10,7 +10,7 @@ export interface ClassInfo {
   declared: { name: string; type: string }[]; text: string; children: Child[]; links: Link[];
   hasIcon: boolean; hasScheme: boolean; hasImage: boolean; source: string;
 }
-export interface Project { root: string; dir: string; native: boolean; unsaved: boolean; classes: ClassInfo[] }
+export interface Project { root: string; dir: string; native: boolean; unsaved: boolean; canUndo: boolean; canRedo: boolean; classes: ClassInfo[] }
 export interface Instance { index: number; path: string; name: string; class: string; parent: number | null; handle: number }
 export interface Frame {
   tick: number; running: boolean; stopped: boolean;
@@ -58,6 +58,30 @@ export const api = {
     if (!r.ok) throw new Error(j.error ?? r.statusText);
     return j as { ok: boolean; dir: string; classes: number };
   },
+  addChild: async (klass: string, child: string, x: number, y: number, name = '') => {
+    const r = await fetch(`/api/child/add?class=${encodeURIComponent(klass)}&child=${encodeURIComponent(child)}&x=${x}&y=${y}&name=${encodeURIComponent(name)}`, { method: 'POST' });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error ?? r.statusText);
+    return j as { ok: boolean; handle: number };
+  },
+  removeChild: (klass: string, handle: number) =>
+    fetch(`/api/child/remove?class=${encodeURIComponent(klass)}&handle=${handle}`, { method: 'POST' }),
+  renameChild: (klass: string, handle: number, name: string) =>
+    fetch(`/api/child/rename?class=${encodeURIComponent(klass)}&handle=${handle}&name=${encodeURIComponent(name)}`, { method: 'POST' }),
+  // handle 0 — новая связь; пустой список пар удаляет связь
+  setLink: async (klass: string, handle: number, source: number, target: number, pairs: [string, string][]) => {
+    const r = await fetch(`/api/link/set?class=${encodeURIComponent(klass)}&handle=${handle}&source=${source}&target=${target}`, { method: 'POST', body: pairs.map(p => p.join('\t')).join('\n') });
+    return r.json() as Promise<{ ok: boolean; handle: number }>;
+  },
+  removeLink: (klass: string, handle: number) =>
+    fetch(`/api/link/remove?class=${encodeURIComponent(klass)}&handle=${handle}`, { method: 'POST' }),
+  newClass: async (name: string) => {
+    const r = await fetch(`/api/class/new?name=${encodeURIComponent(name)}`, { method: 'POST' });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error ?? r.statusText);
+  },
+  undo: () => fetch('/api/undo', { method: 'POST' }).then(r => r.json() as Promise<{ ok: boolean; canUndo: boolean; canRedo: boolean }>),
+  redo: () => fetch('/api/redo', { method: 'POST' }).then(r => r.json() as Promise<{ ok: boolean; canUndo: boolean; canRedo: boolean }>),
   setValue: (index: number, name: string, value: string) =>
     fetch(`/api/set/${index}?var=${encodeURIComponent(name)}&value=${encodeURIComponent(value)}`, { method: 'POST' }),
 };

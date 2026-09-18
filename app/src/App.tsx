@@ -52,6 +52,8 @@ export default function App() {
       else if (e.code === 'F10') { e.preventDefault(); api.event('type=step'); }
       else if (e.key === 'e' && e.ctrlKey) { e.preventDefault(); s.setTab(s.tab === 'code' ? 'scheme' : 'code'); }
       else if (e.key === 's' && e.ctrlKey) { e.preventDefault(); save(); }
+      else if (e.key.toLowerCase() === 'z' && e.ctrlKey && !e.shiftKey) { e.preventDefault(); s.undo(); }
+      else if ((e.key.toLowerCase() === 'z' && e.ctrlKey && e.shiftKey) || (e.key.toLowerCase() === 'y' && e.ctrlKey)) { e.preventDefault(); s.redo(); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -85,6 +87,8 @@ export default function App() {
         </label>
         <span className="counter mono">такт {frame?.tick ?? 0}{frame?.stopped ? ' · остановлено' : ''}</span>
         <span className="sep" />
+        <button className="ghost" onClick={s.undo} disabled={!s.project?.canUndo} title="Ctrl+Z">Отменить</button>
+        <button className="ghost" onClick={s.redo} disabled={!s.project?.canRedo} title="Ctrl+Shift+Z">Повторить</button>
         <button onClick={save} title="Ctrl+S — сохранить проект в текстовом формате" className={s.unsaved ? 'attention' : ''}>Сохранить{s.unsaved ? ' •' : ''}</button>
         <button className="ghost" onClick={() => setDialog('saveAs')} title="Сохранить копию проекта в другую папку">Сохранить как…</button>
         <button className="ghost" onClick={() => setDialog('export')} title="Записать project.spj и .cls для Stratum 2000">Экспорт…</button>

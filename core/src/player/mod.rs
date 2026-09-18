@@ -7,7 +7,7 @@
 
 pub mod api;
 
-use crate::formats::{self, LoadedProject};
+use crate::formats::{Class, self, LoadedProject};
 use crate::gfx::svg;
 use crate::lang;
 use crate::sim::{wm, Simulation};
@@ -46,6 +46,66 @@ pub struct Shared {
     pub dirty: bool,
     /// Есть правки, не записанные на диск.
     pub unsaved: bool,
+    /// Снимки собственных имиджей для Undo/Redo (правки IDE).
+    pub history: Vec<Vec<Class>>,
+    pub future: Vec<Vec<Class>>,
+}
+
+impl Shared {
+    /// Вызывается перед каждой правкой проекта: запоминает состояние.
+    pub fn remember(&mut self) {
+        let own = self.project.classes[..self.project.own_classes].to_vec();
+        self.history.push(own);
+        if self.history.len() > 100 {
+            self.history.remove(0);
+        }
+        self.future.clear();
+        self.dirty = true;
+        self.unsaved = true;
+    }
+
+
+    pub fn undo(&mut self) -> bool {
+        let Some(snapshot) = self.history.pop() else { return false };
+        let lib_count = self.project.classes.len() - self.project.own_classes;
+        let current = self.swap_snapshot_keeping(snapshot, lib_count);
+        self.future.push(current);
+        true
+    }
+
+    pub fn redo(&mut self) -> bool {
+        let Some(snapshot) = self.future.pop() else { return false };
+        let lib_count = self.project.classes.len() - self.project.own_classes;
+        let current = self.swap_snapshot_keeping(snapshot, lib_count);
+        self.history.push(current);
+        true
+    }
+
+    fn swap_snapshot_keeping(&mut self, snapshot: Vec<Class>, lib_count: usize) -> Vec<Class> {
+        let n = self.project.own_classes;
+        let new_len = snapshot.len();
+        let current: Vec<Class> = self.project.classes.splice(..n, snapshot).collect();
+        self.project.own_classes = new_len;
+        debug_assert_eq!(self.project.classes.len() - new_len, lib_count);
+        self.reparse();
+        self.dirty = true;
+        self.unsaved = true;
+        current
+    }
+
+    /// Перечитывает тексты собственных имиджей после Undo/Redo.
+    fn reparse(&mut self) {
+        for c in &self.project.classes[..self.project.own_classes] {
+            match lang::parse(&c.text) {
+                Ok(m) => {
+                    self.models.insert(c.name.to_lowercase(), m);
+                }
+                Err(_) => {
+                    self.models.remove(&c.name.to_lowercase());
+                }
+            }
+        }
+    }
 }
 
 pub struct Options {
@@ -88,6 +148,8 @@ pub fn serve_with(opts: Options, on_ready: impl FnOnce(u16)) -> Result<(), Strin
         models,
         dirty: false,
         unsaved: false,
+        history: Vec::new(),
+        future: Vec::new(),
     }));
     let static_dir = opts.static_dir.clone();
 
