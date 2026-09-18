@@ -212,8 +212,10 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
             s.project.classes[i].text = body.to_string();
             match lang::parse(body) {
                 Ok(m) => {
+                    // на ходу: работающая модель получает новый текст без сброса
+                    let live = s.sim.hot_swap_text(&name, m.clone());
                     s.models.insert(name.to_lowercase(), m);
-                    json("{\"ok\":true}".into())
+                    json(format!("{{\"ok\":true,\"live\":{live}}}"))
                 }
                 Err(e) => json(format!("{{\"ok\":false,\"error\":{}}}", parse_error_json(&e))),
             }

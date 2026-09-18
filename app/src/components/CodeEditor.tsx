@@ -148,7 +148,7 @@ export function CodeEditor() {
         severity: 8, message: r.error.message, startLineNumber: r.error.line, startColumn: r.error.column, endLineNumber: r.error.line, endColumn: r.error.column + 1,
       }]);
     }
-    if (r.ok) { showToast('Текст принят'); say({ level: 'info', where: klass.name, text: 'текст принят' }); }
+    if (r.ok) { showToast(r.live ? 'Применено на ходу' : 'Текст принят'); say({ level: 'info', where: klass.name, text: r.live ? 'текст применён в работающей модели' : 'текст принят' }); }
     else if (r.error) say({ level: 'error', where: `${klass.name}, строка ${r.error.line}`, text: r.error.message });
   }
 

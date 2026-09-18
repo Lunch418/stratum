@@ -41,7 +41,7 @@ export const api = {
   event: (q: string) => fetch('/event?' + q, { method: 'POST' }),
   setText: async (name: string, text: string) => {
     const r = await fetch(`/api/class/${encodeURIComponent(name)}/text`, { method: 'POST', body: text });
-    return r.json() as Promise<{ ok: boolean; error?: ParseError }>;
+    return r.json() as Promise<{ ok: boolean; live?: boolean; error?: ParseError }>;
   },
   setVars: async (name: string, vars: Variable[]) => {
     const body = vars.map(v => [v.name, v.type, v.default, v.description, v.flags].join('\t')).join('\n');

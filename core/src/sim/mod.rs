@@ -507,6 +507,42 @@ impl Simulation {
         result
     }
 
+    /// Живое редактирование: новый текст имиджа подменяется в работающей
+    /// модели. Переменные, появившиеся в тексте, получают ячейки у всех
+    /// экземпляров; прочее состояние (значения, связи, графика) сохраняется.
+    pub fn hot_swap_text(&mut self, class_name: &str, model: Model) -> bool {
+        let Some(class) = self.class_index(class_name) else { return false };
+        let body = std::sync::Arc::new(model.body.clone());
+        let declarations = model.declarations.clone();
+        self.classes[class].model = model;
+        self.classes[class].body = body;
+        self.classes[class].parse_error = None;
+        for i in 0..self.instances.len() {
+            if self.instances[i].class != class {
+                continue;
+            }
+            for decl in &declarations {
+                let ty = ValueType::from_name(&decl.var_type);
+                for var_name in &decl.names {
+                    let key = var_name.to_ascii_lowercase();
+                    if self.instances[i].vars.contains_key(&key) {
+                        continue;
+                    }
+                    let cell = self.cells.len();
+                    self.cells.push(ty.default_value());
+                    self.old.push(ty.default_value());
+                    self.types.push(ty);
+                    self.instances[i].vars.insert(key, cell);
+                    self.instances[i].order.push(var_name.clone());
+                }
+            }
+        }
+        if self.profile.len() != self.instances.len() {
+            self.profile.resize(self.instances.len(), 0);
+        }
+        true
+    }
+
     /// Вычисляет выражение на языке Stratum в контексте экземпляра: для
     /// условных точек останова и окна наблюдения.
     pub fn eval_in(&mut self, instance: usize, src: &str) -> Result<Value, String> {
