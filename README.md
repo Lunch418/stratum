@@ -73,8 +73,18 @@ cd ../core && ./target/release/stratum play ../fixtures/user/solar_system
 инспектор переменных с живыми значениями, окно модели, транспорт, тёмная тема.
 Для разработки фронтенда — `npm run dev` (проксирует API в ядро на 8765).
 
-Стек по ТЗ: React 19 + TypeScript + Vite, Zustand, Monaco. Обёртка Tauri 2
-появится, когда на машине будут системные зависимости (`libwebkit2gtk-4.1-dev`).
+Стек по ТЗ: React 19 + TypeScript + Vite, Zustand, Monaco.
+
+Десктопное окно (Tauri 2, нужны `libwebkit2gtk-4.1-dev` и `libgtk-3-dev`):
+
+```sh
+cd app && npm run build
+cd src-tauri && cargo build --release
+./target/release/stratum-modern ../../fixtures/user/solar_system
+```
+
+Оболочка поднимает ядро на свободном порту и открывает IDE в своём окне;
+установщики (`deb`, AppImage) собираются через `npx @tauri-apps/cli build`.
 
 ## Сборка данных
 

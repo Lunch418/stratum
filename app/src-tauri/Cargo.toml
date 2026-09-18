@@ -1,0 +1,16 @@
+[package]
+name = "stratum-modern"
+version = "0.1.0"
+edition = "2021"
+description = "Stratum Modern — десктопная оболочка IDE"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+stratum-core = { path = "../../core" }
+
+[[bin]]
+name = "stratum-modern"
+path = "src/main.rs"

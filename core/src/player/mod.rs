@@ -63,6 +63,12 @@ fn load(project: &PathBuf, libraries: &[PathBuf]) -> Result<LoadedProject, Strin
 
 /// Запускает плеер и не возвращается, пока сервер жив.
 pub fn serve(opts: Options) -> Result<(), String> {
+    serve_with(opts, |_| {})
+}
+
+/// То же, но с уведомлением о фактическом порте (при `port = 0` порт
+/// выбирает система) — нужно оболочке Tauri, чтобы открыть окно.
+pub fn serve_with(opts: Options, on_ready: impl FnOnce(u16)) -> Result<(), String> {
     let project = load(&opts.project, &opts.libraries)?;
     let sim = Simulation::build(&project).map_err(|e| e.to_string())?;
     let models = project
@@ -107,11 +113,13 @@ pub fn serve(opts: Options) -> Result<(), String> {
     });
 
     let listener = TcpListener::bind(("127.0.0.1", opts.port)).map_err(|e| format!("порт {}: {e}", opts.port))?;
+    let port = listener.local_addr().map(|a| a.port()).unwrap_or(opts.port);
     println!(
         "{}: http://127.0.0.1:{}/  (Ctrl+C — выход)",
         if static_dir.is_some() { "IDE" } else { "плеер" },
-        opts.port
+        port
     );
+    on_ready(port);
     for stream in listener.incoming() {
         let Ok(stream) = stream else { continue };
         let shared = Arc::clone(&shared);
