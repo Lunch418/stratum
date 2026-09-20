@@ -104,15 +104,16 @@ input[type="search"]:focus { background: var(--bg-surface); border-color: var(--
 .chip.INTEGER, .chip.WORD, .chip.BYTE, .chip.POINTER { background: var(--text-muted); }
 
 /* раскладка */
-.ide { display: grid; height: 100%; grid-template-rows: 48px 1fr 26px; grid-template-columns: 1fr; }
-.topbar { display: flex; align-items: center; gap: 6px; padding: 0 10px; background: var(--bg-surface); border-bottom: 1px solid var(--border); white-space: nowrap; }
+.ide { display: grid; height: 100%; grid-template-rows: auto 1fr 26px; grid-template-columns: 1fr; }
+.topbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 2px 10px; min-height: 44px; background: var(--bg-surface); border-bottom: 1px solid var(--border); white-space: nowrap; }
 .topbar button { white-space: nowrap; }
 .topbar .brand { font-size: 13px; font-weight: 800; letter-spacing: -0.01em; margin-right: 10px; }
 .topbar .brand::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: var(--accent); margin-right: 8px; vertical-align: -1px; transform: rotate(45deg); }
 /* пульт модели: сегментированная группа */
-.topbar > button.primary, .topbar > button[title^="Один шаг"], .topbar > button[title^="Такт назад"], .topbar > button[title^="Стоп"] { border-radius: 0; margin-left: -1px; }
-.topbar > button.primary { border-radius: 999px 0 0 999px; margin-left: 0; padding-left: 16px; }
-.topbar > button[title^="Стоп"] { border-radius: 0 999px 999px 0; padding-right: 14px; }
+.transport { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.transport > button.primary, .transport > button[title^="Один шаг"], .transport > button[title^="Такт назад"], .transport > button[title^="Стоп"] { border-radius: 0; margin-left: -1px; }
+.transport > button.primary { border-radius: 999px 0 0 999px; margin-left: 0; padding-left: 16px; }
+.transport > button[title^="Стоп"] { border-radius: 0 999px 999px 0; padding-right: 14px; }
 .topbar .counter { color: var(--text-primary); font-size: 13px; font-weight: 500; padding: 0 6px; font-family: var(--font-mono); min-width: 96px; }
 .topbar .speed { display: flex; align-items: center; margin-left: 8px; }
 .topbar .speed input { width: 90px; }
@@ -120,7 +121,7 @@ input[type="search"]:focus { background: var(--bg-surface); border-color: var(--
 .topbar .spacer { flex: 1; }
 
 /* строка меню как в оригинале */
-.menubar { display: flex; align-items: stretch; height: 100%; }
+.menubar { display: flex; align-items: stretch; height: 40px; }
 .menubar .menu-title { border: 0; background: transparent; border-radius: 4px; padding: 4px 9px; font-weight: 600; color: var(--text-primary); }
 .menubar .menu-host.open .menu-title, .menubar .menu-title:hover { background: var(--accent-soft); color: var(--accent-ink); }
 .menubar .context.menu { top: calc(100% + 2px); min-width: 240px; padding: 5px; }

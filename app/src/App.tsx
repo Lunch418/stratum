@@ -153,6 +153,7 @@ export default function App() {
         <span className="brand">Stratum<span className="brand-accent">Modern</span></span>
         <MenuBar menus={menus} />
         <span className="sep" />
+        <div className="transport">
         <button className={`primary icon-text${running ? ' paused' : ''}`} onClick={() => api.event(running ? 'type=pause' : 'type=run')} title="Запуск / пауза (F5)"><Icon name={running ? 'pause' : 'play'} />{running ? 'Пауза' : 'Пуск'}</button>
         <button className="icon-only" onClick={() => api.event('type=step')} title="Один шаг (F10)"><Icon name="step" /></button>
         <button className="icon-only" onClick={() => api.event('type=back')} title="Такт назад (Shift+F10)" disabled={!frame?.canBack || running}><Icon name="back" /></button>
@@ -161,6 +162,7 @@ export default function App() {
           <input type="range" min={1} max={200} defaultValue={30} onChange={e => api.event('type=speed&fps=' + e.target.value)} />
         </label>
         <span className="counter mono">такт {frame?.tick ?? 0}{frame?.stopped ? ' · стоп' : ''}</span>
+        </div>
         <span className="spacer" />
         <button className="ghost icon-only" onClick={() => setDialog('open')} title="Открыть проект (Ctrl+O)"><Icon name="open" /></button>
         <button onClick={save} title="Сохранить всё (Ctrl+S)" className={`icon-only${s.unsaved ? ' attention' : ' ghost'}`}><Icon name="save" /></button>
