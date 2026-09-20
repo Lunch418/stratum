@@ -13,6 +13,10 @@ export function Debug() {
   const [profile, setProfile] = useState<{ tick: number; total: number; items: { index: number; path: string; class: string; ns: number }[] } | null>(null);
   const [expr, setExpr] = useState('');
   const [scope, setScope] = useState<'instance' | 'class'>('instance');
+  // матрицы модели («Matrix editor» оригинала): список и выбранная с правкой ячеек
+  const [matrices, setMatrices] = useState<{ q: number; minI: number; maxI: number; minJ: number; maxJ: number }[]>([]);
+  const [matrix, setMatrix] = useState<{ q: number; minI: number; maxI: number; minJ: number; maxJ: number; rows: number[][] } | null>(null);
+  const loadMatrix = (q: number) => fetch(`/api/matrix/${q}`).then(r => r.ok ? r.json() : null).then(setMatrix).catch(() => setMatrix(null));
 
   const refresh = () => api.breakpoints().then(setBps).catch(() => {});
   useEffect(() => { refresh(); }, [frame?.halt?.message]);
@@ -20,6 +24,7 @@ export function Debug() {
     let alive = true;
     const poll = async () => {
       try { const p = await api.profile(); if (alive) setProfile(p); } catch { /* ядро недоступно */ }
+      try { const m = await fetch('/api/matrices').then(r => r.json()); if (alive) setMatrices(m); } catch { /* */ }
       if (alive) setTimeout(poll, frame?.running ? 1000 : 3000);
     };
     poll();
@@ -39,7 +44,7 @@ export function Debug() {
   }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', minHeight: 0, flex: 1 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', minHeight: 0, flex: 1 }}>
       <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, borderRight: '1px solid var(--border)' }}>
         <div className="panel-title">Точки останова <span className="spacer" /><span className="muted">{bps.length}</span></div>
         <form style={{ display: 'flex', gap: 6, padding: '6px 8px', borderBottom: '1px solid var(--border)' }} onSubmit={e => { e.preventDefault(); add(); }}>
@@ -78,6 +83,31 @@ export function Debug() {
               ))}
             </tbody>
           </table>
+        </div>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, borderLeft: '1px solid var(--border)' }}>
+        <div className="panel-title">Матрицы
+          <select value={matrix?.q ?? ''} onChange={e => e.target.value ? loadMatrix(Number(e.target.value)) : setMatrix(null)} style={{ marginLeft: 8, textTransform: 'none', letterSpacing: 0 }}>
+            <option value="">—</option>
+            {matrices.map(m => <option key={m.q} value={m.q}>#{m.q} · {m.maxI - m.minI + 1}×{m.maxJ - m.minJ + 1}</option>)}
+          </select>
+          <span className="spacer" /><span className="muted">{matrices.length}</span>
+        </div>
+        <div className="scroll">
+          {!matrix && <div className="muted" style={{ padding: 10, fontSize: 12 }}>{matrices.length ? 'Выберите матрицу, чтобы посмотреть и править ячейки.' : 'Модель не создала матриц (MCreate).'}</div>}
+          {matrix && (
+            <table className="vars matrix">
+              <thead><tr><th></th>{Array.from({ length: matrix.maxJ - matrix.minJ + 1 }, (_, j) => <th key={j} className="num">{matrix.minJ + j}</th>)}</tr></thead>
+              <tbody>
+                {matrix.rows.map((row, i) => (
+                  <tr key={i}><td className="muted num">{matrix.minI + i}</td>
+                    {row.map((v, j) => <td key={j} className="num"><input key={v} defaultValue={v} disabled={!!frame?.running}
+                      onBlur={e => { if (Number(e.target.value) !== v) fetch(`/api/matrix/${matrix.q}?i=${matrix.minI + i}&j=${matrix.minJ + j}&value=${encodeURIComponent(e.target.value)}`, { method: 'POST' }).then(() => loadMatrix(matrix.q)); }} /></td>)}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </div>

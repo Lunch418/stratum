@@ -509,6 +509,39 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
             s.apply_project_options();
             json("{\"ok\":true}".into())
         }
+        // матрицы модели («Matrix editor» оригинала): список и содержимое
+        ("GET", ["matrices"]) => {
+            let s = shared.lock().unwrap();
+            let items: Vec<String> = s
+                .sim
+                .effects
+                .matrices
+                .items
+                .iter()
+                .map(|(q, m)| format!("{{\"q\":{q},\"minI\":{},\"maxI\":{},\"minJ\":{},\"maxJ\":{}}}", m.min_i, m.max_i, m.min_j, m.max_j))
+                .collect();
+            json(format!("[{}]", items.join(",")))
+        }
+        ("GET", ["matrix", q]) => {
+            let q: i64 = q.parse().unwrap_or(0);
+            let s = shared.lock().unwrap();
+            let Some(m) = s.sim.effects.matrices.get(q) else { return error("404 Not Found", "нет такой матрицы") };
+            let rows: Vec<String> = (m.min_i..=m.max_i)
+                .map(|i| format!("[{}]", (m.min_j..=m.max_j).map(|j| num(m.get(i, j))).collect::<Vec<_>>().join(",")))
+                .collect();
+            json(format!("{{\"q\":{q},\"minI\":{},\"maxI\":{},\"minJ\":{},\"maxJ\":{},\"rows\":[{}]}}", m.min_i, m.max_i, m.min_j, m.max_j, rows.join(",")))
+        }
+        // правка ячейки: i, j, value в query
+        ("POST", ["matrix", q]) => {
+            let q: i64 = q.parse().unwrap_or(0);
+            let get = |k: &str| super::param(query, k).and_then(|v| super::url_decode(v).parse::<f64>().ok());
+            let (Some(i), Some(j), Some(v)) = (get("i"), get("j"), get("value")) else {
+                return error("400 Bad Request", "нужны i, j, value");
+            };
+            let mut s = shared.lock().unwrap();
+            let ok = s.sim.effects.matrices.get_mut(q).is_some_and(|m| m.set(i as i64, j as i64, v));
+            json(format!("{{\"ok\":{ok}}}"))
+        }
         ("POST", ["link", "remove"]) => {
             let get = |k: &str| super::param(query, k).map(super::url_decode);
             let (Some(class), Some(h)) = (get("class"), get("handle")) else {

@@ -347,3 +347,6 @@ button.attention { border-color: var(--state-pause); }
 .bitmap-editor .draw-tools { border-bottom: 1px solid var(--border); }
 .bitmap-body { max-height: 70vh; overflow: auto; background: var(--bg-sunken); display: flex; justify-content: center; }
 .bitmap-body canvas { image-rendering: pixelated; cursor: crosshair; background: #fff; }
+
+/* матрицы в отладке */
+.vars.matrix input { width: 64px; text-align: right; }
