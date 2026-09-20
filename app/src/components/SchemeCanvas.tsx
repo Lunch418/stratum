@@ -51,6 +51,7 @@ export function SchemeCanvas() {
   const [linkEdit, setLinkEdit] = useState<{ handle: number; source: number; target: number; pairs: [string, string][]; style?: LinkStyle } | null>(null);
   const [linkMenu, setLinkMenu] = useState<{ x: number; y: number; handle: number } | null>(null);
   const [sheetMenu, setSheetMenu] = useState<{ x: number; y: number } | null>(null);
+  const [replacing, setReplacing] = useState<{ handle: number; value: string } | null>(null);
   const layers = useStore(s => s.layers);
   const setDialog = useStore(s => s.setDialog);
   const sheet = klass?.sheet;
@@ -342,6 +343,7 @@ export function SchemeCanvas() {
           {menu.handle !== SELF && <button onClick={() => { const n = klass.children.find(n => n.handle === menu.handle); setMenu(null); setRenaming({ handle: menu.handle, value: n?.name ?? '' }); }}>Переименовать…</button>}
           {menu.handle !== SELF && <button onClick={() => { const c = klass.children.find(n => n.handle === menu.handle); setMenu(null); if (c) { setClipboard([{ class: c.class, name: c.name, x: c.x, y: c.y }]); showToast('Скопировано'); } }}>Копировать <span className="muted">Ctrl+C</span></button>}
           {menu.handle !== SELF && <button onClick={() => { const c = klass.children.find(n => n.handle === menu.handle); setMenu(null); if (c) pasteBlocks([{ class: c.class, name: c.name, x: c.x, y: c.y }]); }}>Дублировать <span className="muted">Ctrl+D</span></button>}
+          {menu.handle !== SELF && <button onClick={() => { const c = klass.children.find(n => n.handle === menu.handle); setMenu(null); setReplacing({ handle: menu.handle, value: c?.class ?? '' }); }}>Заменить другим…</button>}
           {menu.handle !== SELF && <button onClick={() => { setMenu(null); removeChild(menu.handle); }}>Удалить <span className="muted">Del</span></button>}
         </div>
       )}
@@ -371,7 +373,39 @@ export function SchemeCanvas() {
           <button onClick={() => { setSheetMenu(null); select(klass.name); setDialog('sheet'); }}>Параметры листа…</button>
           <button onClick={() => { setSheetMenu(null); select(klass.name); setDialog('calcOrder'); }}>Порядок вычислений…</button>
           <button onClick={() => { setSheetMenu(null); select(klass.name); setDialog('classProps'); }}>Свойства имиджа…</button>
+          <button onClick={async () => {
+            setSheetMenu(null);
+            const [sx, sy] = gridStep, [ox, oy] = gridOrigin;
+            for (const c of klass.children) {
+              const nx = Math.round((c.x - ox) / sx) * sx + ox, ny = Math.round((c.y - oy) / sy) * sy + oy;
+              if (nx !== c.x || ny !== c.y) await api.moveChild(klass.name, c.handle, nx, ny);
+            }
+            useStore.getState().markUnsaved(); await useStore.getState().reload(); showToast('Выстроено по сетке');
+          }} disabled={!editable}>Выстроить имиджи по узлам сетки</button>
           <button onClick={() => { setSheetMenu(null); if (clipboard.length) pasteBlocks(clipboard); }} disabled={!clipboard.length}>Вставить <span className="muted">Ctrl+V</span></button>
+        </div>
+      )}
+      {replacing && (
+        <div className="modal-backdrop" onMouseDown={() => setReplacing(null)}>
+          <form className="modal" style={{ width: 420 }} onMouseDown={e => e.stopPropagation()} onSubmit={async e => {
+            e.preventDefault();
+            const r = await api.replaceChild(klass.name, replacing.handle, replacing.value);
+            setReplacing(null);
+            useStore.getState().markUnsaved(); await useStore.getState().reload();
+            showToast(r.droppedPairs ? `Заменено; снято пар связей: ${r.droppedPairs}` : 'Заменено');
+          }}>
+            <div className="panel-title">Заменить другим имиджем</div>
+            <div className="modal-body">
+              <select autoFocus value={replacing.value} onChange={e => setReplacing({ ...replacing, value: e.target.value })} style={{ width: '100%' }}>
+                {(project?.classes ?? []).map(c => <option key={c.name} value={c.name}>{c.name}{c.library ? ' · библиотека' : ''}</option>)}
+              </select>
+              <div className="muted small" style={{ marginTop: 6 }}>Положение, имя и связи сохраняются; пары с переменными, которых нет в новом имидже, снимаются.</div>
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="ghost" onClick={() => setReplacing(null)}>Отмена</button>
+              <button type="submit" className="primary">Заменить</button>
+            </div>
+          </form>
         </div>
       )}
       {linkEdit && (

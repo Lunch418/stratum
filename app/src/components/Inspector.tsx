@@ -148,7 +148,9 @@ export function Inspector() {
           <tbody>
             {vars.map((v, i) => (
               <tr key={v.name}>
-                <td title={v.description}>{v.name}{v.local && <span className="muted"> local</span>}</td>
+                <td title={`${v.description || v.name}\nДвойной щелчок — где используется`} style={{ cursor: 'help' }}
+                  onDoubleClick={() => { const st = useStore.getState(); st.setSearchQuery(v.name); st.setBottomTab('search'); }}>
+                  {v.name}{v.local && <span className="muted"> local</span>}</td>
                 <td><span className={`chip ${v.type.toUpperCase()}`}>{v.type.toUpperCase()}</span></td>
                 <td className="num">
                   {klass.library || i >= klass.vars.length ? v.default : <input defaultValue={v.default} onBlur={e => e.target.value !== v.default && edit(i, 'default', e.target.value)} />}

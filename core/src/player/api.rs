@@ -310,6 +310,40 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
             cls.links.retain(|l| l.source != h && l.target != h);
             json("{\"ok\":true}".into())
         }
+        // «Заменить другим…»: экземпляр получает другой класс, handle, имя и
+        // положение сохраняются; пары связей с исчезнувшими переменными снимаются
+        ("POST", ["child", "replace"]) => {
+            let get = |k: &str| super::param(query, k).map(super::url_decode);
+            let (Some(class), Some(h), Some(child)) = (get("class"), get("handle"), get("child")) else {
+                return error("400 Bad Request", "нужны class, handle и child");
+            };
+            let h: u16 = h.parse().unwrap_or(0);
+            let mut s = shared.lock().unwrap();
+            let Some(i) = s.project.classes.iter().position(|c| c.name.eq_ignore_ascii_case(&class)) else {
+                return error("404 Not Found", "нет такого имиджа");
+            };
+            let Some(new_vars) = s.project.class(&child).map(|c| c.vars.iter().map(|v| v.name.to_lowercase()).collect::<Vec<_>>()) else {
+                return error("404 Not Found", "нет такого класса для замены");
+            };
+            s.remember();
+            let cls = &mut s.project.classes[i];
+            if let Some(ch) = cls.children.iter_mut().find(|c| c.handle == h) {
+                ch.class_name = child;
+            }
+            let mut dropped = 0;
+            for l in &mut cls.links {
+                let before = l.vars.len();
+                if l.source == h {
+                    l.vars.retain(|(a, _)| new_vars.contains(&a.to_lowercase()));
+                }
+                if l.target == h {
+                    l.vars.retain(|(_, b)| new_vars.contains(&b.to_lowercase()));
+                }
+                dropped += before - l.vars.len();
+            }
+            cls.links.retain(|l| !l.vars.is_empty());
+            json(format!("{{\"ok\":true,\"droppedPairs\":{dropped}}}"))
+        }
         ("POST", ["child", "rename"]) => {
             let get = |k: &str| super::param(query, k).map(super::url_decode);
             let (Some(class), Some(h)) = (get("class"), get("handle")) else {

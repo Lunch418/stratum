@@ -131,6 +131,8 @@ export const api = {
     if (props.flags !== undefined) q.set('flags', String(props.flags));
     return fetch(`/api/class/${encodeURIComponent(klass)}/props?${q}`, { method: 'POST' });
   },
+  replaceChild: (klass: string, handle: number, child: string) =>
+    fetch(`/api/child/replace?class=${encodeURIComponent(klass)}&handle=${handle}&child=${encodeURIComponent(child)}`, { method: 'POST' }).then(r => r.json() as Promise<{ ok: boolean; droppedPairs: number }>),
   reorderChildren: (klass: string, handles: number[]) =>
     fetch(`/api/child/reorder?class=${encodeURIComponent(klass)}`, { method: 'POST', body: handles.join('\n') }),
   projectProperties: () => get<ProjectProperty[]>('/api/project/properties'),
