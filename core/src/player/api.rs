@@ -542,6 +542,68 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
             let ok = s.sim.effects.matrices.get_mut(q).is_some_and(|m| m.set(i as i64, j as i64, v));
             json(format!("{{\"ok\":{ok}}}"))
         }
+        // библиотека иконок: наборы .dbm рядом с библиотеками и число ячеек 32×32
+        ("GET", ["icons"]) => {
+            let s = shared.lock().unwrap();
+            let gfx = &s.sim.effects.gfx;
+            let mut dirs: Vec<std::path::PathBuf> = vec![gfx.project_dir.clone()];
+            for lib in &gfx.library_dirs {
+                if let Some(parent) = lib.parent() {
+                    dirs.push(parent.join("ICONS"));
+                    dirs.push(parent.join("data").join("ICONS"));
+                }
+            }
+            let mut sets = Vec::new();
+            for d in dirs {
+                let Ok(rd) = std::fs::read_dir(&d) else { continue };
+                for e in rd.flatten() {
+                    let p = e.path();
+                    if !p.extension().is_some_and(|x| x.eq_ignore_ascii_case("dbm")) {
+                        continue;
+                    }
+                    let Ok(bmp) = std::fs::read(&p) else { continue };
+                    let (w, h) = crate::gfx::bmp_size(&bmp);
+                    if w < 32 || h < 32 {
+                        continue;
+                    }
+                    let name = p.file_name().unwrap().to_string_lossy().to_string();
+                    sets.push(format!("{{\"file\":{},\"count\":{},\"cols\":{}}}", json_string(&name), (w / 32) * (h / 32), w / 32));
+                }
+            }
+            sets.sort();
+            sets.dedup();
+            json(format!("[{}]", sets.join(",")))
+        }
+        ("GET", ["iconsheet"]) => {
+            let file = super::param(query, "file").map(super::url_decode).unwrap_or_default();
+            let index: u16 = super::param(query, "index").and_then(|v| v.parse().ok()).unwrap_or(0);
+            let s = shared.lock().unwrap();
+            let Some(path) = s.sim.effects.gfx.find_file(&file) else { return error("404 Not Found", "нет такого набора") };
+            // весь лист целиком отдаёт /api/file?name=…; здесь — одна ячейка
+            let Some(svg) = std::fs::read(path).ok().and_then(|bmp| sheet_icon(&bmp, index)) else { return error("404 Not Found", "нет ячейки") };
+            Response { status: "200 OK", mime: "image/svg+xml", body: svg }
+        }
+        // иконка имиджа из набора: file, index; пустой file — встроенная/по умолчанию
+        ("POST", ["class", name, "icon"]) => {
+            let name = super::url_decode(name);
+            let file = super::param(query, "file").map(super::url_decode).unwrap_or_default();
+            let index: u16 = super::param(query, "index").and_then(|v| v.parse().ok()).unwrap_or(0);
+            let mut s = shared.lock().unwrap();
+            let Some(i) = s.project.classes.iter().position(|c| c.name.eq_ignore_ascii_case(&name)) else {
+                return error("404 Not Found", "нет такого имиджа");
+            };
+            s.remember();
+            let cls = &mut s.project.classes[i];
+            if file.is_empty() {
+                cls.icon_file = None;
+                cls.icon_index = None;
+            } else {
+                cls.icon_file = Some(file);
+                cls.icon_index = Some(index);
+                cls.icon = None;
+            }
+            json("{\"ok\":true}".into())
+        }
         ("POST", ["link", "remove"]) => {
             let get = |k: &str| super::param(query, k).map(super::url_decode);
             let (Some(class), Some(h)) = (get("class"), get("handle")) else {

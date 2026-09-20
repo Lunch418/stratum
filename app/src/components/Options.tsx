@@ -265,8 +265,11 @@ export function ClassPropsDialog({ onClose }: { onClose: () => void }) {
   const markUnsaved = useStore(s => s.markUnsaved);
   const say = useStore(s => s.say);
   const cls = classByName(project, name);
-  const [tab, setTab] = useState<'main' | 'extra' | 'vars'>('main');
+  const [tab, setTab] = useState<'main' | 'extra' | 'icon' | 'vars'>('main');
   const [newName, setNewName] = useState(cls?.name ?? '');
+  const [sets, setSets] = useState<{ file: string; count: number; cols: number }[]>([]);
+  const [set, setSet] = useState('');
+  useEffect(() => { api.iconSets().then(l => { setSets(l); if (l.length && !set) setSet(l.find(x => /default/i.test(x.file))?.file ?? l[0].file); }).catch(() => {}); }, []);
   const [desc, setDesc] = useState(cls?.description ?? '');
   const [flags, setFlags] = useState(cls?.flags ?? 0);
   if (!cls) return null;
@@ -279,7 +282,7 @@ export function ClassPropsDialog({ onClose }: { onClose: () => void }) {
   }
   return (
     <Frame title={`Свойства имиджа — ${cls.name}`} width={560} onClose={onClose} onSubmit={cls.library ? undefined : submit}>
-      <Tabs tabs={[['main', 'Основное'], ['extra', 'Дополнительно'], ['vars', 'Переменные']]} value={tab} onChange={setTab} />
+      <Tabs tabs={[['main', 'Основное'], ['extra', 'Дополнительно'], ['icon', 'Иконка'], ['vars', 'Переменные']]} value={tab} onChange={setTab} />
       <div className="modal-body dialog-page">
         {tab === 'main' && <>
           <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
@@ -296,6 +299,23 @@ export function ClassPropsDialog({ onClose }: { onClose: () => void }) {
           {CLASS_FLAGS.map(([bit, label]) => <Check key={bit} label={label} value={(flags & bit) !== 0} disabled={cls.library} onChange={v => setFlags(f => v ? f | bit : f & ~bit)} />)}
           <label className="prop"><span>Флаги</span><input type="text" className="mono" value={'0x' + flags.toString(16)} readOnly /></label>
         </fieldset>}
+        {tab === 'icon' && <>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <img src={api.iconUrl(cls.name)} width={32} height={32} alt="" style={{ border: '1px solid var(--border)', borderRadius: 4 }} />
+            <label className="prop" style={{ flex: 1 }}><span>Библиотека иконок</span>
+              <select value={set} onChange={e => setSet(e.target.value)}>{sets.map(x => <option key={x.file} value={x.file}>{x.file} · {x.count}</option>)}</select></label>
+            <button type="button" className="small ghost" disabled={cls.library} onClick={async () => { await api.setClassIcon(cls.name, '', 0); api.bumpIcons(); markUnsaved(); await reload(); }}>По умолчанию</button>
+          </div>
+          <div className="icon-grid">
+            {(() => { const cur = sets.find(x => x.file === set); if (!cur) return null; const url = `/api/file?name=${encodeURIComponent(set)}`;
+              return Array.from({ length: cur.count }, (_, i) => (
+                <div key={set + i} className="icon-cell" title={`${set} #${i}`}
+                  style={{ backgroundImage: `url(${url})`, backgroundPosition: `-${(i % cur.cols) * 32}px -${Math.floor(i / cur.cols) * 32}px` }}
+                  onClick={async () => { if (cls.library) return; await api.setClassIcon(cls.name, set, i); api.bumpIcons(); markUnsaved(); await reload(); }} />
+              )); })()}
+          </div>
+          {!sets.length && <div className="muted">Наборы иконок (.dbm) не найдены рядом с библиотеками.</div>}
+        </>}
         {tab === 'vars' && <table className="vars">
           <thead><tr><th>Имя</th><th>Тип</th><th>По умолчанию</th><th>Описание</th></tr></thead>
           <tbody>{cls.vars.map(v => <tr key={v.name}><td className="mono">{v.name}</td><td className="muted">{v.type}</td><td className="mono">{v.default}</td><td>{v.description}</td></tr>)}</tbody>

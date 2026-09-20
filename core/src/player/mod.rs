@@ -539,7 +539,7 @@ fn handle(mut stream: TcpStream, shared: &Arc<Mutex<Shared>>, static_dir: Option
                         Some("mp3") => "audio/mpeg",
                         Some("ogg") => "audio/ogg",
                         Some("mid") | Some("midi") => "audio/midi",
-                        Some("bmp") => "image/bmp",
+                        Some("bmp") | Some("dbm") => "image/bmp",
                         Some("png") => "image/png",
                         Some("jpg") | Some("jpeg") => "image/jpeg",
                         _ => "application/octet-stream",

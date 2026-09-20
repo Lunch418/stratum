@@ -43,11 +43,17 @@ async function get<T>(url: string): Promise<T> {
   return r.json();
 }
 
+// версия иконок: меняется после выбора иконки, чтобы сбросить кэш браузера
+let iconVersion = 0;
+
 export const api = {
   project: () => get<Project>('/api/project'),
   klass: (name: string) => get<ClassInfo>(`/api/class/${encodeURIComponent(name)}`),
   scheme: (name: string) => get<{ bounds: { x: number; y: number; w: number; h: number } | null; svg: string }>(`/api/scheme/${encodeURIComponent(name)}`),
-  iconUrl: (name: string) => `/api/icon/${encodeURIComponent(name)}`,
+  iconUrl: (name: string) => `/api/icon/${encodeURIComponent(name)}${iconVersion ? '?v=' + iconVersion : ''}`,
+  bumpIcons: () => { iconVersion++; },
+  iconSets: () => get<{ file: string; count: number; cols: number }[]>('/api/icons'),
+  setClassIcon: (klass: string, file: string, index: number) => fetch(`/api/class/${encodeURIComponent(klass)}/icon?file=${encodeURIComponent(file)}&index=${index}`, { method: 'POST' }),
   instances: () => get<Instance[]>('/api/instances'),
   watch: (index: number) => get<{ path: string; vars: [string, string][] }>(`/api/watch/${index}`),
   frame: () => get<Frame>('/frame'),
