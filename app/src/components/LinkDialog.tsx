@@ -48,7 +48,7 @@ export function LinkDialog({ source, target, pairs: initial, style: initialStyle
             <fieldset><legend>Линия</legend>
               <label className="prop"><span>Цвет</span><span style={{ display: 'flex', gap: 6 }}>
                 <input type="color" value={style.color || '#5b6470'} onChange={e => st({ color: e.target.value })} style={{ width: 44, padding: 0 }} />
-                <button type="button" className="small ghost" onClick={() => st({ color: '' })} disabled={!style.color}>по умолчанию</button></span></label>
+                <button type="button" className="small ghost" style={{ whiteSpace: 'nowrap' }} onClick={() => st({ color: '' })} disabled={!style.color}>сброс</button></span></label>
               <label className="prop"><span>Толщина</span><input type="number" min={0} max={9} value={style.width} onChange={e => st({ width: Math.max(0, Number(e.target.value)) })} /></label>
               <label className="prop"><span>Слой</span><input type="number" min={0} max={31} value={style.layer} onChange={e => st({ layer: Math.min(31, Math.max(0, Number(e.target.value))) })} /></label>
             </fieldset>
