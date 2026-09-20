@@ -17,7 +17,20 @@ export function Hierarchy() {
   const [ownOpen, setOwnOpen] = useState(true);
   const reload = useStore(s => s.reload);
   const say = useStore(s => s.say);
+  const setDialog = useStore(s => s.setDialog);
+  const enterScheme = useStore(s => s.enterScheme);
+  const showToast = useStore(s => s.showToast);
   const own = project?.classes.filter(c => !c.library) ?? [];
+  // контекстное меню имиджа (меню 115/117 оригинала): свойства, текст, схема,
+  // изображение, информация, удалить
+  const [menu, setMenu] = useState<{ x: number; y: number; cls: string; library: boolean; confirm?: boolean } | null>(null);
+  const openMenu = (e: React.MouseEvent, cls: string, library: boolean, instance: number | null = null) => {
+    e.preventDefault(); select(cls, instance); setMenu({ x: e.clientX, y: e.clientY, cls, library });
+  };
+  async function deleteClass(name: string) {
+    try { await api.deleteClass(name); await reload(); showToast('Имидж удалён'); }
+    catch (e) { say({ level: 'error', where: 'имидж', text: String(e) }); }
+  }
 
   async function newClass() {
     // имя формируется автоматически; переименование — позже, через инспектор
@@ -66,6 +79,7 @@ export function Hierarchy() {
               <div key={inst.index} className={`tree-row${selectedInstance === inst.index ? ' selected' : ''}`} style={{ paddingLeft: 8 + depth * 14 }}
                 onClick={() => select(inst.class, inst.index)}
                 onDoubleClick={() => setTab('code')}
+                onContextMenu={e => openMenu(e, inst.class, false, inst.index)}
                 title={inst.path}>
                 <span className="twisty" onClick={e => { e.stopPropagation(); setCollapsed(s => { const n = new Set(s); n.has(inst.index) ? n.delete(inst.index) : n.add(inst.index); return n; }); }}>
                   {kids ? (isCollapsed ? '▸' : '▾') : ''}
@@ -87,7 +101,7 @@ export function Hierarchy() {
             {own.filter(c => !f || c.name.toLowerCase().includes(f)).map(c => (
               <div key={c.name} className="tree-row" style={{ paddingLeft: 22 }} draggable
                 onDragStart={e => { e.dataTransfer.setData(DRAG_CLASS, c.name); e.dataTransfer.effectAllowed = 'copy'; }}
-                onClick={() => select(c.name, null)} onDoubleClick={() => setTab('code')} title="Перетащите на схему, чтобы добавить экземпляр">
+                onClick={() => select(c.name, null)} onDoubleClick={() => setTab('code')} onContextMenu={e => openMenu(e, c.name, false)} title="Перетащите на схему, чтобы добавить экземпляр">
                 <img src={api.iconUrl(c.name)} alt="" /><span className="name">{c.name}</span>
                 {c.children.length > 0 && <span className="count">{c.children.length}</span>}
               </div>
@@ -103,13 +117,29 @@ export function Hierarchy() {
             {list.filter(c => !f || c.name.toLowerCase().includes(f)).map(c => (
               <div key={c.name} className="tree-row" style={{ paddingLeft: 22 }} draggable
                 onDragStart={e => { e.dataTransfer.setData(DRAG_CLASS, c.name); e.dataTransfer.effectAllowed = 'copy'; }}
-                onClick={() => select(c.name, null)} onDoubleClick={() => setTab('code')} title={c.description || 'Перетащите на схему'}>
+                onClick={() => select(c.name, null)} onDoubleClick={() => setTab('code')} onContextMenu={e => openMenu(e, c.name, true)} title={c.description || 'Перетащите на схему'}>
                 <img src={api.iconUrl(c.name)} alt="" /><span className="name">{c.name}</span>
               </div>
             ))}
           </div>
         ))}
       </div>
+      {menu && (
+        <div className="context" style={{ left: menu.x, top: menu.y }} onMouseLeave={() => setMenu(null)} onMouseDown={e => e.stopPropagation()}>
+          <button onClick={() => { setMenu(null); setDialog('classProps'); }}>Свойства имиджа… <span className="muted">Enter</span></button>
+          <button onClick={() => { setMenu(null); setTab('code'); }}>Редактировать текст…</button>
+          <button onClick={() => { setMenu(null); enterScheme(menu.cls); }}>Редактировать схему…</button>
+          <button onClick={() => { setMenu(null); setTab('picture'); }}>Редактировать изображение…</button>
+          <button onClick={() => { setMenu(null); setTab('graph'); }}>Детальная информация (граф)…</button>
+          {!menu.library && <>
+            <div className="menu-sep" />
+            <button onClick={() => { setMenu(null); newClass(); }}>Новый имидж</button>
+            {menu.confirm
+              ? <button onClick={() => { setMenu(null); deleteClass(menu.cls); }} style={{ color: 'var(--state-error)' }}>Точно удалить «{menu.cls}»</button>
+              : <button onClick={() => setMenu({ ...menu, confirm: true })} disabled={menu.cls === project?.root}>Удалить…</button>}
+          </>}
+        </div>
+      )}
     </>
   );
 }
