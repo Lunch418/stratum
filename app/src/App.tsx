@@ -19,7 +19,7 @@ import { OpenDialog } from './components/OpenDialog';
 import { Palette, type Command } from './components/Palette';
 import { Icon } from './components/Icon';
 import { MenuBar } from './components/MenuBar';
-import { SheetDialog, ProjectOptionsDialog, EnvOptionsDialog, ClassPropsDialog, CalcOrderDialog, FilePickDialog, AboutDialog, loadEnv } from './components/Options';
+import { SheetDialog, ProjectOptionsDialog, EnvOptionsDialog, ClassPropsDialog, CalcOrderDialog, FilePickDialog, AboutDialog, DeleteClassesDialog, loadEnv } from './components/Options';
 import { buildMenus, commandsFromMenus } from './menus';
 
 export default function App() {
@@ -188,6 +188,7 @@ export default function App() {
       {dialog === 'classProps' && <ClassPropsDialog onClose={() => setDialog(null)} />}
       {dialog === 'calcOrder' && <CalcOrderDialog onClose={() => setDialog(null)} />}
       {dialog === 'about' && <AboutDialog onClose={() => setDialog(null)} />}
+      {dialog === 'deleteClasses' && <DeleteClassesDialog onClose={() => setDialog(null)} />}
       {dialog === 'insertFile' && s.selectedClass && (
         <FilePickDialog title="Вставить из файла в рисунок имиджа" ext="vdr,bmp" onClose={() => setDialog(null)}
           onPick={async f => {

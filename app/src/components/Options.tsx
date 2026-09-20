@@ -404,3 +404,52 @@ export function AboutDialog({ onClose }: { onClose: () => void }) {
     </Frame>
   );
 }
+
+// ── Удаление имиджей ───────────────────────────────────────────────────────
+// Диалог 229 оригинала: список имиджей проекта с числом экземпляров;
+// неиспользуемые отмечены заранее.
+export function DeleteClassesDialog({ onClose }: { onClose: () => void }) {
+  const project = useStore(s => s.project);
+  const instances = useStore(s => s.instances);
+  const reload = useStore(s => s.reload);
+  const say = useStore(s => s.say);
+  const showToast = useStore(s => s.showToast);
+  const own = (project?.classes ?? []).filter(c => !c.library && c.name !== project?.root);
+  const used = new Map<string, number>();
+  for (const i of instances) used.set(i.class.toLowerCase(), (used.get(i.class.toLowerCase()) ?? 0) + 1);
+  // упоминание в схемах или текстах других имиджей (CreateObject, GetClassFile…)
+  // — тоже использование, такие имиджи заранее не отмечаются
+  const mentioned = new Set<string>();
+  for (const c of project?.classes ?? []) {
+    for (const ch of c.children) mentioned.add(ch.class.toLowerCase());
+    const t = c.text.toLowerCase();
+    for (const o of own) if (o.name !== c.name && t.includes(o.name.toLowerCase())) mentioned.add(o.name.toLowerCase());
+  }
+  const [picked, setPicked] = useState<Set<string>>(() => new Set(own.filter(c => !used.get(c.name.toLowerCase()) && !mentioned.has(c.name.toLowerCase())).map(c => c.name)));
+  const [busy, setBusy] = useState(false);
+  async function submit() {
+    setBusy(true);
+    try {
+      for (const n of picked) await api.deleteClass(n);
+      await reload(); showToast(`Удалено имиджей: ${picked.size}`); onClose();
+    } catch (e) { say({ level: 'error', where: 'имиджи', text: String(e) }); }
+    finally { setBusy(false); }
+  }
+  return (
+    <Frame title="Удаление имиджей" width={520} onClose={onClose} onSubmit={picked.size && !busy ? submit : undefined} action={`Удалить (${picked.size})`}>
+      <div className="modal-body">
+        <div className="muted small" style={{ marginBottom: 6 }}>Отмечены имиджи, у которых нет экземпляров в модели. Корневой имидж удалить нельзя.</div>
+        <div className="scroll list" style={{ maxHeight: 340, border: '1px solid var(--border)', borderRadius: 6 }}>
+          {own.map(c => { const n = used.get(c.name.toLowerCase()) ?? 0; return (
+            <label key={c.name} className="row check" style={{ cursor: 'pointer' }}>
+              <input type="checkbox" checked={picked.has(c.name)} onChange={e => setPicked(p => { const s = new Set(p); e.target.checked ? s.add(c.name) : s.delete(c.name); return s; })} />
+              <img src={api.iconUrl(c.name)} width={16} height={16} alt="" />
+              <span style={{ flex: 1 }}>{c.name}</span>
+              <span className="muted" style={{ color: n || mentioned.has(c.name.toLowerCase()) ? undefined : 'var(--state-error)' }}>{n ? `экземпляров: ${n}` : mentioned.has(c.name.toLowerCase()) ? 'упоминается' : 'не используется'}</span>
+            </label>); })}
+          {!own.length && <div className="muted" style={{ padding: 10 }}>Кроме корневого имиджа удалять нечего.</div>}
+        </div>
+      </div>
+    </Frame>
+  );
+}

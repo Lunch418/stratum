@@ -60,6 +60,7 @@ export function buildMenus(ctx: MenuContext): Menu[] {
       { label: 'Дублировать', hint: 'Ctrl+D', run: key('d', true) },
       { sep: true },
       { label: 'Удалить', hint: 'Delete', run: key('Delete') },
+      { label: 'Удаление имиджей…', run: () => ctx.open('deleteClasses'), disabled: noProject },
       { sep: true },
       { label: 'Поиск', hint: 'Ctrl+F', run: () => { s.setTab('code'); s.showToast('Ctrl+F в редакторе кода'); } },
       { label: 'Замена', hint: 'Ctrl+H', run: () => { s.setTab('code'); s.showToast('Ctrl+H в редакторе кода'); } },
