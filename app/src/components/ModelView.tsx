@@ -42,6 +42,8 @@ export function ModelView() {
       // «Параметры листа → Окно → Размер»: развёрнутое окно занимает вкладку
       div.classList.toggle('max', w.size === 'max');
       div.classList.toggle('min', w.size === 'min');
+      div.classList.toggle('dialog', w.style === 'dialog');
+      div.classList.toggle('popup', w.style === 'popup');
       const body = div.querySelector<HTMLDivElement>('.body')!;
       if (last.current.get(w.id) !== w.svg) {
         body.querySelector('svg')?.remove();

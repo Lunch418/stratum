@@ -54,6 +54,7 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
                         space.client = sheet.window_wh;
                     }
                     space.window_size = sheet.window_size.clone();
+                    space.window_style = sheet.window_style.clone();
                     space.layers = sheet.layers;
                 }
             }

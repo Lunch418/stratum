@@ -240,6 +240,8 @@ table.vars input:focus { border-color: var(--accent); background: var(--bg-surfa
 .model .win.max { flex: 1 1 100%; align-self: stretch; }
 .model .win.max .body { overflow: auto; height: calc(100% - 26px); }
 .model .win.min .body { display: none; }
+.model .win.dialog { border: 2px solid var(--border-strong); box-shadow: 0 12px 32px rgba(0,0,0,.35); }
+.model .win.popup .title { display: none; }
 .model .win .controls { position: absolute; inset: 0; pointer-events: none; }
 .model .win .ctl { position: absolute; pointer-events: auto; box-sizing: border-box; font: 12px Arial, sans-serif; color: #000; }
 .model .win button.ctl { background: #f0f0f0; border: 1px solid #606060; border-radius: 2px; padding: 0 4px; }

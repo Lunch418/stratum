@@ -385,6 +385,16 @@ pub fn apply(sp: &mut Space, op: &Json) -> Result<Handle, String> {
             d.pixels = Some(rgb);
             d.dirty = true;
             d.flush();
+            // после обрезки («ножницы») объект принимает новый размер
+            if op.get("resize").and_then(Json::as_bool).unwrap_or(false) {
+                if let Some(o) = sp.objects.get_mut(&handle) {
+                    o.w = w as f64;
+                    o.h = h as f64;
+                    if let Shape::Bitmap { src, .. } = &mut o.shape {
+                        *src = (0.0, 0.0, w as f64, h as f64);
+                    }
+                }
+            }
             Ok(handle)
         }
         // вставка из файла («Вставка → Из файла»): .vdr — как группа, .bmp — растр

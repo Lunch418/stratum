@@ -703,11 +703,12 @@ fn frame_json(shared: &Arc<Mutex<Shared>>) -> String {
             })
             .collect();
         windows.push(format!(
-            "{{\"id\":{i},\"name\":{},\"w\":{},\"h\":{},\"size\":{},\"svg\":{},\"controls\":[{}]}}",
+            "{{\"id\":{i},\"name\":{},\"w\":{},\"h\":{},\"size\":{},\"style\":{},\"svg\":{},\"controls\":[{}]}}",
             json_string(name),
             sp.client.0,
             sp.client.1,
             json_string(&sp.window_size),
+            json_string(&sp.window_style),
             json_string(&svg::render_in(sp, Some(gfx))),
             controls.join(",")
         ));

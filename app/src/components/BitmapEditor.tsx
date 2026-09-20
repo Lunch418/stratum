@@ -4,10 +4,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from './Icon';
 
-type Tool = 'pencil' | 'line' | 'rect' | 'frect' | 'ellipse' | 'fill' | 'spray' | 'pick' | 'eraser';
+type Tool = 'pencil' | 'line' | 'rect' | 'frect' | 'ellipse' | 'fill' | 'spray' | 'pick' | 'eraser' | 'scissors';
 const TOOLS: [Tool, string, string][] = [
   ['pencil', 'pencil', 'Карандаш'], ['eraser', 'eraser', 'Ластик (белый)'], ['line', 'line', 'Линия'], ['rect', 'rect', 'Прямоугольник'], ['frect', 'frect', 'Закрашенный прямоугольник'],
-  ['ellipse', 'ellipse', 'Эллипс'], ['fill', 'fill', 'Закраска области'], ['spray', 'spray', 'Распылитель'], ['pick', 'pick', 'Пипетка'],
+  ['ellipse', 'ellipse', 'Эллипс'], ['fill', 'fill', 'Закраска области'], ['spray', 'spray', 'Распылитель'], ['pick', 'pick', 'Пипетка'], ['scissors', 'scissors', 'Ножницы: обрезать до выделенного прямоугольника'],
 ];
 type RGB = [number, number, number];
 
@@ -24,6 +24,8 @@ export function BitmapEditor({ klass, kind, handle, onClose, onSaved }: Props) {
   const start = useRef<[number, number] | null>(null);
   const setStart = (p: [number, number] | null) => { start.current = p; };
   const [error, setError] = useState('');
+  const [cropBox, setCropBox] = useState<[number, number, number, number] | null>(null);
+  const [resized, setResized] = useState(false);
   const backup = useRef<Uint8ClampedArray | null>(null);
   const history = useRef<Uint8ClampedArray[]>([]);
 
@@ -38,7 +40,7 @@ export function BitmapEditor({ klass, kind, handle, onClose, onSaved }: Props) {
       }).catch(e => setError(String(e)));
   }, [klass, kind, handle]);
 
-  useEffect(() => { draw(); }, [size, zoom, grid]);
+  useEffect(() => { draw(); }, [size, zoom, grid, cropBox]);
 
   function draw() {
     const c = canvas.current, px = pixels.current;
@@ -50,6 +52,11 @@ export function BitmapEditor({ klass, kind, handle, onClose, onSaved }: Props) {
     const img = off.getContext('2d')!.createImageData(w, h); img.data.set(px); off.getContext('2d')!.putImageData(img, 0, 0);
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(off, 0, 0, w * zoom, h * zoom);
+    if (cropBox) {
+      const [x0, y0, x1, y1] = cropBox;
+      ctx.save(); ctx.strokeStyle = '#2b5ce6'; ctx.lineWidth = 2; ctx.setLineDash([6, 4]);
+      ctx.strokeRect(x0 * zoom, y0 * zoom, (x1 - x0 + 1) * zoom, (y1 - y0 + 1) * zoom); ctx.restore();
+    }
     if (grid && zoom >= 4) {
       ctx.strokeStyle = 'rgba(0,0,0,.15)'; ctx.lineWidth = 1; ctx.beginPath();
       for (let x = 0; x <= w; x++) { ctx.moveTo(x * zoom + .5, 0); ctx.lineTo(x * zoom + .5, h * zoom); }
@@ -101,6 +108,7 @@ export function BitmapEditor({ klass, kind, handle, onClose, onSaved }: Props) {
   function onDown(e: React.MouseEvent) {
     if (!pixels.current) return;
     const p = at(e); const c = current();
+    if (tool === 'scissors') { setStart(p); setCropBox([p[0], p[1], p[0], p[1]]); return; }
     if (tool === 'pick') { const o = (p[1] * size[0] + p[0]) * 4; const px = pixels.current; setColor('#' + [px[o], px[o + 1], px[o + 2]].map(v => v.toString(16).padStart(2, '0')).join('')); return; }
     remember();
     if (tool === 'fill') { fill(p[0], p[1], c); draw(); return; }
@@ -111,19 +119,30 @@ export function BitmapEditor({ klass, kind, handle, onClose, onSaved }: Props) {
     const s0 = start.current;
     if (!s0 || !pixels.current) return;
     const p = at(e); const c = current();
+    if (tool === 'scissors') { setCropBox([Math.min(s0[0], p[0]), Math.min(s0[1], p[1]), Math.max(s0[0], p[0]), Math.max(s0[1], p[1])]); return; }
     if (tool === 'pencil' || tool === 'eraser') { line(s0, p, c); setStart(p); }
     else if (tool === 'spray') spray(p, c);
     else if (backup.current) { pixels.current.set(backup.current); shape(s0, p, c, tool); }
     draw();
   }
   function onUp() { setStart(null); backup.current = null; }
+  function crop() {
+    if (!cropBox || !pixels.current) return;
+    const [w] = size; const [x0, y0, x1, y1] = [Math.max(0, cropBox[0]), Math.max(0, cropBox[1]), Math.min(size[0] - 1, cropBox[2]), Math.min(size[1] - 1, cropBox[3])];
+    const nw = x1 - x0 + 1, nh = y1 - y0 + 1;
+    if (nw < 1 || nh < 1) return;
+    remember();
+    const out = new Uint8ClampedArray(nw * nh * 4);
+    for (let y = 0; y < nh; y++) out.set(pixels.current.subarray(((y0 + y) * w + x0) * 4, ((y0 + y) * w + x0 + nw) * 4), y * nw * 4);
+    pixels.current = out; setSize([nw, nh]); setCropBox(null); setResized(true);
+  }
   function undo() { const prev = history.current.pop(); if (prev && pixels.current) { pixels.current.set(prev); draw(); } }
 
   async function save() {
     const [w, h] = size; const px = pixels.current!;
     const parts: string[] = [];
     for (let i = 0; i < w * h; i++) parts.push(px[i * 4].toString(16).padStart(2, '0') + px[i * 4 + 1].toString(16).padStart(2, '0') + px[i * 4 + 2].toString(16).padStart(2, '0'));
-    const r = await fetch(`/api/picture/${encodeURIComponent(klass)}?kind=${kind}`, { method: 'POST', body: JSON.stringify({ op: 'dibset', handle, w, h, rgb: parts.join('') }) });
+    const r = await fetch(`/api/picture/${encodeURIComponent(klass)}?kind=${kind}`, { method: 'POST', body: JSON.stringify({ op: 'dibset', handle, w, h, rgb: parts.join(''), resize: resized }) });
     if (!r.ok) { setError((await r.json()).error ?? 'ошибка'); return; }
     onSaved(); onClose();
   }
@@ -137,6 +156,7 @@ export function BitmapEditor({ klass, kind, handle, onClose, onSaved }: Props) {
           <span className="sep" />
           <input type="color" value={color} onChange={e => setColor(e.target.value)} title="Цвет" />
           <span className="sep" />
+          {cropBox && <button className="small" onClick={crop} title="Обрезать до выделения">Обрезать {cropBox[2] - cropBox[0] + 1}×{cropBox[3] - cropBox[1] + 1}</button>}
           <button className="small icon-only" onClick={undo} title="Отменить"><Icon name="undo" /></button>
           <button className={`small icon-only${grid ? ' active' : ''}`} onClick={() => setGrid(g => !g)} title="Сетка"><Icon name="grid" /></button>
           <button className="small ghost mono" onClick={() => setZoom(z => Math.max(1, z - 1))}>−</button>

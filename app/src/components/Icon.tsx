@@ -40,6 +40,7 @@ const PATHS: Record<string, string> = {
   fill: 'M3 8l5-5 5 5-5 5zM13 10c0 1.5-1 2.5-1 2.5s-1-1-1-2.5 1-1.5 1-1.5 1 .5 1 1.5',
   spray: 'M6 6h4v8H6zM8 2v2M5 3l1 1M11 3l-1 1M3 6h1M12 6h1',
   pick: 'M2.5 13.5l6-6M8 5l3 3M10 3l3 3M9 4l1-1 3 3-1 1',
+  scissors: 'M4.5 4.5a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM4.5 9.5a2 2 0 1 0 0 4 2 2 0 0 0 0-4zM6.5 7.5l7-4M6.5 10.5l7 4',
 };
 
 const FILLED = new Set(['play', 'pause', 'step', 'back', 'select']);
