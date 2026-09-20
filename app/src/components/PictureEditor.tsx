@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { type ObjectProps } from '../api';
 import { classByName, useStore } from '../store';
+import { Icon } from './Icon';
 
 type Tool = 'select' | 'line' | 'polyline' | 'rect' | 'roundrect' | 'ellipse' | 'arc' | 'text' | 'points' | 'pan';
 type Kind = 'image' | 'scheme' | 'icon';
@@ -198,17 +199,17 @@ export function PictureEditor({ kind }: { kind: Kind }) {
   return (
     <div className="picture-editor" onWheel={onWheel}>
       <div className="draw-tools">
-        {TOOLS.map(t => <button key={t.id} className={`small${tool === t.id ? ' active' : ''}`} title={t.hint} onClick={() => { setTool(t.id); setDraft([]); }} disabled={!editable && t.id !== 'select' && t.id !== 'pan'}>{t.label}</button>)}
+        {TOOLS.map(t => <button key={t.id} className={`small icon-only${tool === t.id ? ' active' : ''}`} title={t.hint} onClick={() => { setTool(t.id); setDraft([]); }} disabled={!editable && t.id !== 'select' && t.id !== 'pan'}><Icon name={t.id} /></button>)}
         <span className="sep" />
         <label title="Линия"><input type="color" value={pen.color} onChange={e => setPen({ ...pen, color: e.target.value })} /></label>
         <input type="number" min={0} max={20} value={pen.width} onChange={e => setPen({ ...pen, width: Number(e.target.value) })} style={{ width: 44 }} title="Толщина" />
         <label title="Заливка" style={{ display: 'flex', alignItems: 'center', gap: 2 }}><input type="checkbox" checked={fill.on} onChange={e => setFill({ ...fill, on: e.target.checked })} /><input type="color" value={fill.color} onChange={e => setFill({ ...fill, color: e.target.value })} /></label>
         <span className="sep" />
-        <button className="small" disabled={sel.length < 2} onClick={() => op({ op: 'group', handles: sel }).then(h => setSel([h]))} title="Группа">▣</button>
-        <button className="small" disabled={!one || one.kind !== 'group'} onClick={() => op({ op: 'ungroup', handle: one!.handle }).then(() => setSel([]))} title="Разгруппировать">▤</button>
-        <button className="small" disabled={!one} onClick={() => op({ op: 'zorder', handle: one!.handle, to: 'top' })} title="На передний план">⤒</button>
-        <button className="small" disabled={!one} onClick={() => op({ op: 'zorder', handle: one!.handle, to: 'bottom' })} title="На задний план">⤓</button>
-        <button className="small" disabled={!sel.length} onClick={() => op(sel.map(h => ({ op: 'delete', handle: h }))).then(() => setSel([]))} title="Удалить (Del)">✕</button>
+        <button className="small icon-only" disabled={sel.length < 2} onClick={() => op({ op: 'group', handles: sel }).then(h => setSel([h]))} title="Группа"><Icon name="group" /></button>
+        <button className="small icon-only" disabled={!one || one.kind !== 'group'} onClick={() => op({ op: 'ungroup', handle: one!.handle }).then(() => setSel([]))} title="Разгруппировать"><Icon name="ungroup" /></button>
+        <button className="small icon-only" disabled={!one} onClick={() => op({ op: 'zorder', handle: one!.handle, to: 'top' })} title="На передний план"><Icon name="up" /></button>
+        <button className="small icon-only" disabled={!one} onClick={() => op({ op: 'zorder', handle: one!.handle, to: 'bottom' })} title="На задний план"><Icon name="down" /></button>
+        <button className="small icon-only" disabled={!sel.length} onClick={() => op(sel.map(h => ({ op: 'delete', handle: h }))).then(() => setSel([]))} title="Удалить (Del)"><Icon name="trash" /></button>
         <span className="sep" />
         <input type="number" value={state.client[0]} onChange={e => op({ op: 'page', w: Number(e.target.value) })} title="Ширина листа" />
         <span className="muted small">×</span>

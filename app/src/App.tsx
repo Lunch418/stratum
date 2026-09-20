@@ -17,6 +17,7 @@ import { Search } from './components/Search';
 import { NewProjectDialog, InfoDialog } from './components/ProjectDialogs';
 import { OpenDialog } from './components/OpenDialog';
 import { Palette, type Command } from './components/Palette';
+import { Icon } from './components/Icon';
 
 export default function App() {
   const s = useStore();
@@ -163,17 +164,17 @@ export default function App() {
     <div className="ide">
       <header className="topbar">
         <span className="brand">Stratum Modern</span>
-        <button className={`primary${running ? ' paused' : ''}`} onClick={() => api.event(running ? 'type=pause' : 'type=run')} title="F5">{running ? 'Пауза' : 'Пуск'}</button>
-        <button onClick={() => api.event('type=step')} title="F10">Шаг</button>
-        <button onClick={() => api.event('type=back')} title="Shift+F10 — такт назад по истории" disabled={!frame?.canBack || running}>Назад</button>
-        <button onClick={() => api.event('type=reset').then(() => s.refreshInstances())} title="Shift+F5">Сброс</button>
+        <button className={`primary icon-text${running ? ' paused' : ''}`} onClick={() => api.event(running ? 'type=pause' : 'type=run')} title="F5"><Icon name={running ? 'pause' : 'play'} />{running ? 'Пауза' : 'Пуск'}</button>
+        <button className="icon-only" onClick={() => api.event('type=step')} title="Шаг (F10)"><Icon name="step" /></button>
+        <button className="icon-only" onClick={() => api.event('type=back')} title="Такт назад (Shift+F10)" disabled={!frame?.canBack || running}><Icon name="back" /></button>
+        <button className="icon-only" onClick={() => api.event('type=reset').then(() => s.refreshInstances())} title="Сброс (Shift+F5)"><Icon name="reset" /></button>
         <label className="muted" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>Скорость
           <input type="range" min={1} max={200} defaultValue={30} onChange={e => api.event('type=speed&fps=' + e.target.value)} />
         </label>
         <span className="counter mono">такт {frame?.tick ?? 0}{frame?.stopped ? ' · остановлено' : ''}</span>
         <span className="sep" />
-        <button className="ghost" onClick={s.undo} disabled={!s.project?.canUndo} title="Ctrl+Z">Отменить</button>
-        <button className="ghost" onClick={s.redo} disabled={!s.project?.canRedo} title="Ctrl+Shift+Z">Повторить</button>
+        <button className="ghost icon-only" onClick={s.undo} disabled={!s.project?.canUndo} title="Отменить (Ctrl+Z)"><Icon name="undo" /></button>
+        <button className="ghost icon-only" onClick={s.redo} disabled={!s.project?.canRedo} title="Повторить (Ctrl+Shift+Z)"><Icon name="redo" /></button>
         <button onClick={save} title="Ctrl+S — сохранить проект в текстовом формате" className={s.unsaved ? 'attention' : ''}>Сохранить{s.unsaved ? ' •' : ''}</button>
         <div className="menu-host">
           <button className="ghost" onClick={() => setMenuOpen(o => o === 'project' ? null : 'project')}>Проект ▾</button>
@@ -199,7 +200,7 @@ export default function App() {
           )}
         </div>
         <button className="ghost" onClick={() => s.setPaletteOpen(true)} title="Ctrl+Shift+P">Команды</button>
-        <button className="ghost" onClick={s.toggleTheme} title="Тема">{s.theme === 'light' ? 'Тёмная' : 'Светлая'}</button>
+        <button className="ghost icon-only" onClick={s.toggleTheme} title={s.theme === 'light' ? 'Тёмная тема' : 'Светлая тема'}><Icon name={s.theme === 'light' ? 'moon' : 'sun'} /></button>
       </header>
       {dialog === 'open' && <OpenDialog required={!!s.project?.empty} onClose={() => setDialog(null)} />}
       {s.paletteOpen && <Palette commands={commands} onClose={() => s.setPaletteOpen(false)} />}

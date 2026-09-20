@@ -74,6 +74,10 @@ button.primary.paused { background: var(--state-pause); }
 button.ghost { border-color: transparent; background: transparent; color: var(--text-muted); }
 button.ghost:hover { color: var(--text-primary); background: var(--accent-soft); border-color: transparent; }
 button.small { padding: 2px 7px; font-size: 12px; }
+button.icon-only { display: inline-flex; align-items: center; justify-content: center; padding: 5px 7px; line-height: 0; }
+button.small.icon-only { padding: 4px 6px; }
+button.icon-text { display: inline-flex; align-items: center; gap: 8px; }
+button svg { display: block; }
 button.attention { border-color: var(--state-pause); box-shadow: inset 0 0 0 1px var(--state-pause); }
 input[type="text"], input[type="search"], input[type="number"], select, textarea {
   background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 4px 8px;
