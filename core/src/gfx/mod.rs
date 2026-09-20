@@ -182,6 +182,10 @@ pub struct Space {
     pub scale: (f64, f64),
     pub client: (f64, f64),
     pub visible: bool,
+    /// Маска видимых слоёв 0–31 (`SetSpaceLayers2d`, «Параметры листа → Слои»).
+    pub layers: u32,
+    /// Размер окна из «Параметров листа»: "max" — на всю вкладку.
+    pub window_size: String,
     /// Наибольший выданный дескриптор: объекты и инструменты нумеруются
     /// одним счётчиком, как в оригинале.
     next: Handle,
@@ -195,6 +199,7 @@ impl Space {
             scale: (1.0, 1.0),
             client: (640.0, 480.0),
             visible: true,
+            layers: u32::MAX,
             next: 1,
             ..Default::default()
         }
@@ -590,7 +595,7 @@ impl Space {
 
     fn hit(&self, h: Handle, x: f64, y: f64) -> Option<Handle> {
         let obj = self.objects.get(&h)?;
-        if !obj.visible || obj.scheme_element || obj.flags & 0x8000 != 0 {
+        if !obj.visible || obj.scheme_element || obj.flags & 0x8000 != 0 || (self.layers >> (obj.layer & 31)) & 1 == 0 {
             return None;
         }
         match &obj.shape {
@@ -728,6 +733,10 @@ pub struct Gfx {
     /// Рисунки имиджей по имени класса (в нижнем регистре) — для
     /// `OpenSchemeWindow`.
     pub pictures: BTreeMap<String, Picture>,
+    /// Параметры окна из «Параметров листа» имиджа: размер окна
+    /// ("max" | "min" | "fixed" | …), ширина и высота при "fixed", запрет
+    /// изменения размера, видимые слои.
+    pub sheets: BTreeMap<String, crate::formats::SheetOptions>,
     /// Трёхмерные пространства; дескрипторы общие с двумерными.
     pub spaces3d: BTreeMap<Handle, space3d::Space3d>,
     /// Буфер обмена `CopyToClipboard2d` (объект вместе с инструментами).

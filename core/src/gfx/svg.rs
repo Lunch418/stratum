@@ -41,7 +41,7 @@ pub fn render_in(sp: &Space, gfx: Option<&super::Gfx>) -> String {
 
 fn render_object(sp: &Space, h: Handle, out: &mut String, gfx: Option<&super::Gfx>) {
     let Some(o) = sp.objects.get(&h) else { return };
-    if !o.visible || o.scheme_element {
+    if !o.visible || o.scheme_element || (sp.layers >> (o.layer & 31)) & 1 == 0 {
         return;
     }
     if o.alpha < 255 {

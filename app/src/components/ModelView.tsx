@@ -39,6 +39,9 @@ export function ModelView() {
         root.appendChild(div);
       }
       div.querySelector('.title')!.textContent = w.name;
+      // «Параметры листа → Окно → Размер»: развёрнутое окно занимает вкладку
+      div.classList.toggle('max', w.size === 'max');
+      div.classList.toggle('min', w.size === 'min');
       const body = div.querySelector<HTMLDivElement>('.body')!;
       if (last.current.get(w.id) !== w.svg) {
         body.querySelector('svg')?.remove();

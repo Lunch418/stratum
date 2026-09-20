@@ -228,6 +228,9 @@ impl Simulation {
                     sim.effects.gfx.pictures.insert(cls.name.to_lowercase(), pic);
                 }
             }
+            if let Some(sheet) = &cls.sheet {
+                sim.effects.gfx.sheets.insert(cls.name.to_lowercase(), sheet.clone());
+            }
         }
         sim.class_dirs = project
             .classes

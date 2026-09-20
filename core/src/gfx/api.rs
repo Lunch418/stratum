@@ -47,6 +47,15 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
                     gfx.resolve_dibs(sp);
                     gfx.fit_client(sp);
                 }
+                // «Параметры листа → Окно»: заданный размер и маска слоёв
+                if let Some(sheet) = gfx.sheets.get(&class.to_lowercase()).cloned() {
+                    let space = gfx.space_mut(sp).unwrap();
+                    if sheet.window_size == "fixed" && sheet.window_wh.0 > 0.0 && sheet.window_wh.1 > 0.0 {
+                        space.client = sheet.window_wh;
+                    }
+                    space.window_size = sheet.window_size.clone();
+                    space.layers = sheet.layers;
+                }
             }
             handle(sp)
         }
@@ -183,7 +192,12 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
                 }
             }).unwrap_or(0))
         }
-        "setobjectattribute2d" | "getobjectattribute2d" | "setobjectlayer2d" | "getobjectlayer2d" => num(0.0),
+        "setobjectattribute2d" | "getobjectattribute2d" => num(0.0),
+        "setobjectlayer2d" => {
+            let layer = f(args, 2) as u32;
+            ok(object_mut(gfx, args).map(|o| o.layer = layer & 31).is_some())
+        }
+        "getobjectlayer2d" => num(object(gfx, args).map(|o| o.layer as f64).unwrap_or(0.0)),
 
         // ── линии ─────────────────────────────────────────────────────────
         "createline2d" | "createpolyline2d" => {
@@ -551,8 +565,13 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
             let dib = h(args, 2);
             ok(gfx.space_mut(h(args, 0)).and_then(|sp| sp.brushes.get_mut(&h(args, 1))).map(|b| b.dib = dib).is_some())
         }
-        "setbkbrush2d" | "getbkbrush2d" | "setcrdsystem2d" | "setrgncreatemode" | "setlinearrows2d" | "setpoints2d" | "sethyperjump2d" | "setspacelayers2d" => ok(gfx.space(h(args, 0)).is_some()),
-        "getrgncreatemode" | "getspacelayers2d" => num(0.0),
+        "setbkbrush2d" | "getbkbrush2d" | "setcrdsystem2d" | "setrgncreatemode" | "setlinearrows2d" | "setpoints2d" | "sethyperjump2d" => ok(gfx.space(h(args, 0)).is_some()),
+        "setspacelayers2d" => {
+            let mask = f(args, 1) as i64 as u32;
+            ok(gfx.space_mut(h(args, 0)).map(|sp| sp.layers = mask).is_some())
+        }
+        "getspacelayers2d" => num(gfx.space(h(args, 0)).map(|sp| sp.layers as f64).unwrap_or(0.0)),
+        "getrgncreatemode" => num(0.0),
         "createrdib2d" | "createrdoubledib2d" => {
             let file = s(args, 1);
             let data = gfx.find_file(&file).and_then(|p| std::fs::read(p).ok());

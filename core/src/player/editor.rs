@@ -346,6 +346,33 @@ pub fn apply(sp: &mut Space, op: &Json) -> Result<Handle, String> {
             *sp = Space::new(1, "");
             Ok(0)
         }
+        // растр: новый пустой («Битовая карта») и запись пикселей из битового редактора
+        "bitmap" => {
+            let (w, h) = (op.num_or("w", 32.0).max(1.0) as u32, op.num_or("h", 32.0).max(1.0) as u32);
+            let (x, y) = (op.num_or("x", 0.0), op.num_or("y", 0.0));
+            let rgb = vec![255u8; (w * h * 3) as usize];
+            let d = sp.add_dib(crate::gfx::Dib::new(crate::gfx::encode_bmp24(w, h, &rgb), Vec::new(), None));
+            Ok(sp.add_object(Object::new(0, x, y, w as f64, h as f64, Shape::Bitmap { dib: d, src: (0.0, 0.0, w as f64, h as f64), masked: false })))
+        }
+        "dibset" => {
+            let dib = match sp.objects.get(&handle).map(|o| &o.shape) {
+                Some(Shape::Bitmap { dib, .. }) => *dib,
+                _ => return Err("объект — не растр".into()),
+            };
+            let (w, h) = (op.num_or("w", 0.0) as u32, op.num_or("h", 0.0) as u32);
+            let hex = op.str_or("rgb", "");
+            if hex.len() != (w * h * 3 * 2) as usize {
+                return Err("размер rgb не совпадает с w×h".into());
+            }
+            let rgb: Vec<u8> = (0..hex.len() / 2).filter_map(|i| u8::from_str_radix(&hex[i * 2..i * 2 + 2], 16).ok()).collect();
+            let d = sp.dibs.get_mut(&dib).ok_or("нет растра")?;
+            d.width = w;
+            d.height = h;
+            d.pixels = Some(rgb);
+            d.dirty = true;
+            d.flush();
+            Ok(handle)
+        }
         // вставка из файла («Вставка → Из файла»): .vdr — как группа, .bmp — растр
         "insert" => {
             let file = op.str_or("file", "");
@@ -420,6 +447,11 @@ pub fn handle(method: &str, class: &str, kind: Kind, body: &str, s: &mut Shared)
                 return Err(("403 Forbidden", "библиотечный имидж не редактируется".into()));
             }
             let op = json::parse(body).map_err(|e| ("400 Bad Request", e))?;
+            // чтение растра — без записи в проект
+            if op.str_or("op", "") == "dibget" {
+                let mut sp = open(&s.project.classes[i], kind);
+                return dib_get(&mut sp, op.num_or("handle", 0.0) as Handle).map_err(|e| ("400 Bad Request", e));
+            }
             let ops: Vec<Json> = match &op {
                 Json::Array(items) => items.clone(),
                 other => vec![other.clone()],
@@ -435,4 +467,17 @@ pub fn handle(method: &str, class: &str, kind: Kind, body: &str, s: &mut Shared)
         }
         _ => Err(("405 Method Not Allowed", "метод".into())),
     }
+}
+
+/// Пиксели растра объекта как hex RGB — для битового редактора.
+fn dib_get(sp: &mut Space, handle: Handle) -> Result<String, String> {
+    let dib = match sp.objects.get(&handle).map(|o| &o.shape) {
+        Some(Shape::Bitmap { dib, .. }) => *dib,
+        _ => return Err("объект — не растр".into()),
+    };
+    let d = sp.dibs.get_mut(&dib).ok_or("нет растра")?;
+    d.pixel(0, 0);
+    let (w, h) = (d.width, d.height);
+    let hex: String = d.pixels.as_deref().unwrap_or(&[]).iter().map(|b| format!("{b:02x}")).collect();
+    Ok(format!("{{\"w\":{w},\"h\":{h},\"rgb\":\"{hex}\"}}"))
 }

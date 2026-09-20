@@ -7,6 +7,7 @@ import { type ObjectProps } from '../api';
 import { classByName, useStore } from '../store';
 import { Icon } from './Icon';
 import { FilePickDialog } from './Options';
+import { BitmapEditor } from './BitmapEditor';
 
 type Tool = 'select' | 'line' | 'polyline' | 'rect' | 'roundrect' | 'ellipse' | 'arc' | 'text' | 'points' | 'pan';
 type Kind = 'image' | 'scheme' | 'icon';
@@ -45,6 +46,7 @@ export function PictureEditor({ kind }: { kind: Kind }) {
   const [preview, setPreview] = useState<Preview>(null);
   const [textAsk, setTextAsk] = useState<{ at: [number, number]; value: string } | null>(null);
   const [insertAsk, setInsertAsk] = useState(false);
+  const [bitmapEdit, setBitmapEdit] = useState<number | null>(null);
   const sheet = klass?.sheet;
   const grid = sheet?.gridVisible ? { step: sheet.gridStep, origin: sheet.gridOrigin } : null;
   const svgRef = useRef<SVGSVGElement>(null);
@@ -230,6 +232,8 @@ export function PictureEditor({ kind }: { kind: Kind }) {
         <button className="small icon-only" disabled={!one} onClick={() => op({ op: 'zorder', handle: one!.handle, to: 'bottom' })} title="На задний план"><Icon name="down" /></button>
         <button className="small icon-only" disabled={!sel.length} onClick={() => op(sel.map(h => ({ op: 'delete', handle: h }))).then(() => setSel([]))} title="Удалить (Del)"><Icon name="trash" /></button>
         <button className="small icon-only" disabled={!editable} onClick={() => setInsertAsk(true)} title="Вставить из файла (.vdr, .bmp)"><Icon name="file" /></button>
+        <button className="small icon-only" disabled={!editable} onClick={() => { const at = cursor ?? [state.origin[0], state.origin[1]]; op({ op: 'bitmap', w: 32, h: 32, x: at[0], y: at[1] }).then(h => { setSel([h]); setBitmapEdit(h); }); }} title="Новая битовая карта 32×32"><Icon name="bitmap" /></button>
+        <button className="small icon-only" disabled={!editable || !one || one.kind !== 'bitmap'} onClick={() => setBitmapEdit(one!.handle)} title="Битовый редактор выбранного растра"><Icon name="pencil" /></button>
         <button className={`small icon-only${grid ? ' active' : ''}`} onClick={() => useStore.getState().setDialog('sheet')} title="Параметры листа: сетка, окно, слои"><Icon name="grid" /></button>
         <span className="sep" />
         <input type="number" value={state.client[0]} onChange={e => op({ op: 'page', w: Number(e.target.value) })} title="Ширина листа" />
@@ -296,6 +300,7 @@ export function PictureEditor({ kind }: { kind: Kind }) {
         </div>
       )}
       {!editable && <div className="hint muted">Библиотечный имидж: только просмотр.</div>}
+      {bitmapEdit !== null && klass && <BitmapEditor klass={klass.name} kind={kind} handle={bitmapEdit} onClose={() => setBitmapEdit(null)} onSaved={() => { load(); markUnsaved(); }} />}
       {insertAsk && (
         <FilePickDialog title="Вставить из файла" ext="vdr,bmp" onClose={() => setInsertAsk(false)}
           onPick={async f => { setInsertAsk(false); const at = cursor ?? [state.origin[0], state.origin[1]]; const h = await op({ op: 'insert', file: f, x: at[0], y: at[1] }); if (h) setSel([h]); }} />

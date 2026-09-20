@@ -33,6 +33,13 @@ const PATHS: Record<string, string> = {
   info: 'M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM8 7v4M8 5h.01',
   search: 'M7 2.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9zM10.5 10.5l3 3',
   stop: 'M3.5 3.5h9v9h-9z',
+  bitmap: 'M2.5 2.5h11v11h-11zM2.5 10l3-3 3 3 2-2 3 3M10.5 5.5h.01',
+  pencil: 'M3 13l1-4 7-7 3 3-7 7zM10 3l3 3',
+  eraser: 'M2.5 10.5l6-6 4 4-6 6h-4zM6 14.5h8',
+  frect: 'M2.5 3.5h11v9h-11zM2.5 6.5h11M2.5 9.5h11',
+  fill: 'M3 8l5-5 5 5-5 5zM13 10c0 1.5-1 2.5-1 2.5s-1-1-1-2.5 1-1.5 1-1.5 1 .5 1 1.5',
+  spray: 'M6 6h4v8H6zM8 2v2M5 3l1 1M11 3l-1 1M3 6h1M12 6h1',
+  pick: 'M2.5 13.5l6-6M8 5l3 3M10 3l3 3M9 4l1-1 3 3-1 1',
 };
 
 const FILLED = new Set(['play', 'pause', 'step', 'back', 'select']);

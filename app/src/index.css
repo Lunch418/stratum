@@ -236,6 +236,9 @@ table.vars input:focus { border-color: var(--accent); background: var(--bg-surfa
 .model .win .title { background: var(--bg-surface); color: var(--text-primary); font-size: 12px; font-weight: 700; padding: 4px 10px; border-bottom: 1px solid var(--border); }
 .model .win svg { display: block; }
 .model .win .body { position: relative; }
+.model .win.max { flex: 1 1 100%; align-self: stretch; }
+.model .win.max .body { overflow: auto; height: calc(100% - 26px); }
+.model .win.min .body { display: none; }
 .model .win .controls { position: absolute; inset: 0; pointer-events: none; }
 .model .win .ctl { position: absolute; pointer-events: auto; box-sizing: border-box; font: 12px Arial, sans-serif; color: #000; }
 .model .win button.ctl { background: #f0f0f0; border: 1px solid #606060; border-radius: 2px; padding: 0 4px; }
@@ -336,3 +339,8 @@ button.attention { border-color: var(--state-pause); }
 .toast { position: fixed; left: 50%; bottom: 36px; transform: translateX(-50%); background: var(--text-primary); color: var(--bg-surface); padding: 7px 16px; border-radius: 999px; font-size: 12px; font-weight: 600; box-shadow: var(--shadow-pop); }
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* битовый редактор */
+.bitmap-editor .draw-tools { border-bottom: 1px solid var(--border); }
+.bitmap-body { max-height: 70vh; overflow: auto; background: var(--bg-sunken); display: flex; justify-content: center; }
+.bitmap-body canvas { image-rendering: pixelated; cursor: crosshair; background: #fff; }
