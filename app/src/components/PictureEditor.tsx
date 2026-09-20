@@ -210,12 +210,12 @@ export function PictureEditor({ kind }: { kind: Kind }) {
         <button className="small" disabled={!one} onClick={() => op({ op: 'zorder', handle: one!.handle, to: 'bottom' })} title="На задний план">⤓</button>
         <button className="small" disabled={!sel.length} onClick={() => op(sel.map(h => ({ op: 'delete', handle: h }))).then(() => setSel([]))} title="Удалить (Del)">✕</button>
         <span className="sep" />
-        <span className="muted small">Лист</span>
-        <input type="number" value={state.client[0]} style={{ width: 56 }} onChange={e => op({ op: 'page', w: Number(e.target.value) })} title="Ширина листа" />
-        <input type="number" value={state.client[1]} style={{ width: 56 }} onChange={e => op({ op: 'page', h: Number(e.target.value) })} title="Высота листа" />
+        <input type="number" value={state.client[0]} onChange={e => op({ op: 'page', w: Number(e.target.value) })} title="Ширина листа" />
+        <span className="muted small">×</span>
+        <input type="number" value={state.client[1]} onChange={e => op({ op: 'page', h: Number(e.target.value) })} title="Высота листа" />
         <span className="spacer" />
-        <span className="muted small mono">{cursor ? `${Math.round(cursor[0])}, ${Math.round(cursor[1])}` : ''} · {Math.round(view.k * 100)}%</span>
-        <button className="small" onClick={() => setView({ x: 40, y: 40, k: 1 })}>100%</button>
+        <span className="muted small mono">{cursor ? `${Math.round(cursor[0])}, ${Math.round(cursor[1])}` : ''}</span>
+        <button className="small ghost mono" onClick={() => setView({ x: 40, y: 40, k: 1 })} title="Масштаб 100 %">{Math.round(view.k * 100)}%</button>
       </div>
       <svg ref={svgRef} className="canvas" onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp} onContextMenu={e => e.preventDefault()} onDoubleClick={() => tool === 'polyline' && finishPolyline()}>
         <g transform={`translate(${view.x} ${view.y}) scale(${view.k})`}>

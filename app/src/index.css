@@ -162,10 +162,10 @@ table.vars input:focus { border-color: var(--accent); background: var(--bg-surfa
 /* холст схемы */
 .scheme { width: 100%; height: 100%; background: var(--bg-canvas); overflow: hidden; position: relative; }
 .scheme svg.canvas { width: 100%; height: 100%; display: block; }
-.scheme .node rect.box { fill: var(--bg-surface); stroke: var(--border); rx: 4; }
-.scheme .node.selected rect.box { stroke: var(--accent); stroke-width: 2; }
-.scheme .node text { font-size: 12px; font-weight: 500; fill: var(--text-primary); }
-.scheme .link .wire { stroke: var(--type-float); stroke-width: 1.5; fill: none; pointer-events: none; }
+.scheme .node rect.box { fill: var(--bg-surface); stroke: var(--border-strong, var(--border)); rx: 6; filter: drop-shadow(0 1px 0 rgba(20,23,31,.06)); }
+.scheme .node.selected rect.box { stroke: var(--accent); stroke-width: 1.5; filter: drop-shadow(0 0 0 3px var(--accent-soft)); }
+.scheme .node text { font-size: 12px; font-weight: 600; fill: var(--text-primary); font-family: var(--font-ui); }
+.scheme .link .wire { stroke: var(--accent); stroke-width: 1.6; fill: none; pointer-events: none; opacity: .75; }
 .scheme .link .hit { stroke: transparent; stroke-width: 12; fill: none; cursor: pointer; }
 .scheme .link:hover .wire { stroke-width: 2.5; }
 .scheme .link.selected .wire { stroke: var(--accent); stroke-width: 2.5; }
@@ -177,10 +177,11 @@ table.vars input:focus { border-color: var(--accent); background: var(--bg-surfa
 .context { position: fixed; z-index: 30; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-panel); box-shadow: var(--shadow-pop); padding: 4px; min-width: 180px; display: flex; flex-direction: column; }
 .context button { border: 0; background: transparent; text-align: left; padding: 6px 10px; border-radius: 3px; display: flex; justify-content: space-between; gap: 12px; }
 .context button:hover { background: var(--accent-soft); }
-.scheme .grid { stroke: var(--border); stroke-width: 0.5; opacity: 0.5; }
-.scheme .toolbar { position: absolute; right: 10px; top: 10px; display: flex; gap: 4px; }
-.breadcrumbs { display: flex; gap: 4px; padding: 4px 10px; font-size: 12px; color: var(--text-muted); border-bottom: 1px solid var(--border); background: var(--bg-surface); }
-.breadcrumbs button { border: 0; background: transparent; padding: 0 2px; color: var(--accent); }
+.scheme .grid { stroke: var(--border); stroke-width: 0.6; opacity: 0.7; }
+.scheme .toolbar { position: absolute; right: 10px; top: 10px; display: flex; gap: 4px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 999px; padding: 3px 6px; }
+.scheme .toolbar button.small { border-color: transparent; border-radius: 999px; }
+.breadcrumbs { display: flex; gap: 4px; padding: 5px 12px; font-size: 12px; color: var(--text-muted); border-bottom: 1px solid var(--border); background: var(--bg-surface); }
+.breadcrumbs button { border: 0; background: transparent; padding: 0 2px; color: var(--accent-ink); font-weight: 600; }
 
 /* окно модели */
 .model { width: 100%; height: 100%; overflow: auto; background: var(--bg-sunken); background-image: radial-gradient(var(--border) 1px, transparent 1px); background-size: 16px 16px; display: flex; align-items: flex-start; gap: 14px; padding: 14px; }
@@ -202,7 +203,7 @@ table.vars input:focus { border-color: var(--accent); background: var(--bg-surfa
 .messages .row .where { color: var(--text-muted); min-width: 160px; }
 
 /* модальные окна */
-.modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; z-index: 20; }
+.modal-backdrop { position: fixed; inset: 0; background: rgba(20,23,31,.45); backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; z-index: 20; }
 .modal.open-dialog { width: min(760px, 94vw); }
 .browse .tree-row.project .name { font-weight: 600; }
 .modal { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-panel); width: min(560px, 92vw); box-shadow: var(--shadow-pop); }
@@ -229,16 +230,16 @@ button.attention { border-color: var(--state-pause); }
 /* палитра команд */
 .palette-backdrop { align-items: flex-start; padding-top: 12vh; }
 .palette { width: min(640px, 92vw); }
-.palette input { width: 100%; border: 0; border-bottom: 1px solid var(--border); border-radius: 6px 6px 0 0; padding: 10px 14px; font-size: 14px; background: transparent; outline: none; }
+.palette input { width: 100%; border: 0; border-bottom: 1px solid var(--border); border-radius: var(--radius-panel) var(--radius-panel) 0 0; padding: 12px 16px; font-size: 15px; font-weight: 600; background: transparent; outline: none; }
 .palette .list { max-height: 50vh; overflow: auto; padding: 4px; }
 .palette .row { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 3px; cursor: pointer; }
-.palette .row.active { background: var(--accent-soft); }
+.palette .row.active { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
 .palette .row .group { font-size: 11px; min-width: 76px; }
 .palette .row .title { flex: 1; }
 .palette .row .hint { font-size: 11px; }
 
-.halt { display: flex; align-items: center; gap: 8px; padding: 5px 10px; font-size: 12px; border-bottom: 1px solid var(--border); background: var(--accent-soft); }
-.halt.error { background: rgba(201, 59, 59, 0.12); color: var(--state-error); }
+.halt { display: flex; align-items: center; gap: 8px; padding: 6px 12px; font-size: 12px; font-weight: 600; border-bottom: 1px solid var(--border); background: var(--accent-soft); border-left: 3px solid var(--accent); }
+.halt.error { background: rgba(214, 59, 59, 0.10); color: var(--state-error); border-left-color: var(--state-error); }
 .halt .spacer { flex: 1; }
 .line-error { background: rgba(201, 59, 59, 0.18); }
 .line-halt { background: var(--accent-soft); }
@@ -265,8 +266,12 @@ button.attention { border-color: var(--state-pause); }
 .picture-editor .handle { fill: var(--bg-surface); stroke: var(--accent); cursor: nwse-resize; }
 .picture-editor .handle.point { cursor: move; }
 .picture-editor .draft { fill: none; stroke: var(--accent); stroke-width: 1; stroke-dasharray: 3 3; pointer-events: none; }
-.draw-tools { display: flex; align-items: center; gap: 4px; padding: 4px 8px; border-bottom: 1px solid var(--border); background: var(--bg-surface); flex-wrap: wrap; }
-.draw-tools button.active { background: var(--accent-soft); border-color: var(--accent); }
+.draw-tools { display: flex; align-items: center; gap: 3px; padding: 4px 8px; border-bottom: 1px solid var(--border); background: var(--bg-surface); flex-wrap: nowrap; overflow: hidden; }
+.draw-tools input[type="number"] { width: 48px !important; padding: 3px 4px; }
+.draw-tools .muted.small { white-space: nowrap; }
+.draw-tools button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.draw-tools button.small { min-width: 30px; border-color: transparent; }
+.draw-tools button.small:hover { border-color: var(--border-strong, var(--border)); }
 .draw-tools .sep { width: 1px; height: 18px; background: var(--border); margin: 0 4px; }
 .draw-tools .spacer { flex: 1; }
 .draw-tools input[type="color"] { width: 26px; height: 22px; padding: 0; border: 1px solid var(--border); background: none; }
