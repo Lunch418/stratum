@@ -215,6 +215,20 @@ pub fn apply(sp: &mut Space, op: &Json) -> Result<Handle, String> {
                     };
                     add_polyline(sp, outline, pen, brush, shape != "arc")
                 }
+                // «Вставка → Формы»: Windows-элемент (EDIT, BUTTON, COMBOBOX, CHECKBOX, RADIOBUTTON, LISTBOX)
+                "control" => {
+                    let (x, y) = pts.first().copied().unwrap_or((0.0, 0.0));
+                    let class = op.str_or("class", "BUTTON").to_uppercase();
+                    let (w, h) = match class.as_str() {
+                        "LISTBOX" => (120.0, 80.0),
+                        "COMBOBOX" => (120.0, 22.0),
+                        "CHECKBOX" | "RADIOBUTTON" => (110.0, 18.0),
+                        _ => (90.0, 24.0),
+                    };
+                    let (w, h) = (op.num_or("w", w), op.num_or("h", h));
+                    let text = op.str_or("text", &class.to_lowercase());
+                    sp.add_object(Object::new(0, x, y, w, h, Shape::Control { class, caption: text.clone(), style: 0, text, checked: false, enabled: true }))
+                }
                 _ => {
                     if pts.len() < 2 {
                         return Err("нужны хотя бы две точки".into());

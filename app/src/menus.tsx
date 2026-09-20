@@ -17,6 +17,10 @@ export interface MenuContext {
 
 const MDI = 'В новой среде вместо окон MDI — панели с разделителями';
 
+/// Пункты «Правка» работают через те же горячие клавиши, что и панели:
+/// событие уходит в document.body, и его ловит активная вкладка.
+const key = (k: string, ctrl = false) => () => document.body.dispatchEvent(new KeyboardEvent('keydown', { key: k, code: k.length === 1 ? 'Key' + k.toUpperCase() : k, ctrlKey: ctrl, bubbles: true, cancelable: true }));
+
 export function buildMenus(ctx: MenuContext): Menu[] {
   const s = useStore.getState();
   const cls = s.selectedClass;
@@ -25,7 +29,8 @@ export function buildMenus(ctx: MenuContext): Menu[] {
   const st = (action: 'default' | 'keep') => api.stateAction(action).then(() => { if (action === 'keep') s.markUnsaved(); s.showToast(action === 'default' ? 'Переменные — по умолчанию' : 'Текущее состояние стало стартовым'); });
   const tab = (t: typeof s.tab, label: string): MenuItem => ({ label, checked: s.tab === t, run: () => s.setTab(t) });
   const bottom = (t: typeof s.bottomTab, label: string): MenuItem => ({ label, checked: s.bottomTab === t, run: () => s.setBottomTab(t) });
-  const drawTool = (label: string, hint?: string): MenuItem => ({ label, hint, run: () => { s.setTab('picture'); s.showToast('Инструмент — на панели над листом'); } });
+  // инструмент рисования: переключить вкладку и выбрать инструмент в редакторе
+  const drawTool = (label: string, tool: string, hint?: string): MenuItem => ({ label, hint, disabled: noProject || lib, run: () => { if (s.tab !== 'picture' && s.tab !== 'icon') s.setTab('picture'); setTimeout(() => window.dispatchEvent(new CustomEvent('draw-tool', { detail: tool })), 50); } });
 
   return [
     { title: 'Файл', items: [
@@ -49,12 +54,12 @@ export function buildMenus(ctx: MenuContext): Menu[] {
       { label: 'Отмена', hint: 'Ctrl+Z', run: s.undo, disabled: !s.project?.canUndo },
       { label: 'Повтор', hint: 'Ctrl+Shift+Z', run: s.redo, disabled: !s.project?.canRedo },
       { sep: true },
-      { label: 'Вырезать', hint: 'Ctrl+X', run: () => document.execCommand('cut'), disabled: s.tab !== 'scheme' && s.tab !== 'code', why: 'Действует на схеме и в коде' },
-      { label: 'Копировать', hint: 'Ctrl+C', run: () => document.execCommand('copy') },
-      { label: 'Вставить', hint: 'Ctrl+V', run: () => document.execCommand('paste') },
-      { label: 'Дублировать', hint: 'Ctrl+D', run: () => s.showToast('Выберите блок на схеме или объект рисунка и нажмите Ctrl+D') },
+      { label: 'Вырезать', hint: 'Ctrl+X', run: key('x', true) },
+      { label: 'Копировать', hint: 'Ctrl+C', run: key('c', true) },
+      { label: 'Вставить', hint: 'Ctrl+V', run: key('v', true) },
+      { label: 'Дублировать', hint: 'Ctrl+D', run: key('d', true) },
       { sep: true },
-      { label: 'Удалить', hint: 'Delete', run: () => s.showToast('Выберите блок, связь или объект и нажмите Delete') },
+      { label: 'Удалить', hint: 'Delete', run: key('Delete') },
       { sep: true },
       { label: 'Поиск', hint: 'Ctrl+F', run: () => { s.setTab('code'); s.showToast('Ctrl+F в редакторе кода'); } },
       { label: 'Замена', hint: 'Ctrl+H', run: () => { s.setTab('code'); s.showToast('Ctrl+H в редакторе кода'); } },
@@ -89,21 +94,21 @@ export function buildMenus(ctx: MenuContext): Menu[] {
       { label: 'Контактная площадка', disabled: true, why: 'Не реализовано: контактные площадки схемы' },
       { sep: true },
       { label: 'Новый двухмерный объект', sub: [
-        drawTool('Линия'), drawTool('Полилиния', 'Ctrl+P'), drawTool('Прямоугольник', 'Ctrl+B'), drawTool('Скруглённый прямоугольник', 'Ctrl+U'), drawTool('Эллипс', 'Ctrl+E'),
+        drawTool('Линия', 'line'), drawTool('Полилиния', 'polyline', 'Ctrl+P'), drawTool('Прямоугольник', 'rect', 'Ctrl+B'), drawTool('Скруглённый прямоугольник', 'roundrect', 'Ctrl+U'), drawTool('Эллипс', 'ellipse', 'Ctrl+E'),
         { sep: true },
-        drawTool('Текст', 'Ctrl+T'),
-        { label: 'Битовая карта', run: () => { s.setTab('picture'); s.showToast('Кнопка «Вставить из файла» на панели рисования'); } },
+        drawTool('Текст', 'text', 'Ctrl+T'),
+        drawTool('Битовая карта', 'bitmap'),
         { label: 'Двойная битовая карта', disabled: true, why: 'Растры с маской вставляются функцией CreateDoubleBitmap2d' },
         { label: 'Проекция 3d пространства', disabled: true, why: 'Создаётся функцией CreateView3d' },
-        drawTool('Группа', 'кнопка «Группа»'),
+        drawTool('Группа', 'group', 'кнопка «Группа»'),
       ] },
       { label: 'Формы', sub: [
-        { label: 'Строка ввода (Edit)', disabled: true, why: 'Контролы создаются в коде: CreateControl2d' },
-        { label: 'Комбо-бокс', disabled: true, why: 'CreateControl2d' },
-        { label: 'Чек-бокс', disabled: true, why: 'CreateControl2d' },
-        { label: 'Радиокнопка', disabled: true, why: 'CreateControl2d' },
-        { label: 'Кнопка', disabled: true, why: 'CreateControl2d' },
-        { label: 'Список', disabled: true, why: 'CreateControl2d' },
+        drawTool('Строка ввода (Edit)', 'control:EDIT'),
+        drawTool('Комбо-бокс', 'control:COMBOBOX'),
+        drawTool('Чек-бокс', 'control:CHECKBOX'),
+        drawTool('Радиокнопка', 'control:RADIOBUTTON'),
+        drawTool('Кнопка', 'control:BUTTON'),
+        drawTool('Список', 'control:LISTBOX'),
       ] },
       { label: '3d', sub: [
         { label: 'Создать новую камеру', disabled: true, why: 'CreateCamera3d в коде' },

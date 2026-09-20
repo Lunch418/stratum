@@ -58,6 +58,20 @@ export function PictureEditor({ kind }: { kind: Kind }) {
     if (r.ok) setState(await r.json());
   };
   useEffect(() => { load(); setSel([]); setDraft([]); }, [klass?.name, kind]);
+  // «Вставка → Новый двухмерный объект / Формы» из главного меню
+  useEffect(() => {
+    const on = (e: Event) => {
+      const t = String((e as CustomEvent).detail);
+      if (!editable || !state) return;
+      const at = cursor ?? [state.origin[0] + 20, state.origin[1] + 20];
+      if (t.startsWith('control:')) op({ op: 'add', shape: 'control', class: t.slice(8), points: [at] }).then(h => setSel([h]));
+      else if (t === 'bitmap') op({ op: 'bitmap', w: 32, h: 32, x: at[0], y: at[1] }).then(h => { setSel([h]); setBitmapEdit(h); });
+      else if (t === 'group') { if (sel.length >= 2) op({ op: 'group', handles: sel }).then(h => setSel([h])); }
+      else { setTool(t as Tool); setDraft([]); }
+    };
+    window.addEventListener('draw-tool', on);
+    return () => window.removeEventListener('draw-tool', on);
+  }, [editable, state, cursor, sel, klass?.name]);
   // «Формат → Z-порядок» из главного меню
   useEffect(() => {
     const on = (e: Event) => { if (sel.length === 1 && editable) op({ op: 'zorder', handle: sel[0], to: (e as CustomEvent).detail }); };
