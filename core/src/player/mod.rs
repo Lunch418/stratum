@@ -83,6 +83,9 @@ pub struct Shared {
     pub next_trace: u32,
     pub running: bool,
     pub fps: u32,
+    /// Обработка математических ошибок (свойство проекта `MathMode`):
+    /// 0 — остановка, 1 — предупреждение, 2 — протокол, 3 — не замечать.
+    pub math_mode: u32,
     events: VecDeque<Event>,
     pub error: Option<String>,
     /// Проект в памяти: правки IDE ложатся сюда, симуляция собирается из него.
@@ -121,7 +124,30 @@ impl Shared {
         self.breakpoints.clear();
         self.dirty = false;
         self.unsaved = false;
+        self.apply_project_options();
         Ok(())
+    }
+
+    /// Свойства проекта, влияющие на выполнение: режим ошибок и таймер.
+    pub fn apply_project_options(&mut self) {
+        use crate::formats::project::PropertyValue;
+        let int = |key: &str| match self.project.project.property(key) {
+            Some(PropertyValue::Int(i)) => Some(*i),
+            _ => None,
+        };
+        self.math_mode = int("MathMode").unwrap_or(0).min(3);
+        if let Some(n) = int("newton_iter") {
+            self.sim.newton_iterations = n.clamp(1, 1000) as usize;
+        }
+        if let Some(e) = int("newton_eps") {
+            self.sim.newton_tolerance = 10f64.powi(-(e.min(15) as i32));
+        }
+        // run_mode 1 — «по таймеру, через N мс»
+        if int("run_mode") == Some(1) {
+            if let Some(ms) = int("runtimer").filter(|m| *m > 0) {
+                self.fps = (1000 / ms).clamp(1, 1000);
+            }
+        }
     }
 
     /// Один такт с историей, обработкой ошибки и точками останова.
@@ -131,9 +157,20 @@ impl Shared {
             self.past.pop_front();
         }
         if let Err(e) = self.sim.step() {
-            self.running = false;
-            self.error = Some(describe_error(&self.sim, &e));
-            self.halt = Some(Halt { kind: "error", message: e.message.clone(), instance: e.instance, line: e.line });
+            match self.math_mode {
+                0 => {
+                    self.running = false;
+                    self.error = Some(describe_error(&self.sim, &e));
+                    self.halt = Some(Halt { kind: "error", message: e.message.clone(), instance: e.instance, line: e.line });
+                }
+                // предупреждение — остановка без блокировки продолжения
+                1 => {
+                    self.running = false;
+                    self.halt = Some(Halt { kind: "warning", message: e.message.clone(), instance: e.instance, line: e.line });
+                }
+                2 => self.sim.effects.log.push(format!("такт {}: {}", self.sim.tick_number(), describe_error(&self.sim, &e))),
+                _ => {}
+            }
         }
         self.sample_traces();
         self.check_breakpoints();
@@ -326,6 +363,7 @@ pub fn serve_with(opts: Options, on_ready: impl FnOnce(u16)) -> Result<(), Strin
         next_trace: 1,
         running: false,
         fps: opts.fps.max(1),
+        math_mode: 0,
         events: VecDeque::new(),
         error: None,
         project,
@@ -335,6 +373,7 @@ pub fn serve_with(opts: Options, on_ready: impl FnOnce(u16)) -> Result<(), Strin
         history: Vec::new(),
         future: Vec::new(),
     }));
+    shared.lock().unwrap().apply_project_options();
     let static_dir = opts.static_dir.clone();
 
     // поток симуляции: события, затем такт по расписанию

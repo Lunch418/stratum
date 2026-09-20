@@ -25,6 +25,14 @@ const PATHS: Record<string, string> = {
   redo: 'M10 4h4v4M14 8a6 6 0 1 0-1.8 4.2',
   sun: 'M8 5a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.5 1.5M11.5 11.5 13 13M3 13l1.5-1.5M11.5 4.5 13 3',
   moon: 'M13 9.5A5.5 5.5 0 0 1 6.5 3a5.5 5.5 0 1 0 6.5 6.5z',
+  file: 'M4 1.5h5l3 3v10H4zM9 1.5v3h3',
+  grid: 'M2.5 2.5h11v11h-11zM6 2.5v11M10 2.5v11M2.5 6h11M2.5 10h11',
+  save: 'M2.5 2.5h9l2 2v9h-11zM5 2.5v4h5v-4M5 13.5v-4h6v4',
+  open: 'M1.5 4.5h5l1.5 1.5h6.5v7h-13zM1.5 7h13',
+  print: 'M4 6V2.5h8V6M3 6h10a1 1 0 0 1 1 1v4h-2.5M4.5 11H2V7a1 1 0 0 1 1-1M4.5 9.5h7v4h-7z',
+  info: 'M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM8 7v4M8 5h.01',
+  search: 'M7 2.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9zM10.5 10.5l3 3',
+  stop: 'M3.5 3.5h9v9h-9z',
 };
 
 const FILLED = new Set(['play', 'pause', 'step', 'back', 'select']);

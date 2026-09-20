@@ -18,12 +18,16 @@ import { NewProjectDialog, InfoDialog } from './components/ProjectDialogs';
 import { OpenDialog } from './components/OpenDialog';
 import { Palette, type Command } from './components/Palette';
 import { Icon } from './components/Icon';
+import { MenuBar } from './components/MenuBar';
+import { SheetDialog, ProjectOptionsDialog, EnvOptionsDialog, ClassPropsDialog, CalcOrderDialog, FilePickDialog, AboutDialog, loadEnv } from './components/Options';
+import { buildMenus, commandsFromMenus } from './menus';
 
 export default function App() {
   const s = useStore();
   const frame = s.frame;
-  const [dialog, setDialog] = useState<'saveAs' | 'export' | 'open' | 'stateSave' | 'stateLoad' | 'new' | 'info' | null>(null);
-  const [menuOpen, setMenuOpen] = useState<'project' | 'model' | null>(null);
+  const dialog = s.dialog;
+  const setDialog = s.setDialog;
+  const env = loadEnv();
   const [layout, setLayout] = useState<{ left: number; right: number; bottom: number }>(() => {
     const def = { left: 260, right: 300, bottom: 160 };
     try { return { ...def, ...JSON.parse(localStorage.getItem('layout') ?? '{}') as Partial<typeof def> }; }
@@ -72,7 +76,7 @@ export default function App() {
     let alive = true;
     const poll = async () => {
       try { const f = await api.frame(); if (alive) { s.setFrame(f); handleSounds(f.sounds); } } catch { /* ядро недоступно */ }
-      if (alive) setTimeout(poll, s.tab === 'model' ? 40 : 250);
+      if (alive) setTimeout(poll, s.tab === 'model' ? env.pollMs : 250);
     };
     poll();
     return () => { alive = false; };
@@ -82,10 +86,17 @@ export default function App() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement).closest('.monaco-editor, input, textarea')) return;
-      if (e.code === 'F5' && e.shiftKey) { e.preventDefault(); api.event('type=reset').then(() => s.refreshInstances()); }
-      else if (e.code === 'F5') { e.preventDefault(); api.event(frame?.running ? 'type=pause' : 'type=run'); }
+      if ((e.code === 'F5' && e.shiftKey) || (e.code === 'F2' && e.ctrlKey)) { e.preventDefault(); api.event('type=reset').then(() => s.refreshInstances()); }
+      else if (e.code === 'F5' || (e.code === 'F9' && e.ctrlKey)) { e.preventDefault(); api.event(frame?.running ? 'type=pause' : 'type=run'); }
       else if (e.code === 'F10' && e.shiftKey) { e.preventDefault(); api.event('type=back'); }
-      else if (e.code === 'F10') { e.preventDefault(); api.event('type=step'); }
+      else if (e.code === 'F10' || e.code === 'F7') { e.preventDefault(); api.event('type=step'); }
+      else if (e.code === 'F2' && e.altKey) { e.preventDefault(); api.stateAction('keep').then(() => s.markUnsaved()); }
+      else if (e.code === 'F2') { e.preventDefault(); setDialog('stateSave'); }
+      else if (e.code === 'F3') { e.preventDefault(); setDialog('stateLoad'); }
+      else if (e.altKey && ['Digit1', 'Digit2', 'Digit3', 'Digit4'].includes(e.code)) { e.preventDefault(); s.toggleLayer((['grid', 'images', 'links', 'graphics'] as const)[Number(e.code[5]) - 1]); }
+      else if (e.key === 'Enter' && s.selectedClass && !dialog && (e.target as HTMLElement).tagName !== 'BUTTON') { e.preventDefault(); setDialog('classProps'); }
+      else if (e.key.toLowerCase() === 'p' && e.ctrlKey && !e.shiftKey) { e.preventDefault(); window.print(); }
+      else if (e.key.toLowerCase() === 'o' && e.ctrlKey) { e.preventDefault(); setDialog('open'); }
       else if (e.key === 'e' && e.ctrlKey) { e.preventDefault(); s.setTab(s.tab === 'code' ? 'scheme' : 'code'); }
       else if (e.key === 's' && e.ctrlKey) { e.preventDefault(); save(); }
       else if ((e.key.toLowerCase() === 'p' && e.ctrlKey && e.shiftKey) || (e.key.toLowerCase() === 'k' && e.ctrlKey)) { e.preventDefault(); s.setPaletteOpen(true); }
@@ -94,7 +105,7 @@ export default function App() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [frame?.running, s.tab, s.project?.native]);
+  }, [frame?.running, s.tab, s.project?.native, s.selectedClass, dialog]);
 
   // Ctrl+S внутри Monaco принимает текст имиджа; проект сохраняем по Ctrl+Shift+S;
   // палитра открывается отовсюду
@@ -110,51 +121,27 @@ export default function App() {
 
   // автосохранение: проект в родном формате пишется сам через 30 с после правки
   useEffect(() => {
+    if (!env.autosave) return;
     const id = setInterval(() => {
       const st = useStore.getState();
       if (st.unsaved && st.project?.native) st.saveProject().catch(() => {});
-    }, 30000);
+    }, env.autosave * 1000);
     return () => clearInterval(id);
-  }, []);
+  }, [env.autosave]);
+  useEffect(() => { document.documentElement.style.setProperty('--font-size', env.fontSize + 'px'); }, []);
 
   useEffect(() => {
-    const guard = (e: BeforeUnloadEvent) => { if (useStore.getState().unsaved) e.preventDefault(); };
+    const guard = (e: BeforeUnloadEvent) => { if (useStore.getState().unsaved && loadEnv().confirmClose) e.preventDefault(); };
     window.addEventListener('beforeunload', guard);
     return () => window.removeEventListener('beforeunload', guard);
   }, []);
 
   const running = !!frame?.running;
 
+  const newClass = async () => { let n = 1; while (s.project?.classes.some(c => c.name.toLowerCase() === `имидж${n}`)) n++; await api.newClass(`Имидж${n}`); await s.reload(); s.select(`Имидж${n}`); s.setTab('code'); };
+  const menus = buildMenus({ running, canBack: !!frame?.canBack, save, open: setDialog, newClass });
   const commands: Command[] = [
-    { id: 'run', title: running ? 'Пауза' : 'Пуск', hint: 'F5', group: 'модель', run: () => api.event(running ? 'type=pause' : 'type=run') },
-    { id: 'step', title: 'Шаг', hint: 'F10', group: 'модель', run: () => api.event('type=step') },
-    { id: 'back', title: 'Такт назад', hint: 'Shift+F10', group: 'модель', run: () => api.event('type=back') },
-    { id: 'default', title: 'Переменные по умолчанию', group: 'модель', run: () => api.stateAction('default') },
-    { id: 'keep', title: 'Запомнить как стартовое состояние', group: 'модель', run: () => api.stateAction('keep').then(() => s.markUnsaved()) },
-    { id: 'statesave', title: 'Сохранить состояние в .stt…', group: 'модель', run: () => setDialog('stateSave') },
-    { id: 'stateload', title: 'Загрузить состояние из .stt…', group: 'модель', run: () => setDialog('stateLoad') },
-    { id: 'bottom-debug', title: 'Панель: Отладка', group: 'вид', run: () => s.setBottomTab('debug') },
-    { id: 'search', title: 'Поиск по проекту', hint: 'Ctrl+Shift+F', group: 'правка', run: () => s.setBottomTab('search') },
-    { id: 'reset', title: 'Сброс', hint: 'Shift+F5', group: 'модель', run: () => api.event('type=reset').then(() => s.refreshInstances()) },
-    { id: 'open', title: 'Открыть проект…', hint: 'Ctrl+O', group: 'проект', run: () => setDialog('open') },
-    { id: 'newproj', title: 'Новый проект…', group: 'проект', run: () => setDialog('new') },
-    { id: 'info', title: 'Информация о проекте…', group: 'проект', run: () => setDialog('info') },
-    { id: 'save', title: 'Сохранить проект', hint: 'Ctrl+S', group: 'проект', run: save },
-    { id: 'saveas', title: 'Сохранить проект как…', group: 'проект', run: () => setDialog('saveAs') },
-    { id: 'export', title: 'Экспорт в Stratum 2000…', group: 'проект', run: () => setDialog('export') },
-    { id: 'undo', title: 'Отменить', hint: 'Ctrl+Z', group: 'правка', run: s.undo },
-    { id: 'redo', title: 'Повторить', hint: 'Ctrl+Shift+Z', group: 'правка', run: s.redo },
-    { id: 'newclass', title: 'Новый имидж', group: 'правка', run: async () => { let n = 1; while (s.project?.classes.some(c => c.name.toLowerCase() === `имидж${n}`)) n++; await api.newClass(`Имидж${n}`); await s.reload(); s.select(`Имидж${n}`); s.setTab('code'); } },
-    { id: 'tab-scheme', title: 'Вкладка: Схема', group: 'вид', run: () => s.setTab('scheme') },
-    { id: 'tab-code', title: 'Вкладка: Код', hint: 'Ctrl+E', group: 'вид', run: () => s.setTab('code') },
-    { id: 'tab-model', title: 'Вкладка: Окно модели', group: 'вид', run: () => s.setTab('model') },
-    { id: 'tab-graph', title: 'Вкладка: Граф зависимостей', group: 'вид', run: () => s.setTab('graph') },
-    { id: 'tab-picture', title: 'Вкладка: Рисунок имиджа', group: 'вид', run: () => s.setTab('picture') },
-    { id: 'tab-icon', title: 'Вкладка: Иконка имиджа', group: 'вид', run: () => s.setTab('icon') },
-    { id: 'bottom-graphs', title: 'Панель: Графики', group: 'вид', run: () => s.setBottomTab('graphs') },
-    { id: 'bottom-messages', title: 'Панель: Сообщения', group: 'вид', run: () => s.setBottomTab('messages') },
-    { id: 'theme', title: s.theme === 'light' ? 'Тёмная тема' : 'Светлая тема', group: 'вид', run: s.toggleTheme },
-    { id: 'root', title: 'Схема: к корню', group: 'схема', run: () => { s.goToScheme(0); s.setTab('scheme'); } },
+    ...commandsFromMenus(menus),
     ...(s.project?.classes ?? []).filter(c => !c.library).map(c => ({ id: 'code:' + c.name, title: `Код: ${c.name}`, group: 'имидж', run: () => { s.select(c.name); s.setTab('code'); } })),
     ...(s.project?.classes ?? []).filter(c => !c.library && (c.children.length || c.hasScheme)).map(c => ({ id: 'scheme:' + c.name, title: `Схема: ${c.name}`, group: 'имидж', run: () => { s.enterScheme(c.name); } })),
     ...(s.project?.classes ?? []).filter(c => c.library).map(c => ({ id: 'lib:' + c.name, title: `Библиотека: ${c.name}`, hint: c.description.slice(0, 40), group: 'библиотека', run: () => { s.select(c.name); s.setTab('code'); } })),
@@ -163,43 +150,24 @@ export default function App() {
   return (
     <div className="ide">
       <header className="topbar">
-        <span className="brand">Stratum Modern</span>
-        <button className={`primary icon-text${running ? ' paused' : ''}`} onClick={() => api.event(running ? 'type=pause' : 'type=run')} title="F5"><Icon name={running ? 'pause' : 'play'} />{running ? 'Пауза' : 'Пуск'}</button>
-        <button className="icon-only" onClick={() => api.event('type=step')} title="Шаг (F10)"><Icon name="step" /></button>
+        <span className="brand">Stratum<span className="brand-accent">Modern</span></span>
+        <MenuBar menus={menus} />
+        <span className="sep" />
+        <button className={`primary icon-text${running ? ' paused' : ''}`} onClick={() => api.event(running ? 'type=pause' : 'type=run')} title="Запуск / пауза (F5)"><Icon name={running ? 'pause' : 'play'} />{running ? 'Пауза' : 'Пуск'}</button>
+        <button className="icon-only" onClick={() => api.event('type=step')} title="Один шаг (F10)"><Icon name="step" /></button>
         <button className="icon-only" onClick={() => api.event('type=back')} title="Такт назад (Shift+F10)" disabled={!frame?.canBack || running}><Icon name="back" /></button>
-        <button className="icon-only" onClick={() => api.event('type=reset').then(() => s.refreshInstances())} title="Сброс (Shift+F5)"><Icon name="reset" /></button>
-        <label className="muted" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>Скорость
+        <button className="icon-only" onClick={() => api.event('type=reset').then(() => s.refreshInstances())} title="Стоп и сброс (Ctrl+F2)"><Icon name="stop" /></button>
+        <label className="muted speed" title="Тактов в секунду">
           <input type="range" min={1} max={200} defaultValue={30} onChange={e => api.event('type=speed&fps=' + e.target.value)} />
         </label>
-        <span className="counter mono">такт {frame?.tick ?? 0}{frame?.stopped ? ' · остановлено' : ''}</span>
-        <span className="sep" />
-        <button className="ghost icon-only" onClick={s.undo} disabled={!s.project?.canUndo} title="Отменить (Ctrl+Z)"><Icon name="undo" /></button>
-        <button className="ghost icon-only" onClick={s.redo} disabled={!s.project?.canRedo} title="Повторить (Ctrl+Shift+Z)"><Icon name="redo" /></button>
-        <button onClick={save} title="Ctrl+S — сохранить проект в текстовом формате" className={s.unsaved ? 'attention' : ''}>Сохранить{s.unsaved ? ' •' : ''}</button>
-        <div className="menu-host">
-          <button className="ghost" onClick={() => setMenuOpen(o => o === 'project' ? null : 'project')}>Проект ▾</button>
-          {menuOpen === 'project' && (
-            <div className="context menu" onMouseLeave={() => setMenuOpen(null)}>
-              <button onClick={() => { setMenuOpen(null); setDialog('open'); }}>Открыть… <span className="muted">Ctrl+O</span></button>
-              <button onClick={() => { setMenuOpen(null); setDialog('new'); }}>Новый проект…</button>
-              <button onClick={() => { setMenuOpen(null); setDialog('info'); }}>Информация…</button>
-              <button onClick={() => { setMenuOpen(null); setDialog('saveAs'); }}>Сохранить как…</button>
-              <button onClick={() => { setMenuOpen(null); setDialog('export'); }}>Экспорт в Stratum 2000…</button>
-            </div>
-          )}
-        </div>
-        <div className="menu-host">
-          <button className="ghost" onClick={() => setMenuOpen(o => o === 'model' ? null : 'model')}>Модель ▾</button>
-          {menuOpen === 'model' && (
-            <div className="context menu" onMouseLeave={() => setMenuOpen(null)}>
-              <button onClick={() => { setMenuOpen(null); api.stateAction('default').then(() => s.showToast('Переменные — по умолчанию')); }}>Переменные по умолчанию</button>
-              <button onClick={() => { setMenuOpen(null); api.stateAction('keep').then(() => { s.markUnsaved(); s.showToast('Текущее состояние стало стартовым'); }); }}>Запомнить как стартовое состояние</button>
-              <button onClick={() => { setMenuOpen(null); setDialog('stateSave'); }}>Сохранить состояние в .stt…</button>
-              <button onClick={() => { setMenuOpen(null); setDialog('stateLoad'); }}>Загрузить состояние из .stt…</button>
-            </div>
-          )}
-        </div>
-        <button className="ghost" onClick={() => s.setPaletteOpen(true)} title="Ctrl+Shift+P">Команды</button>
+        <span className="counter mono">такт {frame?.tick ?? 0}{frame?.stopped ? ' · стоп' : ''}</span>
+        <span className="spacer" />
+        <button className="ghost icon-only" onClick={() => setDialog('open')} title="Открыть проект (Ctrl+O)"><Icon name="open" /></button>
+        <button onClick={save} title="Сохранить всё (Ctrl+S)" className={`icon-only${s.unsaved ? ' attention' : ' ghost'}`}><Icon name="save" /></button>
+        <button className="ghost icon-only" onClick={s.undo} disabled={!s.project?.canUndo} title="Отмена (Ctrl+Z)"><Icon name="undo" /></button>
+        <button className="ghost icon-only" onClick={s.redo} disabled={!s.project?.canRedo} title="Повтор (Ctrl+Shift+Z)"><Icon name="redo" /></button>
+        <button className="ghost icon-only" onClick={() => setDialog('info')} disabled={!s.project || s.project.empty} title="Информация о проекте"><Icon name="info" /></button>
+        <button className="ghost icon-only" onClick={() => s.setPaletteOpen(true)} title="Палитра команд (Ctrl+Shift+P)"><Icon name="search" /></button>
         <button className="ghost icon-only" onClick={s.toggleTheme} title={s.theme === 'light' ? 'Тёмная тема' : 'Светлая тема'}><Icon name={s.theme === 'light' ? 'moon' : 'sun'} /></button>
       </header>
       {dialog === 'open' && <OpenDialog required={!!s.project?.empty} onClose={() => setDialog(null)} />}
@@ -212,6 +180,25 @@ export default function App() {
       )}
       {dialog === 'new' && <NewProjectDialog onClose={() => setDialog(null)} />}
       {dialog === 'info' && <InfoDialog onClose={() => setDialog(null)} />}
+      {dialog === 'sheet' && <SheetDialog onClose={() => setDialog(null)} />}
+      {dialog === 'projectOptions' && <ProjectOptionsDialog onClose={() => setDialog(null)} />}
+      {dialog === 'envOptions' && <EnvOptionsDialog onClose={() => setDialog(null)} />}
+      {dialog === 'classProps' && <ClassPropsDialog onClose={() => setDialog(null)} />}
+      {dialog === 'calcOrder' && <CalcOrderDialog onClose={() => setDialog(null)} />}
+      {dialog === 'about' && <AboutDialog onClose={() => setDialog(null)} />}
+      {dialog === 'insertFile' && s.selectedClass && (
+        <FilePickDialog title="Вставить из файла в рисунок имиджа" ext="vdr,bmp" onClose={() => setDialog(null)}
+          onPick={async f => {
+            setDialog(null);
+            const r = await fetch(`/api/picture/${encodeURIComponent(s.selectedClass!)}?kind=image`, { method: 'POST', body: JSON.stringify({ op: 'insert', file: f, x: 0, y: 0 }) });
+            if (r.ok) { s.markUnsaved(); s.setTab('picture'); s.showToast('Вставлено'); } else s.say({ level: 'error', where: 'вставка', text: (await r.json()).error ?? 'ошибка' });
+          }} />
+      )}
+      {(dialog === 'imageSave' || dialog === 'imageLoad') && s.project && s.selectedClass && (
+        <FilePickDialog title={`${dialog === 'imageSave' ? 'Сохранить' : 'Прочитать'} переменные имиджа ${s.selectedClass}`} ext="stt" onClose={() => setDialog(null)}
+          save={dialog === 'imageSave' ? (s.project.dir || '.').replace(/[\\/]+$/, '') + `/${s.selectedClass}.stt` : undefined}
+          onPick={p => { const cls = s.selectedClass!; setDialog(null); api.stateAction(dialog === 'imageSave' ? 'save' : 'load', p, cls).then(r => s.showToast(`${dialog === 'imageSave' ? 'Сохранено' : 'Загружено'}: ${r.images} экземпляров`)).catch(e => s.say({ level: 'error', where: 'состояние', text: String(e) })); }} />
+      )}
       {(dialog === 'stateSave' || dialog === 'stateLoad') && s.project && (
         <PathDialog title={dialog === 'stateSave' ? 'Сохранить состояние' : 'Загрузить состояние'} action={dialog === 'stateSave' ? 'Сохранить' : 'Загрузить'}
           initial={(s.project.dir || '.').replace(/[\\/]+$/, '') + '/state.stt'}
@@ -241,7 +228,7 @@ export default function App() {
           </div>
           {frame?.halt && (
             <div className={`halt ${frame.halt.kind}`}>
-              <span>{frame.halt.kind === 'error' ? 'Ошибка' : 'Остановлено'}: {frame.halt.message}{frame.halt.line ? ` (строка ${frame.halt.line})` : ''}</span>
+              <span>{frame.halt.kind === 'error' ? 'Ошибка' : frame.halt.kind === 'warning' ? 'Предупреждение' : 'Остановлено'}: {frame.halt.message}{frame.halt.line ? ` (строка ${frame.halt.line})` : ''}</span>
               <span className="spacer" />
               {frame.halt.class && <button className="small" onClick={() => { s.select(frame.halt!.class, frame.halt!.instance); s.setTab('code'); }}>К коду</button>}
               {frame.halt.kind === 'error' && <button className="small" onClick={() => api.event('type=back')} disabled={!frame.canBack}>Такт назад</button>}

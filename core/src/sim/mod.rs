@@ -133,6 +133,10 @@ pub struct Simulation {
     types: Vec<ValueType>,
     /// Порядок обхода экземпляров в такте.
     order: Vec<usize>,
+    /// Метод Ньютона для уравнений: предел итераций и допустимая невязка
+    /// («Параметры проекта → Методы»).
+    pub newton_iterations: usize,
+    pub newton_tolerance: f64,
     pub effects: Effects,
     pub tick: u64,
     pub stopped: bool,
@@ -206,6 +210,8 @@ impl Simulation {
             old: Vec::new(),
             types: Vec::new(),
             order: Vec::new(),
+            newton_iterations: 8,
+            newton_tolerance: 1e-9,
             effects: Effects::default(),
             tick: 0,
             stopped: false,
@@ -364,7 +370,7 @@ impl Simulation {
         }
 
         // связи схемы: пары переменных двух экземпляров делят ячейку
-        for link in &cls.links {
+        for link in cls.links.iter().filter(|l| !l.style.disabled) {
             let source = by_handle.get(&link.source).copied();
             let target = by_handle.get(&link.target).copied();
             // handle корневого имиджа в его собственной схеме не встречается,
@@ -605,9 +611,10 @@ impl Simulation {
             }
             Ok(out)
         };
-        for _ in 0..8 {
+        let tolerance = self.newton_tolerance;
+        for _ in 0..self.newton_iterations.max(1) {
             let r0 = residuals(self)?;
-            if r0.iter().all(|r| r.abs() < 1e-9) {
+            if r0.iter().all(|r| r.abs() < tolerance) {
                 break;
             }
             let mut jac = vec![vec![0.0; cells.len()]; eqs.len()];

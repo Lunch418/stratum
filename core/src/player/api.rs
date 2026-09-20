@@ -61,11 +61,12 @@ fn class_json(c: &cls::Class, library: bool, model: Option<&lang::Model>) -> Str
         .map(|l| {
             let pairs: Vec<String> = l.vars.iter().map(|(a, b)| format!("[{},{}]", json_string(a), json_string(b))).collect();
             format!(
-                "{{\"handle\":{},\"source\":{},\"target\":{},\"vars\":[{}]}}",
+                "{{\"handle\":{},\"source\":{},\"target\":{},\"vars\":[{}],\"style\":{}}}",
                 l.handle,
                 l.source,
                 l.target,
-                pairs.join(",")
+                pairs.join(","),
+                crate::formats::native::link_style_json(&l.style).compact()
             )
         })
         .collect();
@@ -79,7 +80,7 @@ fn class_json(c: &cls::Class, library: bool, model: Option<&lang::Model>) -> Str
         })
         .unwrap_or_default();
     format!(
-        "{{\"name\":{},\"library\":{},\"description\":{},\"vars\":[{}],\"declared\":[{}],\"text\":{},\"children\":[{}],\"links\":[{}],\"hasIcon\":{},\"hasScheme\":{},\"hasImage\":{},\"source\":{}}}",
+        "{{\"name\":{},\"library\":{},\"description\":{},\"vars\":[{}],\"declared\":[{}],\"text\":{},\"children\":[{}],\"links\":[{}],\"hasIcon\":{},\"hasScheme\":{},\"hasImage\":{},\"source\":{},\"flags\":{},\"sheet\":{}}}",
         json_string(&c.name),
         library,
         json_string(&c.description),
@@ -91,7 +92,9 @@ fn class_json(c: &cls::Class, library: bool, model: Option<&lang::Model>) -> Str
         c.icon.is_some() || c.icon_file.is_some(),
         c.scheme.is_some(),
         c.image.is_some(),
-        json_string(&c.source)
+        json_string(&c.source),
+        c.flags.unwrap_or(0),
+        crate::formats::native::sheet_json(c.sheet.as_ref().unwrap_or(&Default::default())).compact()
     )
 }
 
@@ -361,11 +364,116 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
                 (None, true) => 0,
                 (None, false) => {
                     let h = cls.links.iter().map(|l| l.handle).max().unwrap_or(0) + 1;
-                    cls.links.push(cls::Link { source, target, handle: h, flags: 0, vars });
+                    cls.links.push(cls::Link { source, target, handle: h, flags: 0, vars, style: Default::default() });
                     h
                 }
             };
             json(format!("{{\"ok\":true,\"handle\":{result_handle}}}"))
+        }
+        // оформление связи: class, handle; тело — JSON стиля
+        ("POST", ["link", "style"]) => {
+            let get = |k: &str| super::param(query, k).map(super::url_decode);
+            let (Some(class), Some(h)) = (get("class"), get("handle")) else {
+                return error("400 Bad Request", "нужны class и handle");
+            };
+            let h: u16 = h.parse().unwrap_or(0);
+            let Ok(j) = crate::formats::json::parse(body) else { return error("400 Bad Request", "тело — JSON") };
+            let mut s = shared.lock().unwrap();
+            let Some(i) = s.project.classes.iter().position(|c| c.name.eq_ignore_ascii_case(&class)) else {
+                return error("404 Not Found", "нет такого имиджа");
+            };
+            s.remember();
+            if let Some(l) = s.project.classes[i].links.iter_mut().find(|l| l.handle == h) {
+                l.style = crate::formats::native::link_style_from(&j);
+            }
+            json("{\"ok\":true}".into())
+        }
+        // параметры листа имиджа; тело — JSON (см. native::sheet_json)
+        ("POST", ["class", name, "sheet"]) => {
+            let name = super::url_decode(name);
+            let Ok(j) = crate::formats::json::parse(body) else { return error("400 Bad Request", "тело — JSON") };
+            let mut s = shared.lock().unwrap();
+            let Some(i) = s.project.classes.iter().position(|c| c.name.eq_ignore_ascii_case(&name)) else {
+                return error("404 Not Found", "нет такого имиджа");
+            };
+            s.remember();
+            let sheet = crate::formats::native::sheet_from(&j);
+            s.project.classes[i].sheet = if sheet == Default::default() { None } else { Some(sheet) };
+            json("{\"ok\":true}".into())
+        }
+        // свойства имиджа: description и flags в query
+        ("POST", ["class", name, "props"]) => {
+            let name = super::url_decode(name);
+            let get = |k: &str| super::param(query, k).map(super::url_decode);
+            let mut s = shared.lock().unwrap();
+            let Some(i) = s.project.classes.iter().position(|c| c.name.eq_ignore_ascii_case(&name)) else {
+                return error("404 Not Found", "нет такого имиджа");
+            };
+            s.remember();
+            let cls = &mut s.project.classes[i];
+            if let Some(d) = get("description") {
+                cls.description = d;
+            }
+            if let Some(f) = get("flags").and_then(|v| v.parse::<u32>().ok()) {
+                cls.flags = Some(f);
+            }
+            json("{\"ok\":true}".into())
+        }
+        // порядок вычислений: тело — handles детей построчно в новом порядке
+        ("POST", ["child", "reorder"]) => {
+            let Some(class) = super::param(query, "class").map(super::url_decode) else {
+                return error("400 Bad Request", "нужен class");
+            };
+            let order: Vec<u16> = body.lines().filter_map(|l| l.trim().parse().ok()).collect();
+            let mut s = shared.lock().unwrap();
+            let Some(i) = s.project.classes.iter().position(|c| c.name.eq_ignore_ascii_case(&class)) else {
+                return error("404 Not Found", "нет такого имиджа");
+            };
+            s.remember();
+            let cls = &mut s.project.classes[i];
+            let mut rest = std::mem::take(&mut cls.children);
+            let mut sorted = Vec::with_capacity(rest.len());
+            for h in order {
+                if let Some(k) = rest.iter().position(|c| c.handle == h) {
+                    sorted.push(rest.remove(k));
+                }
+            }
+            sorted.extend(rest);
+            cls.children = sorted;
+            json("{\"ok\":true}".into())
+        }
+        // свойства проекта (.spj «f»): GET — список, POST — key + int|text в query
+        ("GET", ["project", "properties"]) => {
+            let s = shared.lock().unwrap();
+            let items: Vec<String> = s
+                .project
+                .project
+                .properties
+                .iter()
+                .map(|p| match &p.value {
+                    crate::formats::project::PropertyValue::Int(i) => format!("{{\"key\":{},\"int\":{i}}}", json_string(&p.key)),
+                    crate::formats::project::PropertyValue::Text(t) => format!("{{\"key\":{},\"text\":{}}}", json_string(&p.key), json_string(t)),
+                })
+                .collect();
+            json(format!("[{}]", items.join(",")))
+        }
+        ("POST", ["project", "properties"]) => {
+            let get = |k: &str| super::param(query, k).map(super::url_decode);
+            let Some(key) = get("key") else { return error("400 Bad Request", "нужен key") };
+            let value = match (get("int"), get("text")) {
+                (Some(i), _) => i.parse::<i64>().ok().map(|i| crate::formats::project::PropertyValue::Int(i as u32)),
+                (None, Some(t)) => Some(crate::formats::project::PropertyValue::Text(t)),
+                _ => None,
+            };
+            let mut s = shared.lock().unwrap();
+            s.remember();
+            let props = &mut s.project.project.properties;
+            props.retain(|p| !p.key.eq_ignore_ascii_case(&key));
+            if let Some(value) = value {
+                props.push(crate::formats::project::Property { key, value });
+            }
+            s.apply_project_options();
+            json("{\"ok\":true}".into())
         }
         ("POST", ["link", "remove"]) => {
             let get = |k: &str| super::param(query, k).map(super::url_decode);
@@ -715,6 +823,8 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
                 .unwrap_or_else(|| std::env::var_os("HOME").map(std::path::PathBuf::from).unwrap_or_else(|| std::path::PathBuf::from("/")));
             let dir = std::fs::canonicalize(&dir).unwrap_or(dir);
             let Ok(rd) = std::fs::read_dir(&dir) else { return error("404 Not Found", "нет такой папки") };
+            // ext=vdr,bmp — показывать файлы с этими расширениями вместо проектов
+            let exts: Vec<String> = super::param(query, "ext").map(super::url_decode).unwrap_or_default().split(',').filter(|e| !e.is_empty()).map(|e| e.to_lowercase()).collect();
             let mut entries: Vec<(String, String, &str)> = Vec::new();
             for e in rd.filter_map(|e| e.ok()) {
                 let p = e.path();
@@ -726,6 +836,10 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
                     let is_project = p.join("project.json").is_file()
                         || std::fs::read_dir(&p).map(|r| r.filter_map(|x| x.ok()).any(|x| x.path().extension().is_some_and(|x| x.eq_ignore_ascii_case("spj") || x.eq_ignore_ascii_case("prj")))).unwrap_or(false);
                     entries.push((name, p.display().to_string(), if is_project { "project" } else { "dir" }));
+                } else if !exts.is_empty() {
+                    if p.extension().is_some_and(|x| exts.contains(&x.to_string_lossy().to_lowercase())) {
+                        entries.push((name, p.display().to_string(), "file"));
+                    }
                 } else if p.extension().is_some_and(|x| x.eq_ignore_ascii_case("spj") || x.eq_ignore_ascii_case("prj")) || name == "project.json" {
                     entries.push((name, p.display().to_string(), "file"));
                 }
@@ -821,6 +935,8 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
         // состояние модели: файл .stt, стартовое состояние проекта, по умолчанию
         ("POST", ["state", action]) => {
             let path = super::param(query, "path").map(super::url_decode).unwrap_or_default();
+            // class=Имя — только экземпляры этого имиджа («переменные имиджа»)
+            let only = super::param(query, "class").map(super::url_decode).filter(|c| !c.is_empty());
             let mut s = shared.lock().unwrap();
             let root = s.project.project.root.clone();
             match *action {
@@ -828,7 +944,10 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
                     if path.is_empty() {
                         return error("400 Bad Request", "нужен путь path");
                     }
-                    let st = s.sim.snapshot_state(&root);
+                    let mut st = s.sim.snapshot_state(&root);
+                    if let Some(c) = &only {
+                        st.images.retain(|i| i.class_name.eq_ignore_ascii_case(c));
+                    }
                     match std::fs::write(&path, crate::formats::project::write_state(&st)) {
                         Ok(()) => json(format!("{{\"ok\":true,\"images\":{}}}", st.images.len())),
                         Err(e) => error("500 Internal Server Error", &e.to_string()),
@@ -840,7 +959,10 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
                     }
                     let Ok(data) = std::fs::read(&path) else { return error("404 Not Found", "файл не читается") };
                     match crate::formats::project::parse_state(&data, &path) {
-                        Ok(st) => {
+                        Ok(mut st) => {
+                            if let Some(c) = &only {
+                                st.images.retain(|i| i.class_name.eq_ignore_ascii_case(c));
+                            }
                             s.sim.load_state(&st);
                             json(format!("{{\"ok\":true,\"images\":{}}}", st.images.len()))
                         }

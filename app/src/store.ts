@@ -2,6 +2,10 @@ import { create } from 'zustand';
 import { api, type ClassInfo, type Frame, type Instance, type Project } from './api';
 
 export type Tab = 'scheme' | 'code' | 'model' | 'graph' | 'picture' | 'icon';
+export type DialogId = 'saveAs' | 'export' | 'open' | 'stateSave' | 'stateLoad' | 'new' | 'info' | 'sheet' | 'projectOptions' | 'envOptions'
+  | 'classProps' | 'calcOrder' | 'insertFile' | 'about' | 'newClass' | 'imageSave' | 'imageLoad' | 'linkStyle';
+/// Слои схемы (меню «Формат → Слои» оригинала): сетка, имиджи, связи, графика.
+export interface Layers { grid: boolean; images: boolean; links: boolean; graphics: boolean }
 
 interface Message { level: 'info' | 'error'; where: string; text: string }
 
@@ -37,6 +41,13 @@ interface State {
   setGotoLine: (g: { class: string; line: number } | null) => void;
   paletteOpen: boolean;
   setPaletteOpen: (v: boolean) => void;
+  dialog: DialogId | null;
+  setDialog: (d: DialogId | null) => void;
+  /// связь, выбранная для диалога свойств (класс схемы + handle)
+  dialogLink: { class: string; handle: number } | null;
+  setDialogLink: (l: { class: string; handle: number } | null) => void;
+  layers: Layers;
+  toggleLayer: (k: keyof Layers) => void;
   traceCount: number;
   setTraceCount: (n: number) => void;
   openProject: (path: string) => Promise<void>;
@@ -91,6 +102,12 @@ export const useStore = create<State>((set, get) => ({
   setGotoLine: gotoLine => set({ gotoLine }),
   paletteOpen: false,
   setPaletteOpen: paletteOpen => set({ paletteOpen }),
+  dialog: null,
+  setDialog: dialog => set({ dialog }),
+  dialogLink: null,
+  setDialogLink: dialogLink => set({ dialogLink }),
+  layers: { grid: true, images: true, links: true, graphics: true },
+  toggleLayer: k => set(s => ({ layers: { ...s.layers, [k]: !s.layers[k] } })),
   traceCount: 0,
   setTraceCount: traceCount => set({ traceCount }),
   openProject: async path => {

@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 
 use super::json::{self, object, Json};
 use super::project::{Project, ProjectVariable, Property, PropertyValue, State, StateImage};
-use super::{Child, Class, FormatError, Link, LoadedProject, Variable};
+use super::{Child, Class, FormatError, Link, LinkStyle, LoadedProject, SheetOptions, Variable};
 
 pub const FORMAT: &str = "stratum-modern/1";
 pub const PROJECT_FILE: &str = "project.json";
@@ -188,13 +188,17 @@ fn save_class(dir: &Path, stem: &str, cls: &Class) -> std::io::Result<()> {
         .links
         .iter()
         .map(|l| {
-            object(vec![
+            let mut pairs = vec![
                 ("handle", Json::Number(l.handle as f64)),
                 ("source", Json::Number(l.source as f64)),
                 ("target", Json::Number(l.target as f64)),
                 ("flags", Json::Number(l.flags as f64)),
                 ("vars", pairs_json(&l.vars)),
-            ])
+            ];
+            if !l.style.is_default() {
+                pairs.push(("style", link_style_json(&l.style)));
+            }
+            object(pairs)
         })
         .collect();
     let mut pairs = vec![
@@ -206,6 +210,9 @@ fn save_class(dir: &Path, stem: &str, cls: &Class) -> std::io::Result<()> {
     ];
     if let Some(f) = cls.flags {
         pairs.push(("flags", Json::Number(f as f64)));
+    }
+    if let Some(sh) = &cls.sheet {
+        pairs.push(("sheet", sheet_json(sh)));
     }
     if let Some(f) = &cls.icon_file {
         pairs.push(("iconFile", Json::Str(f.clone())));
@@ -369,6 +376,7 @@ fn load_class(dir: &Path, stem: &str) -> std::io::Result<Result<Class, FormatErr
             target: l.num_or("target", 0.0) as u16,
             flags: l.num_or("flags", 0.0) as u32,
             vars: pairs_from(l.get("vars")),
+            style: l.get("style").map(link_style_from).unwrap_or_default(),
         })
         .collect();
 
@@ -387,6 +395,7 @@ fn load_class(dir: &Path, stem: &str) -> std::io::Result<Result<Class, FormatErr
         image: read_opt("image.vdr")?,
         scheme: read_opt("scheme.vdr")?,
         bytecode: None,
+        sheet: j.get("sheet").map(sheet_from),
         equations: read_opt("eq.bin")?,
         timestamp: j.get("timestamp").and_then(Json::as_f64).map(|t| t as u32),
         flags: j.get("flags").and_then(Json::as_f64).map(|f| f as u32),
@@ -415,5 +424,70 @@ mod tests {
         assert_eq!(file_stem("Root2787"), "Root2787");
         assert_eq!(file_stem("a/b:c?"), "a_b_c_");
         assert_eq!(file_stem("..."), "image");
+    }
+}
+
+pub fn link_style_json(st: &LinkStyle) -> Json {
+    object(vec![
+        ("color", Json::Str(st.color.clone())),
+        ("width", Json::Number(st.width as f64)),
+        ("disabled", Json::Bool(st.disabled)),
+        ("arrows", Json::Bool(st.arrows)),
+        ("layer", Json::Number(st.layer as f64)),
+    ])
+}
+
+pub fn link_style_from(j: &Json) -> LinkStyle {
+    LinkStyle {
+        color: j.str_or("color", ""),
+        width: j.num_or("width", 0.0) as u8,
+        disabled: j.get("disabled").and_then(Json::as_bool).unwrap_or(false),
+        arrows: j.get("arrows").and_then(Json::as_bool).unwrap_or(false),
+        layer: j.num_or("layer", 0.0) as u8,
+    }
+}
+
+pub fn sheet_json(sh: &SheetOptions) -> Json {
+    object(vec![
+        ("gridOrigin", Json::Array(vec![Json::Number(sh.grid_origin.0), Json::Number(sh.grid_origin.1)])),
+        ("gridStep", Json::Array(vec![Json::Number(sh.grid_step.0), Json::Number(sh.grid_step.1)])),
+        ("gridVisible", Json::Bool(sh.grid_visible)),
+        ("gridSnap", Json::Bool(sh.grid_snap)),
+        ("windowStyle", Json::Str(sh.window_style.clone())),
+        ("windowSize", Json::Str(sh.window_size.clone())),
+        ("windowWh", Json::Array(vec![Json::Number(sh.window_wh.0), Json::Number(sh.window_wh.1)])),
+        ("windowFixed", Json::Bool(sh.window_fixed)),
+        ("hscroll", Json::Bool(sh.hscroll)),
+        ("vscroll", Json::Bool(sh.vscroll)),
+        ("autoOrigin", Json::Bool(sh.auto_origin)),
+        ("layers", Json::Number(sh.layers as f64)),
+        ("noSubwindows", Json::Bool(sh.no_subwindows)),
+    ])
+}
+
+pub fn sheet_from(j: &Json) -> SheetOptions {
+    let d = SheetOptions::default();
+    let pair = |k: &str, def: (f64, f64)| -> (f64, f64) {
+        match j.get(k).and_then(Json::as_array) {
+            Some(a) if a.len() == 2 => (a[0].as_f64().unwrap_or(def.0), a[1].as_f64().unwrap_or(def.1)),
+            _ => def,
+        }
+    };
+    let flag = |k: &str, def: bool| j.get(k).and_then(Json::as_bool).unwrap_or(def);
+    SheetOptions {
+        grid_origin: pair("gridOrigin", d.grid_origin),
+        grid_step: pair("gridStep", d.grid_step),
+        grid_visible: flag("gridVisible", d.grid_visible),
+        grid_snap: flag("gridSnap", d.grid_snap),
+        window_style: j.str_or("windowStyle", &d.window_style),
+        window_size: j.str_or("windowSize", &d.window_size),
+        window_wh: pair("windowWh", d.window_wh),
+        window_fixed: flag("windowFixed", d.window_fixed),
+        hscroll: flag("hscroll", d.hscroll),
+        vscroll: flag("vscroll", d.vscroll),
+        auto_origin: flag("autoOrigin", d.auto_origin),
+        // из JS маска может прийти со знаком (-1 = все слои)
+        layers: (j.num_or("layers", d.layers as f64) as i64) as u32,
+        no_subwindows: flag("noSubwindows", d.no_subwindows),
     }
 }

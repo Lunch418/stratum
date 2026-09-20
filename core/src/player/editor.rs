@@ -346,6 +346,23 @@ pub fn apply(sp: &mut Space, op: &Json) -> Result<Handle, String> {
             *sp = Space::new(1, "");
             Ok(0)
         }
+        // вставка из файла («Вставка → Из файла»): .vdr — как группа, .bmp — растр
+        "insert" => {
+            let file = op.str_or("file", "");
+            let (x, y) = (op.num_or("x", 0.0), op.num_or("y", 0.0));
+            let data = std::fs::read(&file).map_err(|e| format!("{file}: {e}"))?;
+            if file.to_lowercase().ends_with(".vdr") {
+                let pic = vdr::parse(&data, &file).map_err(|e| format!("{file}: {e}"))?;
+                Ok(crate::gfx::api::insert_picture(sp, &pic, x, y, true))
+            } else if data.starts_with(b"BM") {
+                let dib = crate::gfx::Dib::new(data, Vec::new(), None);
+                let (w, h) = (dib.width as f64, dib.height as f64);
+                let d = sp.add_dib(dib);
+                Ok(sp.add_object(Object::new(0, x, y, w, h, Shape::Bitmap { dib: d, src: (0.0, 0.0, w, h), masked: false })))
+            } else {
+                Err("поддерживаются файлы .vdr и .bmp".into())
+            }
+        }
         other => Err(format!("неизвестная операция {other}")),
     }
 }

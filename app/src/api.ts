@@ -4,15 +4,23 @@ export interface Variable {
   name: string; type: string; default: string; description: string; local: boolean; flags: number;
 }
 export interface Child { handle: number; class: string; name: string; x: number; y: number }
-export interface Link { handle: number; source: number; target: number; vars: [string, string][] }
+export interface LinkStyle { color: string; width: number; disabled: boolean; arrows: boolean; layer: number }
+export interface Link { handle: number; source: number; target: number; vars: [string, string][]; style: LinkStyle }
+/// Параметры листа (диалог «Параметры листа»): сетка, окно модели, слои.
+export interface Sheet {
+  gridOrigin: [number, number]; gridStep: [number, number]; gridVisible: boolean; gridSnap: boolean;
+  windowStyle: 'mdi' | 'dialog' | 'popup' | 'default'; windowSize: 'max' | 'min' | 'default' | 'space' | 'fixed'; windowWh: [number, number];
+  windowFixed: boolean; hscroll: boolean; vscroll: boolean; autoOrigin: boolean; layers: number; noSubwindows: boolean;
+}
 export interface ClassInfo {
   name: string; library: boolean; description: string; vars: Variable[];
   declared: { name: string; type: string }[]; text: string; children: Child[]; links: Link[];
-  hasIcon: boolean; hasScheme: boolean; hasImage: boolean; source: string;
+  hasIcon: boolean; hasScheme: boolean; hasImage: boolean; source: string; flags: number; sheet: Sheet;
 }
+export interface ProjectProperty { key: string; int?: number; text?: string }
 export interface Project { root: string; dir: string; empty: boolean; native: boolean; unsaved: boolean; canUndo: boolean; canRedo: boolean; classes: ClassInfo[] }
 export interface Instance { index: number; path: string; name: string; class: string; parent: number | null; handle: number }
-export interface Halt { kind: 'error' | 'breakpoint'; message: string; instance: number | null; path: string; class: string; line: number }
+export interface Halt { kind: 'error' | 'breakpoint' | 'warning'; message: string; instance: number | null; path: string; class: string; line: number }
 export interface Breakpoint { id: number; index: number | null; path: string; class: string; expr: string; enabled: boolean }
 export interface Frame {
   tick: number; running: boolean; stopped: boolean; canBack: boolean; halt: Halt | null;
@@ -112,7 +120,26 @@ export const api = {
   eval: (index: number, expr: string) => get<{ ok: boolean; value?: string; error?: string }>(`/api/eval/${index}?expr=${encodeURIComponent(expr)}`),
   profile: () => get<{ tick: number; total: number; items: { index: number; path: string; class: string; ns: number }[] }>('/api/profile'),
   helpSearch: (q: string) => get<string[]>(`/api/help?q=${encodeURIComponent(q)}`),
-  browse: (dir: string) => get<{ dir: string; parent: string | null; entries: { name: string; path: string; kind: 'dir' | 'project' | 'file' }[] }>(`/api/browse?dir=${encodeURIComponent(dir)}`),
+  browse: (dir: string, ext = '') => get<{ dir: string; parent: string | null; entries: { name: string; path: string; kind: 'dir' | 'project' | 'file' }[] }>(`/api/browse?dir=${encodeURIComponent(dir)}${ext ? '&ext=' + ext : ''}`),
+  setLinkStyle: (klass: string, handle: number, style: LinkStyle) =>
+    fetch(`/api/link/style?class=${encodeURIComponent(klass)}&handle=${handle}`, { method: 'POST', body: JSON.stringify(style) }),
+  setSheet: (klass: string, sheet: Sheet) =>
+    fetch(`/api/class/${encodeURIComponent(klass)}/sheet`, { method: 'POST', body: JSON.stringify(sheet) }),
+  setClassProps: (klass: string, props: { description?: string; flags?: number }) => {
+    const q = new URLSearchParams();
+    if (props.description !== undefined) q.set('description', props.description);
+    if (props.flags !== undefined) q.set('flags', String(props.flags));
+    return fetch(`/api/class/${encodeURIComponent(klass)}/props?${q}`, { method: 'POST' });
+  },
+  reorderChildren: (klass: string, handles: number[]) =>
+    fetch(`/api/child/reorder?class=${encodeURIComponent(klass)}`, { method: 'POST', body: handles.join('\n') }),
+  projectProperties: () => get<ProjectProperty[]>('/api/project/properties'),
+  setProjectProperty: (key: string, value: number | string | null) => {
+    const q = new URLSearchParams({ key });
+    if (typeof value === 'number') q.set('int', String(value));
+    else if (typeof value === 'string') q.set('text', value);
+    return fetch(`/api/project/properties?${q}`, { method: 'POST' });
+  },
   open: async (path: string) => {
     const r = await fetch(`/api/open?path=${encodeURIComponent(path)}`, { method: 'POST' });
     const j = await r.json();
@@ -124,8 +151,8 @@ export const api = {
   object: (win: string, handle: number) => get<ObjectProps | null>(`/api/object?win=${encodeURIComponent(win)}&handle=${handle}`),
   objectSet: (win: string, handle: number, field: string, value: string | number) =>
     fetch(`/api/object/set?win=${encodeURIComponent(win)}&handle=${handle}&field=${field}&value=${encodeURIComponent(String(value))}`, { method: 'POST' }),
-  stateAction: async (action: 'save' | 'load' | 'keep' | 'default', path = '') => {
-    const r = await fetch(`/api/state/${action}?path=${encodeURIComponent(path)}`, { method: 'POST' });
+  stateAction: async (action: 'save' | 'load' | 'keep' | 'default', path = '', klass = '') => {
+    const r = await fetch(`/api/state/${action}?path=${encodeURIComponent(path)}${klass ? '&class=' + encodeURIComponent(klass) : ''}`, { method: 'POST' });
     const j = await r.json();
     if (!r.ok) throw new Error(j.error ?? r.statusText);
     return j as { ok: boolean; images?: number };

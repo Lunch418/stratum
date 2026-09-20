@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react';
 import { type ObjectProps } from '../api';
 import { classByName, useStore } from '../store';
 import { Icon } from './Icon';
+import { FilePickDialog } from './Options';
 
 type Tool = 'select' | 'line' | 'polyline' | 'rect' | 'roundrect' | 'ellipse' | 'arc' | 'text' | 'points' | 'pan';
 type Kind = 'image' | 'scheme' | 'icon';
@@ -43,6 +44,9 @@ export function PictureEditor({ kind }: { kind: Kind }) {
   const [drag, setDrag] = useState<{ kind: 'move' | 'resize' | 'point' | 'pan'; start: [number, number]; orig?: ObjectProps; corner?: string; index?: number; vx?: number; vy?: number } | null>(null);
   const [preview, setPreview] = useState<Preview>(null);
   const [textAsk, setTextAsk] = useState<{ at: [number, number]; value: string } | null>(null);
+  const [insertAsk, setInsertAsk] = useState(false);
+  const sheet = klass?.sheet;
+  const grid = sheet?.gridVisible ? { step: sheet.gridStep, origin: sheet.gridOrigin } : null;
   const svgRef = useRef<SVGSVGElement>(null);
   const editable = !!klass && !klass.library;
 
@@ -52,6 +56,12 @@ export function PictureEditor({ kind }: { kind: Kind }) {
     if (r.ok) setState(await r.json());
   };
   useEffect(() => { load(); setSel([]); setDraft([]); }, [klass?.name, kind]);
+  // «Формат → Z-порядок» из главного меню
+  useEffect(() => {
+    const on = (e: Event) => { if (sel.length === 1 && editable) op({ op: 'zorder', handle: sel[0], to: (e as CustomEvent).detail }); };
+    window.addEventListener('zorder', on);
+    return () => window.removeEventListener('zorder', on);
+  }, [sel, editable, klass?.name]);
 
   async function op(body: unknown): Promise<number> {
     if (!klass) return 0;
@@ -72,7 +82,14 @@ export function PictureEditor({ kind }: { kind: Kind }) {
     const st = state!;
     return [(p[0] - st.view[0]) * view.k + view.x, (p[1] - st.view[1]) * view.k + view.y];
   };
-  const snap = (p: [number, number]): [number, number] => [Math.round(p[0]), Math.round(p[1])];
+  // привязка к сетке листа («Параметры листа → Сетка → Привязка»)
+  const snap = (p: [number, number]): [number, number] => {
+    if (sheet?.gridSnap) {
+      const [sx, sy] = sheet.gridStep, [ox, oy] = sheet.gridOrigin;
+      return [Math.round((p[0] - ox) / sx) * sx + ox, Math.round((p[1] - oy) / sy) * sy + oy];
+    }
+    return [Math.round(p[0]), Math.round(p[1])];
+  };
   const penJson = () => ({ color: pen.color, width: pen.width, style: 0 });
   const brushJson = () => fill.on ? { color: fill.color, style: 0 } : undefined;
 
@@ -82,6 +99,8 @@ export function PictureEditor({ kind }: { kind: Kind }) {
       if (e.key === 'Escape') { setTool('select'); setDraft([]); setSel([]); setTextAsk(null); }
       else if ((e.key === 'Delete' || e.key === 'Backspace') && sel.length && editable) { e.preventDefault(); op(sel.map(h => ({ op: 'delete', handle: h }))).then(() => setSel([])); }
       else if (e.key.toLowerCase() === 'd' && e.ctrlKey && sel.length === 1 && editable) { e.preventDefault(); op({ op: 'duplicate', handle: sel[0] }).then(h => setSel([h])); }
+      // Z-порядок как в оригинале: PgUp/PgDn на одну, с Ctrl — на верх/вниз
+      else if ((e.key === 'PageUp' || e.key === 'PageDown') && sel.length === 1 && editable) { e.preventDefault(); op({ op: 'zorder', handle: sel[0], to: e.key === 'PageUp' ? (e.ctrlKey ? 'top' : 'up') : (e.ctrlKey ? 'bottom' : 'down') }); }
       else if (e.key === 'Enter' && tool === 'polyline' && draft.length >= 2) finishPolyline();
     };
     window.addEventListener('keydown', onKey);
@@ -210,6 +229,8 @@ export function PictureEditor({ kind }: { kind: Kind }) {
         <button className="small icon-only" disabled={!one} onClick={() => op({ op: 'zorder', handle: one!.handle, to: 'top' })} title="На передний план"><Icon name="up" /></button>
         <button className="small icon-only" disabled={!one} onClick={() => op({ op: 'zorder', handle: one!.handle, to: 'bottom' })} title="На задний план"><Icon name="down" /></button>
         <button className="small icon-only" disabled={!sel.length} onClick={() => op(sel.map(h => ({ op: 'delete', handle: h }))).then(() => setSel([]))} title="Удалить (Del)"><Icon name="trash" /></button>
+        <button className="small icon-only" disabled={!editable} onClick={() => setInsertAsk(true)} title="Вставить из файла (.vdr, .bmp)"><Icon name="file" /></button>
+        <button className={`small icon-only${grid ? ' active' : ''}`} onClick={() => useStore.getState().setDialog('sheet')} title="Параметры листа: сетка, окно, слои"><Icon name="grid" /></button>
         <span className="sep" />
         <input type="number" value={state.client[0]} onChange={e => op({ op: 'page', w: Number(e.target.value) })} title="Ширина листа" />
         <span className="muted small">×</span>
@@ -221,6 +242,10 @@ export function PictureEditor({ kind }: { kind: Kind }) {
       <svg ref={svgRef} className="canvas" onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp} onContextMenu={e => e.preventDefault()} onDoubleClick={() => tool === 'polyline' && finishPolyline()}>
         <g transform={`translate(${view.x} ${view.y}) scale(${view.k})`}>
           <rect x={state.origin[0] - state.view[0]} y={state.origin[1] - state.view[1]} width={state.client[0]} height={state.client[1]} className="page" />
+          {grid && <g className="page-grid">
+            {Array.from({ length: Math.min(400, Math.floor(state.client[0] / grid.step[0]) + 1) }, (_, i) => { const x = state.origin[0] - state.view[0] + grid.origin[0] + i * grid.step[0]; return <line key={'v' + i} x1={x} x2={x} y1={state.origin[1] - state.view[1]} y2={state.origin[1] - state.view[1] + state.client[1]} />; })}
+            {Array.from({ length: Math.min(400, Math.floor(state.client[1] / grid.step[1]) + 1) }, (_, i) => { const y = state.origin[1] - state.view[1] + grid.origin[1] + i * grid.step[1]; return <line key={'h' + i} y1={y} y2={y} x1={state.origin[0] - state.view[0]} x2={state.origin[0] - state.view[0] + state.client[0]} />; })}
+          </g>}
           <g dangerouslySetInnerHTML={{ __html: state.svg.replace(/<svg[^>]*>/, '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="' + state.view[2] + '" height="' + state.view[3] + '">').replace(/<rect width="100%" height="100%" fill="#ffffff"\/>/, '') }} />
         </g>
         {selObjs.map(o => {
@@ -271,6 +296,10 @@ export function PictureEditor({ kind }: { kind: Kind }) {
         </div>
       )}
       {!editable && <div className="hint muted">Библиотечный имидж: только просмотр.</div>}
+      {insertAsk && (
+        <FilePickDialog title="Вставить из файла" ext="vdr,bmp" onClose={() => setInsertAsk(false)}
+          onPick={async f => { setInsertAsk(false); const at = cursor ?? [state.origin[0], state.origin[1]]; const h = await op({ op: 'insert', file: f, x: at[0], y: at[1] }); if (h) setSel([h]); }} />
+      )}
     </div>
   );
 }

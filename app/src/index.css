@@ -51,7 +51,7 @@ html, body, #root { height: 100%; margin: 0; }
 body {
   background: var(--bg-app);
   color: var(--text-primary);
-  font: 500 13px/1.45 var(--font-ui);
+  font: 500 var(--font-size, 13px)/1.45 var(--font-ui);
   letter-spacing: 0.005em;
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
@@ -110,10 +110,51 @@ input[type="search"]:focus { background: var(--bg-surface); border-color: var(--
 .topbar .brand { font-size: 13px; font-weight: 800; letter-spacing: -0.01em; margin-right: 10px; }
 .topbar .brand::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: var(--accent); margin-right: 8px; vertical-align: -1px; transform: rotate(45deg); }
 /* пульт модели: сегментированная группа */
-.topbar > button.primary, .topbar > button[title="F10"], .topbar > button[title^="Shift+F10"], .topbar > button[title="Shift+F5"] { border-radius: 0; margin-left: -1px; }
+.topbar > button.primary, .topbar > button[title^="Один шаг"], .topbar > button[title^="Такт назад"], .topbar > button[title^="Стоп"] { border-radius: 0; margin-left: -1px; }
 .topbar > button.primary { border-radius: 999px 0 0 999px; margin-left: 0; padding-left: 16px; }
-.topbar > button[title="Shift+F5"] { border-radius: 0 999px 999px 0; padding-right: 14px; }
-.topbar .counter { margin-left: auto; color: var(--text-primary); font-size: 14px; font-weight: 500; padding: 0 8px; font-family: var(--font-mono); }
+.topbar > button[title^="Стоп"] { border-radius: 0 999px 999px 0; padding-right: 14px; }
+.topbar .counter { color: var(--text-primary); font-size: 13px; font-weight: 500; padding: 0 6px; font-family: var(--font-mono); min-width: 96px; }
+.topbar .speed { display: flex; align-items: center; margin-left: 8px; }
+.topbar .speed input { width: 90px; }
+.topbar .brand-accent { color: var(--accent); margin-left: 3px; }
+.topbar .spacer { flex: 1; }
+
+/* строка меню как в оригинале */
+.menubar { display: flex; align-items: stretch; height: 100%; }
+.menubar .menu-title { border: 0; background: transparent; border-radius: 4px; padding: 4px 9px; font-weight: 600; color: var(--text-primary); }
+.menubar .menu-host.open .menu-title, .menubar .menu-title:hover { background: var(--accent-soft); color: var(--accent-ink); }
+.menubar .context.menu { top: calc(100% + 2px); min-width: 240px; padding: 5px; }
+.menu-row { position: relative; display: flex; flex-direction: column; }
+.menu-row > button { width: 100%; align-items: center; gap: 8px; justify-content: flex-start; }
+.menu-row > button:disabled { color: var(--text-muted); opacity: .6; cursor: default; }
+.menu-row > button:disabled:hover { background: transparent; }
+.menu-check { width: 14px; text-align: center; color: var(--accent-ink); font-size: 11px; }
+.menu-label { flex: 1; }
+.menu-hint { font-size: 11px; font-family: var(--font-mono); }
+.menu-sep { height: 1px; background: var(--border); margin: 4px 6px; }
+.submenu { position: absolute; left: 100%; top: -5px; }
+.submenu .context.menu { position: static; margin: 0; }
+
+/* диалоги параметров: вкладки, группы, колонки */
+.dialog-tabs { padding: 0 10px; }
+.dialog-page { display: flex; flex-direction: column; gap: 10px; max-height: 70vh; overflow: auto; font-size: 12.5px; }
+.dialog-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.dialog-page fieldset { border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px 10px; margin: 0; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.dialog-page legend { color: var(--text-muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 0 4px; }
+.dialog-page .prop > span:first-child { min-width: 120px; }
+.dialog-page textarea, .dialog-page select { width: 100%; }
+label.check { display: flex; align-items: center; gap: 8px; cursor: pointer; text-align: left; }
+.layer-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px 8px; }
+.list .row { display: flex; gap: 8px; padding: 4px 10px; border-bottom: 1px solid var(--border); }
+.list .row.selected { background: var(--accent-soft); color: var(--accent-ink); }
+.about-name { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
+
+/* печать: только активная вкладка */
+@media print {
+  .topbar, .left, .right, .bottom, .splitter, .statusbar, .tabs, .toast { display: none !important; }
+  .workspace { display: block !important; }
+  .center, .tab-body { position: static !important; height: auto !important; overflow: visible !important; }
+}
 .topbar .sep { width: 1px; height: 24px; background: var(--border); margin: 0 4px; }
 .menu-host { position: relative; }
 .context.menu { position: absolute; top: 100%; left: 0; margin-top: 4px; }
@@ -170,6 +211,8 @@ table.vars input:focus { border-color: var(--accent); background: var(--bg-surfa
 .scheme .node.selected rect.box { stroke: var(--accent); stroke-width: 1.5; filter: drop-shadow(0 0 0 3px var(--accent-soft)); }
 .scheme .node text { font-size: 12px; font-weight: 600; fill: var(--text-primary); font-family: var(--font-ui); }
 .scheme .link .wire { stroke: var(--accent); stroke-width: 1.6; fill: none; pointer-events: none; opacity: .75; }
+.scheme .link.disabled .wire { stroke-dasharray: 6 4; opacity: .4; }
+.picture-editor .page-grid line { stroke: var(--border-strong); stroke-width: .5; opacity: .5; }
 .scheme .link .hit { stroke: transparent; stroke-width: 12; fill: none; cursor: pointer; }
 .scheme .link:hover .wire { stroke-width: 2.5; }
 .scheme .link.selected .wire { stroke: var(--accent); stroke-width: 2.5; }
@@ -213,6 +256,9 @@ table.vars input:focus { border-color: var(--accent); background: var(--bg-surfa
 .modal { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-panel); width: min(560px, 92vw); box-shadow: var(--shadow-pop); }
 .modal-body { padding: 12px 14px; }
 .modal-body input { width: 100%; }
+.modal-body input[type="checkbox"], .modal-body input[type="radio"] { width: auto; flex: none; margin: 0; }
+.modal-body input[type="color"] { width: 44px; padding: 0; }
+.dialog-page .prop input[type="number"] { max-width: 120px; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--border); }
 .topbar .sep { width: 1px; height: 22px; background: var(--border); margin: 0 4px; }
 button.attention { border-color: var(--state-pause); }

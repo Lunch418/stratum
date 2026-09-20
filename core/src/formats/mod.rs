@@ -11,7 +11,7 @@ pub mod reader;
 pub mod vdr;
 pub mod writer;
 
-pub use cls::{Child, Class, Link, Variable};
+pub use cls::{Child, Class, Link, LinkStyle, SheetOptions, Variable};
 pub use project::{Project, State};
 pub use vdr::Picture;
 pub use reader::{FormatError, Result};

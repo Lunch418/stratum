@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, type ClassInfo } from '../api';
 import { classByName, useStore } from '../store';
 import { LinkDialog } from './LinkDialog';
+import type { LinkStyle } from '../api';
 
 export const DRAG_CLASS = 'application/x-stratum-class';
 
@@ -47,7 +48,14 @@ export function SchemeCanvas() {
   const [selLink, setSelLink] = useState<number | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; handle: number } | null>(null);
   const [renaming, setRenaming] = useState<{ handle: number; value: string } | null>(null);
-  const [linkEdit, setLinkEdit] = useState<{ handle: number; source: number; target: number; pairs: [string, string][] } | null>(null);
+  const [linkEdit, setLinkEdit] = useState<{ handle: number; source: number; target: number; pairs: [string, string][]; style?: LinkStyle } | null>(null);
+  const [linkMenu, setLinkMenu] = useState<{ x: number; y: number; handle: number } | null>(null);
+  const [sheetMenu, setSheetMenu] = useState<{ x: number; y: number } | null>(null);
+  const layers = useStore(s => s.layers);
+  const setDialog = useStore(s => s.setDialog);
+  const sheet = klass?.sheet;
+  const gridStep: [number, number] = sheet?.gridVisible ? sheet.gridStep : [16, 16];
+  const gridOrigin: [number, number] = sheet?.gridVisible ? sheet.gridOrigin : [0, 0];
   const svgRef = useRef<SVGSVGElement>(null);
 
   useEffect(() => {
@@ -157,7 +165,10 @@ export function SchemeCanvas() {
     else if (wire) { const p = toScene(e); setWire({ ...wire, x: p.x, y: p.y }); }
     else if (drag && klass) {
       const p = toScene(e);
-      const gx = Math.round((p.x - drag.dx) / 8) * 8, gy = Math.round((p.y - drag.dy) / 8) * 8;
+      // привязка к сетке листа, если она включена в параметрах, иначе шаг 8
+      const [sx, sy] = sheet?.gridSnap ? gridStep : [8, 8];
+      const [ox, oy] = sheet?.gridSnap ? gridOrigin : [0, 0];
+      const gx = Math.round((p.x - drag.dx - ox) / sx) * sx + ox, gy = Math.round((p.y - drag.dy - oy) / sy) * sy + oy;
       const c = klass.children.find(c => c.handle === drag.handle);
       if (c && (c.x !== gx || c.y !== gy)) {
         setDrag({ ...drag, moved: true });
@@ -229,9 +240,10 @@ export function SchemeCanvas() {
     setRenaming(null);
     await reload();
   }
-  async function saveLink(pairs: [string, string][]) {
+  async function saveLink(pairs: [string, string][], style: LinkStyle) {
     if (!klass || !linkEdit) return;
     const r = await api.setLink(klass.name, linkEdit.handle, linkEdit.source, linkEdit.target, pairs);
+    if (r.handle) await api.setLinkStyle(klass.name, r.handle, style);
     setLinkEdit(null);
     await reload();
     setSelLink(r.handle || null);
@@ -253,35 +265,39 @@ export function SchemeCanvas() {
       <svg ref={svgRef} className="canvas" onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={onMouseUp}
         onContextMenu={e => e.preventDefault()}>
         <defs>
-          <pattern id="grid" width={16 * view.k} height={16 * view.k} patternUnits="userSpaceOnUse" x={view.x} y={view.y}>
-            <path className="grid" d={`M ${16 * view.k} 0 L 0 0 0 ${16 * view.k}`} fill="none" />
+          <pattern id="grid" width={gridStep[0] * view.k} height={gridStep[1] * view.k} patternUnits="userSpaceOnUse" x={view.x + gridOrigin[0] * view.k} y={view.y + gridOrigin[1] * view.k}>
+            <path className="grid" d={`M ${gridStep[0] * view.k} 0 L 0 0 0 ${gridStep[1] * view.k}`} fill="none" />
           </pattern>
+          <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="context-stroke" /></marker>
         </defs>
-        <rect width="100%" height="100%" fill="url(#grid)" />
+        {layers.grid && <rect width="100%" height="100%" fill="url(#grid)" />}
+        <rect width="100%" height="100%" fill="transparent" onContextMenu={e => { e.preventDefault(); if (editable) setSheetMenu({ x: e.clientX, y: e.clientY }); }} />
         <g transform={`translate(${view.x} ${view.y}) scale(${view.k})`}>
-          {background.svg && background.bounds && (
+          {layers.graphics && background.svg && background.bounds && (
             <g opacity="0.85" dangerouslySetInnerHTML={{ __html: background.svg.replace(/<svg[^>]*>/, `<svg x="${background.bounds.x}" y="${background.bounds.y}" width="${background.bounds.w}" height="${background.bounds.h}" viewBox="0 0 ${background.bounds.w} ${background.bounds.h}" xmlns="http://www.w3.org/2000/svg">`) }} />
           )}
-          {klass.links.map(l => {
+          {layers.links && klass.links.map(l => {
             const a = centers.get(l.source), b = centers.get(l.target);
             if (!a || !b) return null;
             const title = l.vars.map(([p, q]) => `${p} → ${q}`).join(', ');
             const mx = (a.x + b.x) / 2;
             const d = `M ${a.x} ${a.y} C ${mx} ${a.y}, ${mx} ${b.y}, ${b.x} ${b.y}`;
+            const st = l.style;
             return (
-              <g key={l.handle} className={`link${selLink === l.handle ? ' selected' : ''}`}
-                onMouseDown={e => { e.stopPropagation(); setSelLink(l.handle); setSelNode(null); }}
-                onDoubleClick={e => { e.stopPropagation(); if (editable) setLinkEdit({ handle: l.handle, source: l.source, target: l.target, pairs: l.vars }); }}>
+              <g key={l.handle} className={`link${selLink === l.handle ? ' selected' : ''}${st?.disabled ? ' disabled' : ''}`}
+                onMouseDown={e => { e.stopPropagation(); setSelLink(l.handle); setSelNode(null); if (e.button === 2) setLinkMenu({ x: e.clientX, y: e.clientY, handle: l.handle }); }}
+                onContextMenu={e => e.preventDefault()}
+                onDoubleClick={e => { e.stopPropagation(); if (editable) setLinkEdit({ handle: l.handle, source: l.source, target: l.target, pairs: l.vars, style: l.style }); }}>
                 <path className="hit" d={d} />
-                <path className="wire" d={d} />
-                <title>{title || 'связь без пар'}</title>
+                <path className="wire" d={d} style={{ stroke: st?.color || undefined, strokeWidth: st?.width ? st.width / view.k : undefined }} markerEnd={st?.arrows ? 'url(#arrow)' : undefined} />
+                <title>{(title || 'связь без пар') + (st?.disabled ? ' · выключена' : '')}</title>
               </g>
             );
           })}
           {wire && centers.get(wire.from) && (
             <path className="link drawing" d={`M ${centers.get(wire.from)!.x} ${centers.get(wire.from)!.y} L ${wire.x} ${wire.y}`} />
           )}
-          {nodes.map(c => {
+          {layers.images && nodes.map(c => {
             const { w, h, label } = nodeSize(c);
             const cls = classByName(project, c.class);
             const isSelf = c.handle === SELF;
@@ -344,8 +360,22 @@ export function SchemeCanvas() {
           </form>
         </div>
       )}
+      {linkMenu && (
+        <div className="context" style={{ left: linkMenu.x, top: linkMenu.y }} onMouseDown={e => e.stopPropagation()} onMouseLeave={() => setLinkMenu(null)}>
+          <button onClick={() => { const l = klass.links.find(l => l.handle === linkMenu.handle); setLinkMenu(null); if (l && editable) setLinkEdit({ handle: l.handle, source: l.source, target: l.target, pairs: l.vars, style: l.style }); }}>Свойства связи…</button>
+          <button onClick={() => { setLinkMenu(null); removeLink(linkMenu.handle); }} disabled={!editable}>Удалить эту связь <span className="muted">Del</span></button>
+        </div>
+      )}
+      {sheetMenu && (
+        <div className="context" style={{ left: sheetMenu.x, top: sheetMenu.y }} onMouseDown={e => e.stopPropagation()} onMouseLeave={() => setSheetMenu(null)}>
+          <button onClick={() => { setSheetMenu(null); select(klass.name); setDialog('sheet'); }}>Параметры листа…</button>
+          <button onClick={() => { setSheetMenu(null); select(klass.name); setDialog('calcOrder'); }}>Порядок вычислений…</button>
+          <button onClick={() => { setSheetMenu(null); select(klass.name); setDialog('classProps'); }}>Свойства имиджа…</button>
+          <button onClick={() => { setSheetMenu(null); if (clipboard.length) pasteBlocks(clipboard); }} disabled={!clipboard.length}>Вставить <span className="muted">Ctrl+V</span></button>
+        </div>
+      )}
       {linkEdit && (
-        <LinkDialog isNew={linkEdit.handle === 0} pairs={linkEdit.pairs}
+        <LinkDialog isNew={linkEdit.handle === 0} pairs={linkEdit.pairs} style={linkEdit.style}
           source={{ label: labelOf(linkEdit.source), cls: classOf(linkEdit.source) }}
           target={{ label: labelOf(linkEdit.target), cls: classOf(linkEdit.target) }}
           onSubmit={saveLink} onClose={() => setLinkEdit(null)} />

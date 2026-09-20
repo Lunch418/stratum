@@ -61,14 +61,76 @@ pub struct Child {
     pub flags: u8,
 }
 
+/// Оформление связи (диалог «Параметры связи» оригинала): цвет, толщина,
+/// выключение, стрелки, слой. В `.cls` не хранится — только в родном формате.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct LinkStyle {
+    /// Цвет `#rrggbb`; пусто — цвет по умолчанию.
+    pub color: String,
+    /// Толщина линии в пикселях; 0 — по умолчанию.
+    pub width: u8,
+    /// «Связь не работает»: переменные не объединяются.
+    pub disabled: bool,
+    pub arrows: bool,
+    pub layer: u8,
+}
+
+impl LinkStyle {
+    pub fn is_default(&self) -> bool {
+        *self == LinkStyle::default()
+    }
+}
+
 /// Связь: одна или несколько пар переменных между двумя экземплярами.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Link {
     pub source: u16,
     pub target: u16,
     pub handle: u16,
     pub flags: u32,
     pub vars: Vec<(String, String)>,
+    pub style: LinkStyle,
+}
+
+/// Параметры листа (диалог «Параметры листа»: сетка, окно, слои).
+#[derive(Debug, Clone, PartialEq)]
+pub struct SheetOptions {
+    pub grid_origin: (f64, f64),
+    pub grid_step: (f64, f64),
+    pub grid_visible: bool,
+    pub grid_snap: bool,
+    /// Стиль окна модели: "mdi" | "dialog" | "popup" | "default".
+    pub window_style: String,
+    /// Размер окна: "max" | "min" | "default" | "space" | "fixed".
+    pub window_size: String,
+    pub window_wh: (f64, f64),
+    pub window_fixed: bool,
+    pub hscroll: bool,
+    pub vscroll: bool,
+    pub auto_origin: bool,
+    /// Битовая маска видимых слоёв 0–31.
+    pub layers: u32,
+    pub no_subwindows: bool,
+}
+
+impl Default for SheetOptions {
+    fn default() -> Self {
+        SheetOptions {
+            grid_origin: (0.0, 0.0),
+            grid_step: (10.0, 10.0),
+            grid_visible: false,
+            grid_snap: false,
+            window_style: "default".into(),
+            window_size: "space".into(),
+            window_wh: (0.0, 0.0),
+            window_fixed: false,
+            hscroll: false,
+            vscroll: false,
+            auto_origin: true,
+            layers: u32::MAX,
+            no_subwindows: false,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -94,6 +156,8 @@ pub struct Class {
     pub equations: Option<Vec<u8>>,
     pub timestamp: Option<u32>,
     pub flags: Option<u32>,
+    /// Параметры листа; `None` — по умолчанию (в `.cls` не хранятся).
+    pub sheet: Option<SheetOptions>,
 }
 
 impl Class {
@@ -172,7 +236,7 @@ fn read_section(
                 for _ in 0..pairs {
                     vars.push((r.string()?, r.string()?));
                 }
-                cls.links.push(Link { source, target, handle, flags, vars });
+                cls.links.push(Link { source, target, handle, flags, vars, style: LinkStyle::default() });
             }
         }
         section::CHILDREN => {
@@ -348,7 +412,7 @@ mod tests {
             vars: vec![Variable { name: "x".into(), description: String::new(), default: "1.5".into(), var_type: "FLOAT".into(), flags: 0x100 }],
             text: "x := ~x + 1".into(),
             children: vec![Child { class_name: "Луна".into(), handle: 3, name: String::new(), x: -12.0, y: 48.5, flags: 0 }],
-            links: vec![Link { source: 0, target: 3, handle: 1, flags: 0, vars: vec![("x".into(), "y".into())] }],
+            links: vec![Link { source: 0, target: 3, handle: 1, flags: 0, vars: vec![("x".into(), "y".into())], style: LinkStyle::default() }],
             icon: Some(vec![1, 2, 3]),
             timestamp: Some(7),
             flags: Some(0x200),
