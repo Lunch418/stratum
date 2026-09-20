@@ -67,7 +67,7 @@ export const useStore = create<State>((set, get) => ({
   tab: 'scheme',
   messages: [],
   toast: null,
-  theme: (localStorage.getItem('theme') as 'light' | 'dark') || 'light',
+  theme: (new URLSearchParams(location.search).get('theme') as 'light' | 'dark' | null) || (localStorage.getItem('theme') as 'light' | 'dark') || 'light',
   load: async () => {
     const project = await api.project();
     set({ project, schemePath: [project.root], selectedClass: project.root, unsaved: project.unsaved });
