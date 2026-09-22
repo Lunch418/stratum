@@ -45,6 +45,9 @@ export function SchemeCanvas() {
   const [pan, setPan] = useState<{ sx: number; sy: number; vx: number; vy: number } | null>(null);
   const [wire, setWire] = useState<{ from: number; x: number; y: number } | null>(null);
   const [selNode, setSelNode] = useState<number | null>(null);
+  // групповое выделение: Shift+щелчок и рамка на пустом месте
+  const [selSet, setSelSet] = useState<Set<number>>(new Set());
+  const [band, setBand] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
   const [selLink, setSelLink] = useState<number | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; handle: number } | null>(null);
   const [renaming, setRenaming] = useState<{ handle: number; value: string } | null>(null);
@@ -110,18 +113,20 @@ export function SchemeCanvas() {
       if ((e.target as HTMLElement).closest('input, textarea, select, .monaco-editor')) return;
       if (e.key === 'Escape') { setMenu(null); setWire(null); setRenaming(null); }
       if ((e.key === 'Delete' || e.key === 'Backspace') && editable && klass) {
-        if (selNode !== null && selNode !== SELF) { e.preventDefault(); removeChild(selNode); }
+        if (selSet.size > 1) { e.preventDefault(); Promise.all([...selSet].filter(h => h !== SELF).map(h => api.removeChild(klass.name, h))).then(async () => { setSelSet(new Set()); setSelNode(null); useStore.getState().markUnsaved(); await useStore.getState().reload(); showToast('Блоки удалены'); }); }
+        else if (selNode !== null && selNode !== SELF) { e.preventDefault(); removeChild(selNode); }
         else if (selLink !== null) { e.preventDefault(); removeLink(selLink); }
       }
       // буфер обмена схемы: копировать/вырезать/вставить/дублировать блок
       if (e.ctrlKey && klass && selNode !== null && selNode !== SELF && ['c', 'x', 'd'].includes(e.key.toLowerCase())) {
-        const c = klass.children.find(x => x.handle === selNode);
-        if (!c) return;
+        const group = selSet.size ? selSet : new Set([selNode]);
+        const items = klass.children.filter(x => group.has(x.handle)).map(c => ({ class: c.class, name: c.name, x: c.x, y: c.y }));
+        if (!items.length) return;
         e.preventDefault();
-        if (e.key.toLowerCase() === 'd') { if (editable) pasteBlocks([{ class: c.class, name: c.name, x: c.x, y: c.y }]); return; }
-        setClipboard([{ class: c.class, name: c.name, x: c.x, y: c.y }]);
-        showToast(e.key.toLowerCase() === 'x' ? 'Вырезано' : 'Скопировано');
-        if (e.key.toLowerCase() === 'x' && editable) removeChild(selNode);
+        if (e.key.toLowerCase() === 'd') { if (editable) pasteBlocks(items); return; }
+        setClipboard(items);
+        showToast((e.key.toLowerCase() === 'x' ? 'Вырезано' : 'Скопировано') + (items.length > 1 ? `: ${items.length}` : ''));
+        if (e.key.toLowerCase() === 'x' && editable) Promise.all([...group].map(h => api.removeChild(klass.name, h))).then(async () => { setSelSet(new Set()); setSelNode(null); useStore.getState().markUnsaved(); await useStore.getState().reload(); });
       } else if (e.ctrlKey && e.key.toLowerCase() === 'v' && editable && clipboard.length) {
         e.preventDefault();
         pasteBlocks(clipboard);
@@ -129,7 +134,7 @@ export function SchemeCanvas() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [selNode, selLink, editable, klass?.name]);
+  }, [selNode, selLink, selSet, editable, klass?.name]);
 
   function fitAll() {
     const el = svgRef.current;
@@ -156,14 +161,20 @@ export function SchemeCanvas() {
 
   function onMouseDown(e: React.MouseEvent) {
     setMenu(null);
-    if (e.button === 1 || (e.button === 0 && (e.target as Element).closest('.node, .link') === null)) {
+    const empty = (e.target as Element).closest('.node, .link') === null;
+    if (e.button === 1 || (e.button === 0 && empty && e.altKey)) {
       setPan({ sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y });
-      if (e.button === 0) { select(klass?.name ?? null); setSelNode(null); setSelLink(null); }
+    } else if (e.button === 0 && empty) {
+      // рамка выделения (Alt — панорама)
+      const p = toScene(e);
+      setBand({ x0: p.x, y0: p.y, x1: p.x, y1: p.y });
+      if (!e.shiftKey) { select(klass?.name ?? null); setSelNode(null); setSelLink(null); setSelSet(new Set()); }
     }
   }
 
   function onMouseMove(e: React.MouseEvent) {
     if (pan) setView(v => ({ ...v, x: pan.vx + e.clientX - pan.sx, y: pan.vy + e.clientY - pan.sy }));
+    else if (band) { const p = toScene(e); setBand({ ...band, x1: p.x, y1: p.y }); }
     else if (wire) { const p = toScene(e); setWire({ ...wire, x: p.x, y: p.y }); }
     else if (drag && klass) {
       const p = toScene(e);
@@ -173,16 +184,29 @@ export function SchemeCanvas() {
       const gx = Math.round((p.x - drag.dx - ox) / sx) * sx + ox, gy = Math.round((p.y - drag.dy - oy) / sy) * sy + oy;
       const c = klass.children.find(c => c.handle === drag.handle);
       if (c && (c.x !== gx || c.y !== gy)) {
+        const ddx = gx - c.x, ddy = gy - c.y;
+        const group = selSet.has(drag.handle) ? selSet : new Set([drag.handle]);
         setDrag({ ...drag, moved: true });
-        updateClass({ ...klass, children: klass.children.map(c => c.handle === drag.handle ? { ...c, x: gx, y: gy } : c) });
+        updateClass({ ...klass, children: klass.children.map(c => group.has(c.handle) ? { ...c, x: c.x + ddx, y: c.y + ddy } : c) });
       }
     }
   }
 
   function onMouseUp(e: React.MouseEvent) {
     if (drag && klass && drag.moved) {
-      const c = klass.children.find(c => c.handle === drag.handle);
-      if (c) api.moveChild(klass.name, c.handle, c.x, c.y).then(() => { showToast('Перемещено'); useStore.getState().markUnsaved(); });
+      const group = selSet.has(drag.handle) ? selSet : new Set([drag.handle]);
+      const moves = klass.children.filter(c => group.has(c.handle)).map(c => api.moveChild(klass.name, c.handle, c.x, c.y));
+      Promise.all(moves).then(() => { showToast(moves.length > 1 ? `Перемещено блоков: ${moves.length}` : 'Перемещено'); useStore.getState().markUnsaved(); });
+    }
+    if (band && klass) {
+      const [bx0, bx1] = [Math.min(band.x0, band.x1), Math.max(band.x0, band.x1)], [by0, by1] = [Math.min(band.y0, band.y1), Math.max(band.y0, band.y1)];
+      if (bx1 - bx0 > 2 || by1 - by0 > 2) {
+        const inside = klass.children.filter(c => { const { w, h } = nodeSize(c); return c.x >= bx0 && c.y >= by0 && c.x + w <= bx1 && c.y + h <= by1; }).map(c => c.handle);
+        const next = new Set(e.shiftKey ? [...selSet, ...inside] : inside);
+        setSelSet(next);
+        if (inside.length) setSelNode(inside[0]);
+      }
+      setBand(null);
     }
     if (wire && klass) {
       const target = (e.target as Element).closest('.node')?.getAttribute('data-handle');
@@ -296,6 +320,7 @@ export function SchemeCanvas() {
               </g>
             );
           })}
+          {band && <rect className="band" x={Math.min(band.x0, band.x1)} y={Math.min(band.y0, band.y1)} width={Math.abs(band.x1 - band.x0)} height={Math.abs(band.y1 - band.y0)} />}
           {wire && centers.get(wire.from) && (
             <path className="link drawing" d={`M ${centers.get(wire.from)!.x} ${centers.get(wire.from)!.y} L ${wire.x} ${wire.y}`} />
           )}
@@ -303,7 +328,7 @@ export function SchemeCanvas() {
             const { w, h, label } = nodeSize(c);
             const cls = classByName(project, c.class);
             const isSelf = c.handle === SELF;
-            const selected = selNode === c.handle || (selNode === null && selectedClass === c.class && !isSelf);
+            const selected = selNode === c.handle || selSet.has(c.handle) || (selNode === null && selectedClass === c.class && !isSelf);
             const ports = cls?.vars.filter(v => !v.local).slice(0, 6) ?? [];
             return (
               <g key={c.handle} data-handle={c.handle} className={`node${selected ? ' selected' : ''}${isSelf ? ' self' : ''}`} transform={`translate(${c.x} ${c.y})`}
@@ -311,6 +336,8 @@ export function SchemeCanvas() {
                   e.stopPropagation(); setMenu(null);
                   if (e.button === 2) return;
                   setSelNode(c.handle); setSelLink(null);
+                  if (e.shiftKey && !isSelf) setSelSet(prev => { const n = new Set(prev); n.has(c.handle) ? n.delete(c.handle) : n.add(c.handle); return n; });
+                  else if (!selSet.has(c.handle)) setSelSet(new Set());
                   if (!isSelf) { const p = toScene(e); setDrag({ handle: c.handle, dx: p.x - c.x, dy: p.y - c.y, moved: false }); }
                   select(c.class, isSelf ? null : instanceIndexFor(c.handle));
                 }}
@@ -345,7 +372,7 @@ export function SchemeCanvas() {
           {menu.handle !== SELF && <button onClick={() => { const c = klass.children.find(n => n.handle === menu.handle); setMenu(null); if (c) { setClipboard([{ class: c.class, name: c.name, x: c.x, y: c.y }]); showToast('Скопировано'); } }}>Копировать <span className="muted">Ctrl+C</span></button>}
           {menu.handle !== SELF && <button onClick={() => { const c = klass.children.find(n => n.handle === menu.handle); setMenu(null); if (c) pasteBlocks([{ class: c.class, name: c.name, x: c.x, y: c.y }]); }}>Дублировать <span className="muted">Ctrl+D</span></button>}
           {menu.handle !== SELF && <button onClick={() => { const c = klass.children.find(n => n.handle === menu.handle); setMenu(null); setReplacing({ handle: menu.handle, value: c?.class ?? '' }); }}>Заменить другим…</button>}
-          {menu.handle !== SELF && <button onClick={() => { setMenu(null); let n = 1; while (project?.classes.some(c => c.name.toLowerCase() === `блок${n}`)) n++; setMerging({ picked: new Set([menu.handle]), name: `Блок${n}` }); }}>Конвертировать в один имидж…</button>}
+          {menu.handle !== SELF && <button onClick={() => { setMenu(null); let n = 1; while (project?.classes.some(c => c.name.toLowerCase() === `блок${n}`)) n++; setMerging({ picked: new Set(selSet.size ? [...selSet, menu.handle] : [menu.handle]), name: `Блок${n}` }); }}>Конвертировать в один имидж…</button>}
           {menu.handle !== SELF && <button onClick={() => { setMenu(null); removeChild(menu.handle); }}>Удалить <span className="muted">Del</span></button>}
         </div>
       )}

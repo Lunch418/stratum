@@ -357,3 +357,5 @@ button.attention { border-color: var(--state-pause); }
 .icon-grid .icon-cell:hover { border-color: var(--accent); }
 
 .hyper-back { position: absolute; z-index: 5; margin: 8px; }
+
+.scheme .band { fill: var(--accent-soft); stroke: var(--accent); stroke-dasharray: 4 3; opacity: .7; }
