@@ -471,7 +471,11 @@ fn apply_event(s: &mut Shared, ev: Event) {
         Event::Speed(fps) => s.fps = fps.clamp(1, 1000),
         Event::Dialog { answer } => {
             if let Some(req) = s.dialog.take() {
-                let v = if req.kind == "input" { crate::runtime::Value::Str(answer) } else { crate::runtime::Value::Float(answer.parse().unwrap_or(1.0)) };
+                let v = match req.kind {
+                    "input" | "open" | "save" | "folder" => crate::runtime::Value::Str(answer),
+                    "color" => crate::runtime::Value::Color(answer.parse().unwrap_or(0.0)),
+                    _ => crate::runtime::Value::Float(answer.parse().unwrap_or(1.0)),
+                };
                 s.dialog_answers.push(v);
                 // повторяем такт с ответом; если модель шла — продолжит сама
                 s.advance();

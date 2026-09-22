@@ -351,8 +351,16 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
             fx.ask(super::builtins::DialogRequest { kind: "message", title: s(args, 1), text: s(args, 0), style, default: String::new() }, num(default))
         }
         "dialog" | "dialogex" | "dialogbox" => num(1.0),
-        "fileloaddialog" | "filesavedialog" | "chosefolderdialog" | "choosefolderdialog" => text(s(args, 1)),
-        "chosecolordialog" => Value::Color(f(args, 1)),
+        // файловые диалоги: заголовок, путь/имя по умолчанию, фильтр расширений
+        "fileloaddialog" | "filesavedialog" | "chosefolderdialog" | "choosefolderdialog" => {
+            let kind = match lower.as_str() { "filesavedialog" => "save", "fileloaddialog" => "open", _ => "folder" };
+            let d = s(args, 1);
+            fx.ask(super::builtins::DialogRequest { kind, title: s(args, 0), text: s(args, 2), style: 0, default: d.clone() }, text(d))
+        }
+        "chosecolordialog" => {
+            let c = f(args, 1);
+            fx.ask(super::builtins::DialogRequest { kind: "color", title: s(args, 0), text: String::new(), style: 0, default: format!("{}", c as u32) }, Value::Color(c))
+        }
         "meditor" | "maddcolumn" | "maddrow" => num(1.0),
 
         // ── аудио: через очередь звука плеера ─────────────────────────────

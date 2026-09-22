@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, type Control } from '../api';
 import { useStore } from '../store';
+import { FilePickDialog } from './Options';
 
 // звук модели: SndPlaySound и MCI приходят в кадре как команды
 const playing = new Map<string, HTMLAudioElement>();
@@ -69,6 +70,25 @@ export function ModelView() {
 function ModelDialogBox({ d }: { d: import('../api').ModelDialog }) {
   const [value, setValue] = useState(d.default);
   const answer = (v: string | number) => api.event(`type=dialog&answer=${encodeURIComponent(String(v))}`);
+  // файловые диалоги — обзор папок ядра; фильтр расширений из «*.bmp;*.png»
+  if (d.kind === 'open' || d.kind === 'save' || d.kind === 'folder') {
+    const ext = (d.text.match(/\*\.(\w+)/g) ?? []).map(m => m.slice(2)).join(',');
+    return <FilePickDialog title={d.title || (d.kind === 'save' ? 'Сохранить файл' : d.kind === 'folder' ? 'Выбор папки' : 'Открыть файл')} ext={ext || 'txt,bmp,vdr,stt,wav,dat'}
+      save={d.kind === 'save' ? d.default : undefined} onPick={p => answer(p)} onClose={() => answer(d.default)} />;
+  }
+  if (d.kind === 'color') {
+    const n = Number(d.default) || 0;
+    const hex = '#' + [n & 255, (n >> 8) & 255, (n >> 16) & 255].map(v => v.toString(16).padStart(2, '0')).join('');
+    return (
+      <div className="modal-backdrop">
+        <form className="modal" style={{ width: 360 }} onSubmit={e => { e.preventDefault(); const h = (document.getElementById('model-color') as HTMLInputElement).value; answer(parseInt(h.slice(1, 3), 16) | parseInt(h.slice(3, 5), 16) << 8 | parseInt(h.slice(5, 7), 16) << 16); }}>
+          <div className="panel-title">{d.title || 'Выбор цвета'}</div>
+          <div className="modal-body" style={{ display: 'flex', gap: 10, alignItems: 'center' }}><input id="model-color" type="color" defaultValue={hex} style={{ width: 64, height: 40, padding: 0 }} /><span className="muted small">Цвет для модели (COLORREF)</span></div>
+          <div className="modal-actions"><button type="button" className="ghost" onClick={() => answer(n)}>Отмена</button><button type="submit" className="primary">OK</button></div>
+        </form>
+      </div>
+    );
+  }
   const buttons: [string, number][] = d.kind === 'input' ? [] : (d.style & 0xf) === 1 ? [['OK', 1], ['Отмена', 2]] : (d.style & 0xf) === 3 ? [['Да', 6], ['Нет', 7], ['Отмена', 2]] : (d.style & 0xf) === 4 ? [['Да', 6], ['Нет', 7]] : [['OK', 1]];
   return (
     <div className="modal-backdrop">
