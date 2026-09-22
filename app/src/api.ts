@@ -35,6 +35,7 @@ export interface ObjectProps {
   handle: number; name: string; kind: string; x: number; y: number; w: number; h: number; angle: number; visible: boolean; alpha: number;
   zorder: number | null; parent: number | null; pen?: { color: string; width: number; style: number }; brush?: { color: string; style: number };
   points?: [number, number][]; text?: string; class?: string; children?: number;
+  font?: { face: string; size: number; bold: boolean; italic: boolean; underline: boolean; fg: string; bg: string }; enabled?: boolean; checked?: boolean;
 }
 export interface ParseError { line: number; column: number; message: string }
 

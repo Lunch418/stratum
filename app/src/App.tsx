@@ -139,7 +139,18 @@ export default function App() {
   const running = !!frame?.running;
 
   const newClass = async () => { let n = 1; while (s.project?.classes.some(c => c.name.toLowerCase() === `имидж${n}`)) n++; await api.newClass(`Имидж${n}`); await s.reload(); s.select(`Имидж${n}`); s.setTab('code'); };
-  const menus = buildMenus({ running, canBack: !!frame?.canBack, save, open: setDialog, newClass });
+  const newClassOnScheme = async () => {
+    const scheme = s.schemePath[s.schemePath.length - 1] ?? s.project?.root;
+    if (!scheme) return;
+    let n = 1; while (s.project?.classes.some(c => c.name.toLowerCase() === `имидж${n}`)) n++;
+    const name = `Имидж${n}`;
+    await api.newClass(name);
+    const parent = s.project?.classes.find(c => c.name === scheme);
+    const x = parent ? Math.max(0, ...parent.children.map(c => c.x + 140)) : 0;
+    await api.addChild(scheme, name, x, 0);
+    s.markUnsaved(); await s.reload(); s.select(name); s.setTab('scheme'); s.showToast(`${name} создан и поставлен на схему ${scheme}`);
+  };
+  const menus = buildMenus({ running, canBack: !!frame?.canBack, save, open: setDialog, newClass, newClassOnScheme });
   const commands: Command[] = [
     ...commandsFromMenus(menus),
     ...(s.project?.classes ?? []).filter(c => !c.library).map(c => ({ id: 'code:' + c.name, title: `Код: ${c.name}`, group: 'имидж', run: () => { s.select(c.name); s.setTab('code'); } })),

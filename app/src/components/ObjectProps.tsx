@@ -66,8 +66,25 @@ export function ObjectProps() {
             </label>
           </div>
         )}
-        {o.text !== undefined && <div className="prop"><span>Текст</span><span className="mono">{o.text}</span></div>}
-        {o.class && <div className="prop"><span>Контрол</span><span className="mono">{o.class}</span></div>}
+        {o.text !== undefined && <label className="prop"><span>Текст</span><input type="text" defaultValue={o.text} key={'t' + o.handle + o.text} onBlur={e => e.target.value !== o.text && set('text', e.target.value)} /></label>}
+        {o.font && (
+          <div className="prop-grid">
+            <label className="prop"><span>Шрифт</span><input type="text" defaultValue={o.font.face} key={'ff' + o.font.face} onBlur={e => e.target.value !== o.font!.face && set('font.face', e.target.value)} /></label>
+            <label className="prop"><span>Кегль</span><input type="number" className="mono" defaultValue={o.font.size} key={'fs' + o.font.size} onBlur={e => Number(e.target.value) !== o.font!.size && set('font.size', e.target.value)} /></label>
+            <label className="prop"><span>Цвет</span><input type="color" value={o.font.fg} onChange={e => set('text.fg', e.target.value)} /></label>
+            <label className="prop"><span>Фон</span><input type="color" value={o.font.bg} onChange={e => set('text.bg', e.target.value)} /></label>
+            <label className="check"><input type="checkbox" checked={o.font.bold} onChange={e => set('font.bold', e.target.checked ? 1 : 0)} />жирный</label>
+            <label className="check"><input type="checkbox" checked={o.font.italic} onChange={e => set('font.italic', e.target.checked ? 1 : 0)} />курсив</label>
+            <label className="check"><input type="checkbox" checked={o.font.underline} onChange={e => set('font.underline', e.target.checked ? 1 : 0)} />подчёркнутый</label>
+          </div>
+        )}
+        {o.class && (
+          <div className="prop-grid">
+            <div className="prop"><span>Контрол</span><span className="mono">{o.class}</span></div>
+            <label className="check"><input type="checkbox" checked={!!o.enabled} onChange={e => set('enabled', e.target.checked ? 1 : 0)} />доступен</label>
+            {(o.class === 'CHECKBOX' || o.class === 'RADIOBUTTON') && <label className="check"><input type="checkbox" checked={!!o.checked} onChange={e => set('checked', e.target.checked ? 1 : 0)} />отмечен</label>}
+          </div>
+        )}
         {o.points && (
           <details>
             <summary className="muted small">Точки ({o.points.length})</summary>

@@ -1271,6 +1271,47 @@ pub(crate) fn set_object_field(space: &mut Space, handle: u32, field: &str, valu
                 _ => b.style = num.max(0.0) as u16,
             }).is_some()
         }
+        // текст: строка, шрифт и цвета первого фрагмента
+        "text" | "font.face" | "font.size" | "font.bold" | "font.italic" | "font.underline" | "text.fg" | "text.bg" => {
+            let shape = space.objects.get(&handle).map(|o| o.shape.clone());
+            match shape {
+                Some(crate::gfx::Shape::Text { text }) => {
+                    let Some(parts) = space.texts.get(&text).cloned() else { return false };
+                    let Some(first) = parts.first().cloned() else { return false };
+                    match field {
+                        "text" => {
+                            // весь текст — в первый фрагмент, остальные убираем
+                            let sh = space.add_string(value.to_string());
+                            let mut p0 = first;
+                            p0.string = sh;
+                            space.texts.insert(text, vec![p0]);
+                        }
+                        "text.fg" | "text.bg" => {
+                            let c = parse_color(value);
+                            if let Some(ps) = space.texts.get_mut(&text) {
+                                for p in ps { if field == "text.fg" { p.fg = c } else { p.bg = c } }
+                            }
+                        }
+                        _ => {
+                            let mut f = space.fonts.get(&first.font).cloned().unwrap_or(crate::gfx::Font { height: -16, weight: 400, italic: false, underline: false, face: "Arial".into() });
+                            match field {
+                                "font.face" => f.face = value.to_string(),
+                                "font.size" => f.height = -(num.max(1.0) * 96.0 / 72.0).round() as i32,
+                                "font.bold" => f.weight = if num != 0.0 { 700 } else { 400 },
+                                "font.italic" => f.italic = num != 0.0,
+                                _ => f.underline = num != 0.0,
+                            }
+                            let fh = space.add_font(f);
+                            if let Some(ps) = space.texts.get_mut(&text) { for p in ps { p.font = fh; } }
+                        }
+                    }
+                    true
+                }
+                Some(crate::gfx::Shape::Control { .. }) if field == "text" => space.objects.get_mut(&handle).map(|o| if let crate::gfx::Shape::Control { text, caption, .. } = &mut o.shape { *text = value.to_string(); *caption = value.to_string(); }).is_some(),
+                _ => false,
+            }
+        }
+        "enabled" | "checked" => space.objects.get_mut(&handle).map(|o| if let crate::gfx::Shape::Control { enabled, checked, .. } = &mut o.shape { if field == "enabled" { *enabled = num != 0.0 } else { *checked = num != 0.0 } }).is_some(),
         "zorder" => {
             let n = (num.max(0.0) as usize).min(space.zorder.len().saturating_sub(1));
             if let Some(pos) = space.zorder.iter().position(|&h| h == handle) {
@@ -1322,8 +1363,17 @@ pub(crate) fn object_json(sp: &Space, o: &crate::gfx::Object) -> String {
         Shape::Text { text } => {
             let t: String = sp.texts.get(text).map(|parts| parts.iter().filter_map(|p| sp.strings.get(&p.string).cloned()).collect::<Vec<_>>().join("")).unwrap_or_default();
             extra.push_str(&format!(",\"text\":{}", json_string(&t)));
+            // шрифт и цвета первого фрагмента — для правки в инспекторе
+            if let Some(first) = sp.texts.get(text).and_then(|p| p.first()) {
+                if let Some(f) = sp.fonts.get(&first.font) {
+                    extra.push_str(&format!(",\"font\":{{\"face\":{},\"size\":{},\"bold\":{},\"italic\":{},\"underline\":{},\"fg\":{},\"bg\":{}}}",
+                        json_string(&f.face), (f.height.abs() as f64 * 72.0 / 96.0).round(), f.weight >= 600, f.italic, f.underline,
+                        json_string(&format!("#{:02x}{:02x}{:02x}", first.fg & 255, (first.fg >> 8) & 255, (first.fg >> 16) & 255)),
+                        json_string(&format!("#{:02x}{:02x}{:02x}", first.bg & 255, (first.bg >> 8) & 255, (first.bg >> 16) & 255))));
+                }
+            }
         }
-        Shape::Control { class, text, .. } => extra.push_str(&format!(",\"class\":{},\"text\":{}", json_string(class), json_string(text))),
+        Shape::Control { class, text, enabled, checked, .. } => extra.push_str(&format!(",\"class\":{},\"text\":{},\"enabled\":{enabled},\"checked\":{checked}", json_string(class), json_string(text))),
         Shape::Group { children } => extra.push_str(&format!(",\"children\":{}", children.len())),
         _ => {}
     }

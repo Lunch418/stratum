@@ -13,6 +13,8 @@ export interface MenuContext {
   save: () => void;
   open: (d: DialogId) => void;
   newClass: () => void;
+  /// создать имидж и сразу поставить на текущую схему
+  newClassOnScheme: () => void;
 }
 
 const MDI = 'В новой среде вместо окон MDI — панели с разделителями';
@@ -91,7 +93,7 @@ export function buildMenus(ctx: MenuContext): Menu[] {
     { title: 'Вставка', items: [
       { label: 'Имидж…', hint: 'перетащить из иерархии', run: () => { s.setTab('scheme'); s.showToast('Перетащите имидж из иерархии на схему'); } },
       { label: 'Связь', run: () => { s.setTab('scheme'); s.showToast('Потяните от порта блока к другому блоку'); } },
-      { label: 'Создать и вставить новый имидж…', run: ctx.newClass, disabled: noProject },
+      { label: 'Создать и вставить новый имидж', run: ctx.newClassOnScheme, disabled: noProject || lib },
       { label: 'Контактная площадка', disabled: true, why: 'Не реализовано: контактные площадки схемы' },
       { sep: true },
       { label: 'Новый двухмерный объект', sub: [
