@@ -495,6 +495,8 @@ impl Simulation {
     /// подсхемой — они работают только по сообщениям.
     pub fn step(&mut self) -> Result<(), RuntimeError> {
         self.old.clone_from(&self.cells);
+        self.effects.dialog_ordinal = 0;
+        self.effects.dialog_request = None;
         self.solve_equations()?;
         let order = self.order.clone();
         let mut disabled_roots: Vec<usize> = Vec::new();

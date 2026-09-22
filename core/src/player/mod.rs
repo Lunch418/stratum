@@ -30,6 +30,8 @@ enum Event {
     Reset,
     Back,
     Speed(u32),
+    /// Ответ на диалог модели: число (кнопка) или строка (InputBox).
+    Dialog { answer: String },
     Mouse { window: String, msg: u32, x: f64, y: f64, keys: u32 },
     Key { msg: u32, vk: u32 },
     /// Действие в контроле окна модели: код уведомления и новое значение.
@@ -79,6 +81,12 @@ pub struct Shared {
     pub next_breakpoint: u32,
     /// Последняя остановка: ошибка или точка останова.
     pub halt: Option<Halt>,
+    /// Диалог модели, ждущий ответа: такт откачен и будет выполнен заново.
+    pub dialog: Option<crate::runtime::builtins::DialogRequest>,
+    /// Модель шла, когда появился диалог — после ответа продолжить.
+    resume_after_dialog: bool,
+    /// Ответы на диалоги текущего (повторяемого) такта.
+    dialog_answers: Vec<crate::runtime::Value>,
     pub traces: Vec<Trace>,
     pub next_trace: u32,
     pub running: bool,
@@ -156,7 +164,21 @@ impl Shared {
         if self.past.len() > HISTORY_LEN {
             self.past.pop_front();
         }
-        if let Err(e) = self.sim.step() {
+        self.sim.effects.dialog_answers = self.dialog_answers.clone();
+        let result = self.sim.step();
+        // модель спросила пользователя: откатываем такт, ждём ответа и
+        // выполняем такт заново уже с ответом
+        if let Some(req) = self.sim.effects.dialog_request.take() {
+            if let Some(prev) = self.past.pop_back() {
+                self.sim = prev;
+            }
+            self.dialog = Some(req);
+            self.resume_after_dialog = self.running;
+            self.running = false;
+            return;
+        }
+        self.dialog_answers.clear();
+        if let Err(e) = result {
             match self.math_mode {
                 0 => {
                     self.running = false;
@@ -359,6 +381,9 @@ pub fn serve_with(opts: Options, on_ready: impl FnOnce(u16)) -> Result<(), Strin
         breakpoints: Vec::new(),
         next_breakpoint: 1,
         halt: None,
+        dialog: None,
+        dialog_answers: Vec::new(),
+        resume_after_dialog: false,
         traces: Vec::new(),
         next_trace: 1,
         running: false,
@@ -444,6 +469,15 @@ fn apply_event(s: &mut Shared, ev: Event) {
             Err(e) => s.error = Some(e.to_string()),
         },
         Event::Speed(fps) => s.fps = fps.clamp(1, 1000),
+        Event::Dialog { answer } => {
+            if let Some(req) = s.dialog.take() {
+                let v = if req.kind == "input" { crate::runtime::Value::Str(answer) } else { crate::runtime::Value::Float(answer.parse().unwrap_or(1.0)) };
+                s.dialog_answers.push(v);
+                // повторяем такт с ответом; если модель шла — продолжит сама
+                s.advance();
+                s.running = s.dialog.is_none() && s.error.is_none() && s.resume_after_dialog;
+            }
+        }
         Event::Mouse { window, msg, x, y, keys } => {
             if let Some(space) = s.sim.effects.gfx.window_space(&window) {
                 // координаты страницы → координаты пространства
@@ -637,6 +671,7 @@ fn parse_event(query: &str) -> Option<Event> {
         "reset" => Event::Reset,
         "back" => Event::Back,
         "speed" => Event::Speed(num("fps")? as u32),
+        "dialog" => Event::Dialog { answer: param(query, "answer").map(url_decode).unwrap_or_default() },
         "mouse" => Event::Mouse {
             window: url_decode(param(query, "win")?),
             msg: num("msg")? as u32,
@@ -738,13 +773,25 @@ fn frame_json(shared: &Arc<Mutex<Shared>>) -> String {
         }
         None => "null".into(),
     };
+    let dialog = match &s.dialog {
+        Some(d) => format!(
+            "{{\"kind\":{},\"title\":{},\"text\":{},\"style\":{},\"default\":{}}}",
+            json_string(d.kind),
+            json_string(&d.title),
+            json_string(&d.text),
+            d.style,
+            json_string(&d.default)
+        ),
+        None => "null".into(),
+    };
     format!(
-        "{{\"tick\":{},\"running\":{},\"stopped\":{},\"canBack\":{},\"halt\":{},\"windows\":[{}],\"sounds\":[{}],\"log\":[{}]}}",
+        "{{\"tick\":{},\"running\":{},\"stopped\":{},\"canBack\":{},\"halt\":{},\"dialog\":{},\"windows\":[{}],\"sounds\":[{}],\"log\":[{}]}}",
         s.sim.tick_number(),
         s.running,
         s.sim.stopped,
         !s.past.is_empty(),
         halt,
+        dialog,
         windows.join(","),
         sounds.join(","),
         log.join(",")

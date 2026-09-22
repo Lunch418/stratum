@@ -345,8 +345,10 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
 
         // ── диалоги: окна нет, ответ по умолчанию и запись в сообщения ────
         "messagebox" => {
-            fx.log.push(format!("{}: {}", s(args, 1), s(args, 0)));
-            num(1.0)
+            let style = f(args, 2) as u32;
+            // ответ по умолчанию: IDOK (1); для «да/нет» — IDYES (6)
+            let default = if style & 0xf == 4 || style & 0xf == 3 { 6.0 } else { 1.0 };
+            fx.ask(super::builtins::DialogRequest { kind: "message", title: s(args, 1), text: s(args, 0), style, default: String::new() }, num(default))
         }
         "dialog" | "dialogex" | "dialogbox" => num(1.0),
         "fileloaddialog" | "filesavedialog" | "chosefolderdialog" | "choosefolderdialog" => text(s(args, 1)),

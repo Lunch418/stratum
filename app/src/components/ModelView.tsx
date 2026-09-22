@@ -1,5 +1,5 @@
 // Окно модели: живые окна из ядра; мышь и клавиатура уходят в модель.
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, type Control } from '../api';
 import { useStore } from '../store';
 
@@ -55,10 +55,37 @@ export function ModelView() {
     for (const div of [...root.children]) if (!frame.windows.some(w => String(w.id) === (div as HTMLElement).dataset.win)) div.remove();
   }, [frame]);
 
-  if (!frame?.windows.length) return <div className="model"><div className="muted" style={{ color: '#eee' }}>Модель не открыла окон — нажмите Пуск или Шаг.</div></div>;
-  return <div className="model" ref={host} tabIndex={0} title="Alt+щелчок — свойства объекта в инспекторе"
-    onKeyDown={e => { e.preventDefault(); api.event(`type=key&msg=256&vk=${e.keyCode}`); }}
-    onKeyUp={e => api.event(`type=key&msg=257&vk=${e.keyCode}`)} />;
+  if (!frame?.windows.length) return <div className="model"><div className="muted" style={{ color: '#eee' }}>Модель не открыла окон — нажмите Пуск или Шаг.</div>{frame?.dialog && <ModelDialogBox d={frame.dialog} />}</div>;
+  return <>
+    <div className="model" ref={host} tabIndex={0} title="Alt+щелчок — свойства объекта в инспекторе"
+      onKeyDown={e => { e.preventDefault(); api.event(`type=key&msg=256&vk=${e.keyCode}`); }}
+      onKeyUp={e => api.event(`type=key&msg=257&vk=${e.keyCode}`)} />
+    {frame.dialog && <ModelDialogBox d={frame.dialog} />}
+  </>;
+}
+
+// MessageBox / InputBox модели: такт откачен ядром и повторится с ответом.
+// Кнопки по стилю MB_*: 0 — OK, 1 — OK/Отмена, 3 — Да/Нет/Отмена, 4 — Да/Нет
+function ModelDialogBox({ d }: { d: import('../api').ModelDialog }) {
+  const [value, setValue] = useState(d.default);
+  const answer = (v: string | number) => api.event(`type=dialog&answer=${encodeURIComponent(String(v))}`);
+  const buttons: [string, number][] = d.kind === 'input' ? [] : (d.style & 0xf) === 1 ? [['OK', 1], ['Отмена', 2]] : (d.style & 0xf) === 3 ? [['Да', 6], ['Нет', 7], ['Отмена', 2]] : (d.style & 0xf) === 4 ? [['Да', 6], ['Нет', 7]] : [['OK', 1]];
+  return (
+    <div className="modal-backdrop">
+      <form className="modal" style={{ width: 'min(440px, 92vw)' }} onSubmit={e => { e.preventDefault(); answer(d.kind === 'input' ? value : buttons[0][1]); }}>
+        <div className="panel-title">{d.title || 'Модель'}</div>
+        <div className="modal-body" style={{ whiteSpace: 'pre-wrap' }}>
+          {d.text}
+          {d.kind === 'input' && <input autoFocus type="text" value={value} onChange={e => setValue(e.target.value)} style={{ marginTop: 8 }} />}
+        </div>
+        <div className="modal-actions">
+          {d.kind === 'input'
+            ? <><button type="button" className="ghost" onClick={() => answer(d.default)}>Отмена</button><button type="submit" className="primary">OK</button></>
+            : buttons.map(([t, v], i) => <button key={t} type={i === 0 ? 'submit' : 'button'} className={i === 0 ? 'primary' : 'ghost'} onClick={i === 0 ? undefined : () => answer(v)}>{t}</button>)}
+        </div>
+      </form>
+    </div>
+  );
 }
 
 // Настоящие кнопки, флажки, поля ввода и списки поверх SVG: события уходят

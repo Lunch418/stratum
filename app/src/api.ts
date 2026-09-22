@@ -22,8 +22,9 @@ export interface Project { root: string; dir: string; empty: boolean; native: bo
 export interface Instance { index: number; path: string; name: string; class: string; parent: number | null; handle: number }
 export interface Halt { kind: 'error' | 'breakpoint' | 'warning'; message: string; instance: number | null; path: string; class: string; line: number }
 export interface Breakpoint { id: number; index: number | null; path: string; class: string; expr: string; enabled: boolean }
+export interface ModelDialog { kind: 'message' | 'input'; title: string; text: string; style: number; default: string }
 export interface Frame {
-  tick: number; running: boolean; stopped: boolean; canBack: boolean; halt: Halt | null;
+  tick: number; running: boolean; stopped: boolean; canBack: boolean; halt: Halt | null; dialog: ModelDialog | null;
   windows: { id: number; name: string; w: number; h: number; size?: string; style?: string; svg: string; controls: Control[] }[];
   sounds: { cmd: 'play' | 'stop'; file: string; loop: boolean }[];
   log: string[];

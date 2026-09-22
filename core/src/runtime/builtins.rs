@@ -11,6 +11,33 @@ use super::value::{format_number, Value};
 use crate::gfx::Gfx;
 use std::collections::BTreeMap;
 
+/// Запрос диалога модели: вид, заголовок, текст, стиль (MB_*) и значение по
+/// умолчанию для строки ввода.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DialogRequest {
+    pub kind: &'static str,
+    pub title: String,
+    pub text: String,
+    pub style: u32,
+    pub default: String,
+}
+
+impl Effects {
+    /// Ответ на очередной диалог такта, если он уже дан; иначе — запрос и
+    /// значение по умолчанию.
+    pub fn ask(&mut self, req: DialogRequest, default: Value) -> Value {
+        let n = self.dialog_ordinal;
+        self.dialog_ordinal += 1;
+        if let Some(v) = self.dialog_answers.get(n) {
+            return v.clone();
+        }
+        if self.dialog_request.is_none() {
+            self.dialog_request = Some(req);
+        }
+        default
+    }
+}
+
 /// Побочные эффекты текста модели, которые ядро пока только записывает.
 #[derive(Debug, Default, Clone)]
 pub struct Effects {
@@ -35,6 +62,13 @@ pub struct Effects {
     pub outputs: Vec<(usize, Value)>,
     /// Команды звука для плеера: (`play`|`stop`, файл, зациклить).
     pub sounds: Vec<(String, String, bool)>,
+    /// Диалоги модели (`MessageBox`, `InputBox`): такт выполняется заново
+    /// после ответа пользователя, ответы подставляются по порядку вызовов.
+    pub dialog_answers: Vec<Value>,
+    /// Сколько диалогов уже вызвано в этом такте.
+    pub dialog_ordinal: usize,
+    /// Первый диалог такта, на который ещё нет ответа.
+    pub dialog_request: Option<DialogRequest>,
     /// Открытые через MCI псевдонимы: alias → файл.
     pub mci: BTreeMap<String, String>,
     /// Потоки (`CreateStream`).
@@ -77,7 +111,10 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
         "getanglebyxy" => num(f(args, 1).atan2(f(args, 0))),
         "fileexist" => num(if std::path::Path::new(&s(args, 0)).exists() { 1.0 } else { 0.0 }),
         // диалог ввода строки: без окна возвращаем значение по умолчанию
-        "inputbox" => Value::Str(s(args, 2)),
+        "inputbox" => {
+            let d = s(args, 2);
+            fx.ask(DialogRequest { kind: "input", title: s(args, 1), text: s(args, 0), style: 0, default: d.clone() }, Value::Str(d))
+        }
         "change" => Value::Str(s(args, 0).replace(&s(args, 1), &s(args, 2))),
         "replicate" => Value::Str(s(args, 0).repeat(f(args, 1).max(0.0) as usize)),
         "exp" => num(f(args, 0).exp()),
