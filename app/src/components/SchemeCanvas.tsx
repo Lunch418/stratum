@@ -52,6 +52,7 @@ export function SchemeCanvas() {
   const [linkMenu, setLinkMenu] = useState<{ x: number; y: number; handle: number } | null>(null);
   const [sheetMenu, setSheetMenu] = useState<{ x: number; y: number } | null>(null);
   const [replacing, setReplacing] = useState<{ handle: number; value: string } | null>(null);
+  const [merging, setMerging] = useState<{ picked: Set<number>; name: string } | null>(null);
   const layers = useStore(s => s.layers);
   const setDialog = useStore(s => s.setDialog);
   const sheet = klass?.sheet;
@@ -344,6 +345,7 @@ export function SchemeCanvas() {
           {menu.handle !== SELF && <button onClick={() => { const c = klass.children.find(n => n.handle === menu.handle); setMenu(null); if (c) { setClipboard([{ class: c.class, name: c.name, x: c.x, y: c.y }]); showToast('Скопировано'); } }}>Копировать <span className="muted">Ctrl+C</span></button>}
           {menu.handle !== SELF && <button onClick={() => { const c = klass.children.find(n => n.handle === menu.handle); setMenu(null); if (c) pasteBlocks([{ class: c.class, name: c.name, x: c.x, y: c.y }]); }}>Дублировать <span className="muted">Ctrl+D</span></button>}
           {menu.handle !== SELF && <button onClick={() => { const c = klass.children.find(n => n.handle === menu.handle); setMenu(null); setReplacing({ handle: menu.handle, value: c?.class ?? '' }); }}>Заменить другим…</button>}
+          {menu.handle !== SELF && <button onClick={() => { setMenu(null); let n = 1; while (project?.classes.some(c => c.name.toLowerCase() === `блок${n}`)) n++; setMerging({ picked: new Set([menu.handle]), name: `Блок${n}` }); }}>Конвертировать в один имидж…</button>}
           {menu.handle !== SELF && <button onClick={() => { setMenu(null); removeChild(menu.handle); }}>Удалить <span className="muted">Del</span></button>}
         </div>
       )}
@@ -383,6 +385,35 @@ export function SchemeCanvas() {
             useStore.getState().markUnsaved(); await useStore.getState().reload(); showToast('Выстроено по сетке');
           }} disabled={!editable}>Выстроить имиджи по узлам сетки</button>
           <button onClick={() => { setSheetMenu(null); if (clipboard.length) pasteBlocks(clipboard); }} disabled={!clipboard.length}>Вставить <span className="muted">Ctrl+V</span></button>
+        </div>
+      )}
+      {merging && (
+        <div className="modal-backdrop" onMouseDown={() => setMerging(null)}>
+          <form className="modal" style={{ width: 460 }} onMouseDown={e => e.stopPropagation()} onSubmit={async e => {
+            e.preventDefault();
+            try {
+              const r = await api.mergeChildren(klass.name, merging.name.trim(), [...merging.picked]);
+              setMerging(null); useStore.getState().markUnsaved(); await useStore.getState().reload(); setSelNode(r.handle); showToast(`Создан имидж ${merging.name}`);
+            } catch (err) { useStore.getState().say({ level: 'error', where: 'схема', text: String(err) }); }
+          }}>
+            <div className="panel-title">Конвертировать в один имидж</div>
+            <div className="modal-body">
+              <label className="prop"><span>Имя нового имиджа</span><input autoFocus type="text" value={merging.name} onChange={e => setMerging({ ...merging, name: e.target.value })} /></label>
+              <div className="muted small" style={{ margin: '8px 0 4px' }}>Блоки, которые уйдут внутрь (внешние связи станут переменными нового имиджа):</div>
+              <div className="scroll list" style={{ maxHeight: 240, border: '1px solid var(--border)', borderRadius: 6 }}>
+                {klass.children.map(c => (
+                  <label key={c.handle} className="row check" style={{ cursor: 'pointer' }}>
+                    <input type="checkbox" checked={merging.picked.has(c.handle)} onChange={e => { const p = new Set(merging.picked); e.target.checked ? p.add(c.handle) : p.delete(c.handle); setMerging({ ...merging, picked: p }); }} />
+                    <span>{c.name || c.class}</span>{c.name && <span className="muted"> · {c.class}</span>}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="ghost" onClick={() => setMerging(null)}>Отмена</button>
+              <button type="submit" className="primary" disabled={!merging.picked.size || !merging.name.trim()}>Конвертировать ({merging.picked.size})</button>
+            </div>
+          </form>
         </div>
       )}
       {replacing && (

@@ -344,6 +344,80 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
             cls.links.retain(|l| !l.vars.is_empty());
             json(format!("{{\"ok\":true,\"droppedPairs\":{dropped}}}"))
         }
+        // «Конвертировать в один имидж»: выбранные блоки уходят в новый имидж,
+        // внутренние связи — вместе с ними, внешние идут через переменные
+        // нового имиджа. Тело — handles построчно; query: class, name
+        ("POST", ["child", "merge"]) => {
+            let get = |k: &str| super::param(query, k).map(super::url_decode);
+            let (Some(class), Some(name)) = (get("class"), get("name").filter(|n| !n.trim().is_empty())) else {
+                return error("400 Bad Request", "нужны class и name");
+            };
+            let picked: Vec<u16> = body.lines().filter_map(|l| l.trim().parse().ok()).collect();
+            if picked.len() < 1 {
+                return error("400 Bad Request", "выберите хотя бы один блок");
+            }
+            let mut s = shared.lock().unwrap();
+            if s.project.classes.iter().any(|c| c.name.eq_ignore_ascii_case(&name)) {
+                return error("409 Conflict", "имидж с таким именем уже есть");
+            }
+            let Some(i) = s.project.classes.iter().position(|c| c.name.eq_ignore_ascii_case(&class)) else {
+                return error("404 Not Found", "нет такого имиджа");
+            };
+            // типы переменных детей — для сквозных переменных нового имиджа
+            let var_type = |s: &super::Shared, child_class: &str, var: &str| -> String {
+                s.project.class(child_class).and_then(|c| c.vars.iter().find(|v| v.name.eq_ignore_ascii_case(var))).map(|v| v.var_type.clone()).unwrap_or_else(|| "FLOAT".into())
+            };
+            s.remember();
+            let parent = s.project.classes[i].clone();
+            let inside = |h: u16| picked.contains(&h);
+            let moved: Vec<cls::Child> = parent.children.iter().filter(|c| inside(c.handle)).cloned().collect();
+            let (cx, cy) = (moved.iter().map(|c| c.x).sum::<f64>() / moved.len() as f64, moved.iter().map(|c| c.y).sum::<f64>() / moved.len() as f64);
+            let mut new_cls = cls::Class { name: name.clone(), version: 0x3003, ..Default::default() };
+            new_cls.children = moved.iter().map(|c| cls::Child { x: c.x - cx, y: c.y - cy, ..c.clone() }).collect();
+            let new_handle = parent.children.iter().map(|c| c.handle).max().unwrap_or(0) + 1;
+            let mut parent_links = Vec::new();
+            let mut next_inner = 1u16;
+            for l in &parent.links {
+                match (inside(l.source), inside(l.target)) {
+                    (true, true) => {
+                        new_cls.links.push(cls::Link { handle: next_inner, ..l.clone() });
+                        next_inner += 1;
+                    }
+                    (false, false) => parent_links.push(l.clone()),
+                    (src_in, _) => {
+                        // внешняя связь: переменная-прокладка в новом имидже
+                        let inner = if src_in { l.source } else { l.target };
+                        let inner_class = moved.iter().find(|c| c.handle == inner).map(|c| c.class_name.clone()).unwrap_or_default();
+                        let mut outer_pairs = Vec::new();
+                        for (a, b) in &l.vars {
+                            let (inner_var, outer_var) = if src_in { (a, b) } else { (b, a) };
+                            if !new_cls.vars.iter().any(|v| v.name.eq_ignore_ascii_case(inner_var)) {
+                                new_cls.vars.push(cls::Variable { name: inner_var.clone(), description: format!("из {inner_class}"), default: String::new(), var_type: var_type(&s, &inner_class, inner_var), flags: 0 });
+                            }
+                            // внутри: сам имидж (handle 0) ↔ блок
+                            new_cls.links.push(cls::Link { source: 0, target: inner, handle: next_inner, flags: 0, vars: vec![(inner_var.clone(), inner_var.clone())], style: Default::default() });
+                            next_inner += 1;
+                            outer_pairs.push(if src_in { (inner_var.clone(), outer_var.clone()) } else { (outer_var.clone(), inner_var.clone()) });
+                        }
+                        let mut nl = l.clone();
+                        if src_in { nl.source = new_handle } else { nl.target = new_handle }
+                        nl.vars = outer_pairs;
+                        parent_links.push(nl);
+                    }
+                }
+            }
+            let cls_mut = &mut s.project.classes[i];
+            cls_mut.children.retain(|c| !inside(c.handle));
+            cls_mut.children.push(cls::Child { class_name: name.clone(), handle: new_handle, name: String::new(), x: cx, y: cy, flags: 0 });
+            cls_mut.links = parent_links;
+            let n = s.project.own_classes;
+            s.project.classes.insert(n, new_cls);
+            s.project.own_classes += 1;
+            if let Ok(m) = lang::parse("") {
+                s.models.insert(name.to_lowercase(), m);
+            }
+            json(format!("{{\"ok\":true,\"handle\":{new_handle}}}"))
+        }
         ("POST", ["child", "rename"]) => {
             let get = |k: &str| super::param(query, k).map(super::url_decode);
             let (Some(class), Some(h)) = (get("class"), get("handle")) else {
