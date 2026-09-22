@@ -264,6 +264,27 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
             }
             json("{\"ok\":true}".into())
         }
+        // групповой перенос одним шагом отмены: тело — строки «handle\tx\ty»
+        ("POST", ["child", "moveall"]) => {
+            let Some(class) = super::param(query, "class").map(super::url_decode) else {
+                return error("400 Bad Request", "нужен class");
+            };
+            let mut s = shared.lock().unwrap();
+            let Some(i) = s.project.classes.iter().position(|c| c.name.eq_ignore_ascii_case(&class)) else {
+                return error("404 Not Found", "нет такого имиджа");
+            };
+            s.remember();
+            let cls = &mut s.project.classes[i];
+            for line in body.lines() {
+                let f: Vec<&str> = line.split('\t').collect();
+                let (Some(h), Some(x), Some(y)) = (f.first().and_then(|v| v.parse::<u16>().ok()), f.get(1).and_then(|v| v.parse::<f64>().ok()), f.get(2).and_then(|v| v.parse::<f64>().ok())) else { continue };
+                if let Some(ch) = cls.children.iter_mut().find(|c| c.handle == h) {
+                    ch.x = x;
+                    ch.y = y;
+                }
+            }
+            json("{\"ok\":true}".into())
+        }
         // добавить имидж на схему: class (схема), child (класс), x, y, name
         ("POST", ["child", "add"]) => {
             let get = |k: &str| super::param(query, k).map(super::url_decode);

@@ -195,8 +195,8 @@ export function SchemeCanvas() {
   function onMouseUp(e: React.MouseEvent) {
     if (drag && klass && drag.moved) {
       const group = selSet.has(drag.handle) ? selSet : new Set([drag.handle]);
-      const moves = klass.children.filter(c => group.has(c.handle)).map(c => api.moveChild(klass.name, c.handle, c.x, c.y));
-      Promise.all(moves).then(() => { showToast(moves.length > 1 ? `Перемещено блоков: ${moves.length}` : 'Перемещено'); useStore.getState().markUnsaved(); });
+      const items = klass.children.filter(c => group.has(c.handle)).map(c => ({ handle: c.handle, x: c.x, y: c.y }));
+      api.moveChildren(klass.name, items).then(() => { showToast(items.length > 1 ? `Перемещено блоков: ${items.length}` : 'Перемещено'); useStore.getState().markUnsaved(); });
     }
     if (band && klass) {
       const [bx0, bx1] = [Math.min(band.x0, band.x1), Math.max(band.x0, band.x1)], [by0, by1] = [Math.min(band.y0, band.y1), Math.max(band.y0, band.y1)];

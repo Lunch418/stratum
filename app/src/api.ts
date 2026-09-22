@@ -141,6 +141,8 @@ export const api = {
   },
   replaceChild: (klass: string, handle: number, child: string) =>
     fetch(`/api/child/replace?class=${encodeURIComponent(klass)}&handle=${handle}&child=${encodeURIComponent(child)}`, { method: 'POST' }).then(r => r.json() as Promise<{ ok: boolean; droppedPairs: number }>),
+  moveChildren: (klass: string, items: { handle: number; x: number; y: number }[]) =>
+    fetch(`/api/child/moveall?class=${encodeURIComponent(klass)}`, { method: 'POST', body: items.map(i => `${i.handle}\t${i.x}\t${i.y}`).join('\n') }),
   mergeChildren: (klass: string, name: string, handles: number[]) =>
     fetch(`/api/child/merge?class=${encodeURIComponent(klass)}&name=${encodeURIComponent(name)}`, { method: 'POST', body: handles.join('\n') }).then(async r => { const j = await r.json(); if (!r.ok) throw new Error(j.error); return j as { ok: boolean; handle: number }; }),
   reorderChildren: (klass: string, handles: number[]) =>
