@@ -138,6 +138,8 @@ pub struct Object {
     pub flags: u16,
     /// Иконка имиджа или линия связи: показывается только в редакторе схемы.
     pub scheme_element: bool,
+    /// Гиперссылка (`SetHyperJump2d`): режим, цель (файл .vdr или имидж), окно.
+    pub hyper: Option<(i32, String, String)>,
     /// Прозрачность 0–255 (`SetObjectAlpha2d`); 255 — непрозрачный.
     pub alpha: u8,
     pub shape: Shape,
@@ -158,6 +160,7 @@ impl Object {
             parent: None,
             flags: 0,
             scheme_element: false,
+            hyper: None,
             alpha: 255,
             shape,
         }
@@ -739,6 +742,10 @@ pub struct Gfx {
     /// ("max" | "min" | "fixed" | …), ширина и высота при "fixed", запрет
     /// изменения размера, видимые слои.
     pub sheets: BTreeMap<String, crate::formats::SheetOptions>,
+    /// История гиперпереходов: (окно, что было открыто) — для кнопки «назад».
+    pub hyper_history: Vec<(String, String)>,
+    /// Что открыто в каждом окне гипербазы (окно → цель).
+    pub hyper_current: BTreeMap<String, String>,
     /// Трёхмерные пространства; дескрипторы общие с двумерными.
     pub spaces3d: BTreeMap<Handle, space3d::Space3d>,
     /// Буфер обмена `CopyToClipboard2d` (объект вместе с инструментами).
@@ -897,4 +904,39 @@ fn find_case_insensitive(dir: &std::path::Path, name: &str, depth: u32) -> Optio
         }
     }
     None
+}
+
+impl Gfx {
+    /// Гиперпереход: показать цель (файл `.vdr` или рисунок имиджа) в окне,
+    /// запомнив прежнее содержимое для возврата.
+    pub fn hyper_jump(&mut self, window: &str, target: &str) -> bool {
+        let window = if window.is_empty() { "MainWindow" } else { window };
+        let pic = if target.to_lowercase().ends_with(".vdr") {
+            self.load_picture_file(target)
+        } else {
+            self.pictures.get(&target.to_lowercase()).cloned()
+        };
+        // имидж без рисунка — пустая страница
+        let Some(pic) = pic.or_else(|| (!target.to_lowercase().ends_with(".vdr")).then(crate::formats::Picture::default)) else { return false };
+        if let Some(prev) = self.hyper_current.get(window).cloned() {
+            self.hyper_history.push((window.to_string(), prev));
+        }
+        let sp = self.open_window(window);
+        let name = self.space(sp).map(|s| s.window.clone()).unwrap_or_default();
+        self.spaces.insert(sp, Space::new(sp, &name));
+        self.space_mut(sp).unwrap().load(&pic);
+        self.resolve_dibs(sp);
+        self.fit_client(sp);
+        self.hyper_current.insert(window.to_string(), target.to_string());
+        true
+    }
+
+    /// Возврат на предыдущую страницу гипербазы.
+    pub fn hyper_back(&mut self) -> bool {
+        let Some((window, target)) = self.hyper_history.pop() else { return false };
+        let ok = self.hyper_jump(&window, &target);
+        // сам переход назад не должен ложиться в историю
+        self.hyper_history.pop();
+        ok
+    }
 }

@@ -32,6 +32,8 @@ enum Event {
     Speed(u32),
     /// Ответ на диалог модели: число (кнопка) или строка (InputBox).
     Dialog { answer: String },
+    /// Гипербаза: предыдущая страница.
+    HyperBack,
     Mouse { window: String, msg: u32, x: f64, y: f64, keys: u32 },
     Key { msg: u32, vk: u32 },
     /// Действие в контроле окна модели: код уведомления и новое значение.
@@ -469,6 +471,9 @@ fn apply_event(s: &mut Shared, ev: Event) {
             Err(e) => s.error = Some(e.to_string()),
         },
         Event::Speed(fps) => s.fps = fps.clamp(1, 1000),
+        Event::HyperBack => {
+            s.sim.effects.gfx.hyper_back();
+        }
         Event::Dialog { answer } => {
             if let Some(req) = s.dialog.take() {
                 let v = match req.kind {
@@ -495,6 +500,13 @@ fn apply_event(s: &mut Shared, ev: Event) {
                 let (sx, sy) = ((x + ox) / k, (y + oy) / k);
                 if let Err(e) = s.sim.mouse(space, msg, sx, sy, keys) {
                     s.error = Some(e.message);
+                }
+                // гипербаза: щелчок по объекту со ссылкой «открыть окно»
+                if msg == 514 {
+                    let jump = s.sim.effects.gfx.space(space).and_then(|sp| sp.object_at(sx, sy).and_then(|h| sp.objects.get(&h)).and_then(|o| o.hyper.clone()));
+                    if let Some((0, target, win)) = jump {
+                        s.sim.effects.gfx.hyper_jump(&win, &target);
+                    }
                 }
             }
         }
@@ -676,6 +688,7 @@ fn parse_event(query: &str) -> Option<Event> {
         "back" => Event::Back,
         "speed" => Event::Speed(num("fps")? as u32),
         "dialog" => Event::Dialog { answer: param(query, "answer").map(url_decode).unwrap_or_default() },
+        "hyperback" => Event::HyperBack,
         "mouse" => Event::Mouse {
             window: url_decode(param(query, "win")?),
             msg: num("msg")? as u32,
@@ -789,11 +802,12 @@ fn frame_json(shared: &Arc<Mutex<Shared>>) -> String {
         None => "null".into(),
     };
     format!(
-        "{{\"tick\":{},\"running\":{},\"stopped\":{},\"canBack\":{},\"halt\":{},\"dialog\":{},\"windows\":[{}],\"sounds\":[{}],\"log\":[{}]}}",
+        "{{\"tick\":{},\"running\":{},\"stopped\":{},\"canBack\":{},\"canHyperBack\":{},\"halt\":{},\"dialog\":{},\"windows\":[{}],\"sounds\":[{}],\"log\":[{}]}}",
         s.sim.tick_number(),
         s.running,
         s.sim.stopped,
         !s.past.is_empty(),
+        !s.sim.effects.gfx.hyper_history.is_empty(),
         halt,
         dialog,
         windows.join(","),

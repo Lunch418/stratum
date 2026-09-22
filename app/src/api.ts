@@ -24,7 +24,7 @@ export interface Halt { kind: 'error' | 'breakpoint' | 'warning'; message: strin
 export interface Breakpoint { id: number; index: number | null; path: string; class: string; expr: string; enabled: boolean }
 export interface ModelDialog { kind: 'message' | 'input' | 'open' | 'save' | 'folder' | 'color'; title: string; text: string; style: number; default: string }
 export interface Frame {
-  tick: number; running: boolean; stopped: boolean; canBack: boolean; halt: Halt | null; dialog: ModelDialog | null;
+  tick: number; running: boolean; stopped: boolean; canBack: boolean; canHyperBack?: boolean; halt: Halt | null; dialog: ModelDialog | null;
   windows: { id: number; name: string; w: number; h: number; size?: string; style?: string; svg: string; controls: Control[] }[];
   sounds: { cmd: 'play' | 'stop'; file: string; loop: boolean }[];
   log: string[];

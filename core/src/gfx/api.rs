@@ -42,6 +42,7 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
             let class = s(args, 1);
             let sp = gfx.open_window(&window);
             if !class.is_empty() {
+                gfx.hyper_current.insert(window.clone(), class.clone());
                 if let Some(pic) = gfx.pictures.get(&class.to_lowercase()).cloned() {
                     gfx.space_mut(sp).unwrap().load(&pic);
                     gfx.resolve_dibs(sp);
@@ -566,7 +567,18 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
             let dib = h(args, 2);
             ok(gfx.space_mut(h(args, 0)).and_then(|sp| sp.brushes.get_mut(&h(args, 1))).map(|b| b.dib = dib).is_some())
         }
-        "setbkbrush2d" | "getbkbrush2d" | "setcrdsystem2d" | "setrgncreatemode" | "setlinearrows2d" | "setpoints2d" | "sethyperjump2d" => ok(gfx.space(h(args, 0)).is_some()),
+        "setbkbrush2d" | "getbkbrush2d" | "setcrdsystem2d" | "setrgncreatemode" | "setlinearrows2d" | "setpoints2d" => ok(gfx.space(h(args, 0)).is_some()),
+        // гиперссылка объекта: mode (-1 снять, 0 окно, 3 ничего), target, window
+        "sethyperjump2d" => {
+            let (mode, target, window) = (f(args, 2) as i32, s(args, 3), s(args, 4));
+            ok(object_mut(gfx, args).map(|o| {
+                if mode < 0 { o.hyper = None; } else {
+                    let (t0, w0) = o.hyper.clone().map(|h| (h.1, h.2)).unwrap_or_default();
+                    o.hyper = Some((mode, if args.len() > 3 { target } else { t0 }, if args.len() > 4 { window } else { w0 }));
+                }
+            }).is_some())
+        }
+        "gethyperjump2d" => num(object(gfx, args).and_then(|o| o.hyper.as_ref()).map(|h| h.0 as f64).unwrap_or(-1.0)),
         "setspacelayers2d" => {
             let mask = f(args, 1) as i64 as u32;
             ok(gfx.space_mut(h(args, 0)).map(|sp| sp.layers = mask).is_some())

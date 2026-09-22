@@ -58,6 +58,7 @@ export function ModelView() {
 
   if (!frame?.windows.length) return <div className="model"><div className="muted" style={{ color: '#eee' }}>Модель не открыла окон — нажмите Пуск или Шаг.</div>{frame?.dialog && <ModelDialogBox d={frame.dialog} />}</div>;
   return <>
+    {frame.canHyperBack && <button className="small hyper-back" onClick={() => api.event('type=hyperback')} title="Гипербаза: предыдущая страница">‹ Назад</button>}
     <div className="model" ref={host} tabIndex={0} title="Alt+щелчок — свойства объекта в инспекторе"
       onKeyDown={e => { e.preventDefault(); api.event(`type=key&msg=256&vk=${e.keyCode}`); }}
       onKeyUp={e => api.event(`type=key&msg=257&vk=${e.keyCode}`)} />

@@ -355,3 +355,5 @@ button.attention { border-color: var(--state-pause); }
 .icon-grid { display: grid; grid-template-columns: repeat(auto-fill, 36px); gap: 4px; max-height: 320px; overflow: auto; padding: 4px; border: 1px solid var(--border); border-radius: 6px; }
 .icon-grid .icon-cell { width: 32px; height: 32px; border: 1px solid transparent; border-radius: 4px; cursor: pointer; background-color: #fff; background-repeat: no-repeat; }
 .icon-grid .icon-cell:hover { border-color: var(--accent); }
+
+.hyper-back { position: absolute; z-index: 5; margin: 8px; }
