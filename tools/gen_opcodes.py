@@ -43,5 +43,14 @@ out = ['// Сгенерировано tools/gen_opcodes.py из docs/lang/builti
 for name, args, opt, ret, op in rows:
     out.append(f'    ({json.dumps(name, ensure_ascii=False)}, "{args}", "{opt}", \'{ret}\', {op}),')
 out.append('];')
+out.append('')
+out.append('/// Старые имена функций → нынешние (docs/lang/aliases.json, найдены')
+out.append('/// `stratum bytecode --aliases` по байт-коду корпуса).')
+out.append('pub static ALIASES: &[(&str, &str)] = &[')
+aliases_path = ROOT / 'docs/lang/aliases.json'
+if aliases_path.exists():
+    for old, new in sorted(json.loads(aliases_path.read_text(encoding='utf-8')).items()):
+        out.append(f'    ({json.dumps(old.lower(), ensure_ascii=False)}, {json.dumps(new.lower(), ensure_ascii=False)}),')
+out.append('];')
 (ROOT / 'core/src/lang/opcodes.rs').write_text('\n'.join(out) + '\n', encoding='utf-8')
 print(len(rows), 'перегрузок')

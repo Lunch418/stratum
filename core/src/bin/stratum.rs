@@ -480,6 +480,7 @@ fn cmd_bytecode(args: &[String]) -> Result<(), String> {
     let mut dir = None;
     let mut show = 0usize;
     let mut filter = String::new();
+    let mut aliases = false;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
@@ -487,6 +488,7 @@ fn cmd_bytecode(args: &[String]) -> Result<(), String> {
                 i += 1;
                 show = args.get(i).and_then(|v| v.parse().ok()).unwrap_or(5);
             }
+            "--aliases" => aliases = true,
             "--only" => {
                 i += 1;
                 filter = args.get(i).cloned().unwrap_or_default();
@@ -521,6 +523,8 @@ fn cmd_bytecode(args: &[String]) -> Result<(), String> {
         }
     }
     let (mut same, mut differ, mut failed, mut skipped, mut shown) = (0, 0, 0, 0, 0);
+    // старое имя → найденные для него коды операций
+    let mut votes: std::collections::BTreeMap<String, std::collections::BTreeMap<u16, usize>> = Default::default();
     let mut reasons: std::collections::BTreeMap<String, usize> = Default::default();
     let mut seen = std::collections::HashSet::new();
     for f in &files {
@@ -549,7 +553,7 @@ fn cmd_bytecode(args: &[String]) -> Result<(), String> {
         };
         let constants = |n: &str| stratum_core::runtime::constants::lookup(n);
         let functions = |n: &str| image_functions.get(&lang::fold(n)).cloned();
-        let env = |fold_minus| Env { constant: &constants, function: &functions, fold_minus };
+        let env = |fold_minus| Env { constant: &constants, function: &functions, fold_minus, placeholders: false };
         // сворачивание `-число` в корпусе встречается в обоих вариантах
         let result = compile(&model, &known, &env(true)).and_then(|a| {
             if a.code == original {
@@ -574,6 +578,23 @@ fn cmd_bytecode(args: &[String]) -> Result<(), String> {
             }
             Err(e) => {
                 failed += 1;
+                if aliases {
+                    let probe = Env { constant: &constants, function: &functions, fold_minus: true, placeholders: true };
+                    for fold in [true, false] {
+                        let Ok(c) = compile(&model, &known, &Env { fold_minus: fold, ..probe }) else { break };
+                        if c.code.len() != original.len() {
+                            continue;
+                        }
+                        let slots: Vec<usize> = c.code.iter().enumerate().filter(|(_, w)| **w == 0xFFFF).map(|(i, _)| i).collect();
+                        let rest_same = c.code.iter().zip(&original).enumerate().all(|(i, (a, b))| a == b || slots.contains(&i));
+                        if rest_same && slots.len() == c.unknown.len() {
+                            for (at, name) in slots.iter().zip(&c.unknown) {
+                                *votes.entry(lang::fold(name)).or_default().entry(original[*at]).or_default() += 1;
+                            }
+                            break;
+                        }
+                    }
+                }
                 *reasons.entry(e.message.split(':').next().unwrap_or("").to_string() + ": " + e.message.split(':').nth(1).unwrap_or("").trim()).or_default() += 1;
                 if shown < show && filter.len() > 0 {
                     shown += 1;
@@ -581,6 +602,19 @@ fn cmd_bytecode(args: &[String]) -> Result<(), String> {
                 }
             }
         }
+    }
+    if aliases {
+        // код операции → нынешнее имя функции
+        let names = stratum_core::lang::compile::function_names();
+        let mut found = Vec::new();
+        for (old, codes) in &votes {
+            let (code, _) = codes.iter().max_by_key(|(_, n)| **n).unwrap();
+            match names.get(code) {
+                Some(new) => found.push(format!("  {:?}: {:?}", old, new)),
+                None => println!("старое имя {old}: код {code} не найден в таблице"),
+            }
+        }
+        println!("{{\n{}\n}}", found.join(",\n"));
     }
     let total = same + differ + failed;
     println!("совпало слово в слово: {same} из {total}; расходится: {differ}; не скомпилировано: {failed}; без байт-кода: {skipped}");

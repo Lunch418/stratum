@@ -435,7 +435,7 @@ pub fn compile_classes(project: &LoadedProject) -> Vec<Class> {
         .collect();
     let constant = |n: &str| crate::runtime::constants::lookup(n);
     let function = |n: &str| functions.get(&crate::lang::fold(n)).cloned();
-    let env = Env { constant: &constant, function: &function, fold_minus: true };
+    let env = Env { constant: &constant, function: &function, fold_minus: true, placeholders: false };
     project.classes[..project.own_classes]
         .iter()
         .map(|cls| {

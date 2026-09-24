@@ -1,0 +1,11 @@
+{
+  "create3dview": "create3dview2d",
+  "getobjectsize2dx": "getobjectwidth2d",
+  "getobjectsize2dy": "getobjectheight2d",
+  "getschemeobject": "gethobjectbyname",
+  "getspaceorgx": "getspaceorg2dx",
+  "getspaceorgy": "getspaceorg2dy",
+  "setbitmapsrcrect": "setbitmapsrcrect2d",
+  "setlogstring2d": "setstring2d",
+  "videocompressdialog": "videodialog"
+}

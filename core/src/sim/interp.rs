@@ -263,6 +263,9 @@ impl Interpreter {
                 binary(*op, a, b)
             }
             Expr::Call(name, args) => {
+                // старые имена функций (GetObjectSize2dy…) — как нынешние
+                let canonical = crate::lang::compile::alias(&crate::lang::fold(name));
+                let name: &str = canonical.unwrap_or(name);
                 let mut values = Vec::with_capacity(args.len());
                 for a in args {
                     values.push(self.eval_in(a, vars, phase)?);

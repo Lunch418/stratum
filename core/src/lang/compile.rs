@@ -68,6 +68,8 @@ pub struct CompileError {
 pub struct Compiled {
     pub code: Vec<u16>,
     pub vars: Vec<(String, Ty)>,
+    /// Имена неизвестных функций в порядке заглушек (режим `placeholders`).
+    pub unknown: Vec<String>,
 }
 
 type Function = (&'static str, &'static str, &'static str, char, u16);
@@ -84,6 +86,9 @@ pub struct Env<'a> {
     pub constant: &'a dyn Fn(&str) -> Option<f64>,
     pub function: &'a dyn Fn(&str) -> Option<ImageFunction>,
     pub fold_minus: bool,
+    /// Для поиска старых имён функций: неизвестная функция компилируется
+    /// как заглушка `0xFFFF` вместо ошибки (см. `stratum bytecode --aliases`).
+    pub placeholders: bool,
 }
 
 impl Ty {
@@ -112,6 +117,8 @@ struct Compiler<'a> {
     /// скомпилированные и так, и так (видимо, настройка оптимизации среды);
     /// на результат вычислений это не влияет.
     fold_minus: bool,
+    placeholders: bool,
+    unknown: Vec<String>,
     /// Для `break`: адреса переходов, которые надо дописать концом цикла.
     breaks: Vec<Vec<usize>>,
     constant: &'a dyn Fn(&str) -> Option<f64>,
@@ -129,6 +136,8 @@ pub fn compile(model: &Model, known: &[(String, Ty)], env: &Env) -> Result<Compi
         function: model.is_function,
         new_phase: false,
         fold_minus: env.fold_minus,
+        placeholders: env.placeholders,
+        unknown: Vec::new(),
         breaks: Vec::new(),
         constant: env.constant,
         function_of: env.function,
@@ -141,7 +150,7 @@ pub fn compile(model: &Model, known: &[(String, Ty)], env: &Env) -> Result<Compi
     }
     c.block(&model.body)?;
     c.code.push(0);
-    Ok(Compiled { code: c.code, vars: c.vars })
+    Ok(Compiled { code: c.code, vars: c.vars, unknown: c.unknown })
 }
 
 impl Compiler<'_> {
@@ -410,6 +419,17 @@ impl Compiler<'_> {
             if let Some(f) = (self.function_of)(name) {
                 return self.call_image(name, args, &f);
             }
+            if let Some(canonical) = alias(&lower) {
+                return self.call(canonical, args);
+            }
+            if self.placeholders {
+                for a in args {
+                    self.expr(a)?;
+                }
+                self.emit(0xFFFF);
+                self.unknown.push(name.to_string());
+                return Ok(Ty::Float);
+            }
             return self.err(format!("неизвестная функция {name}"));
         }
         // типы аргументов узнаём, компилируя их во временный буфер
@@ -549,4 +569,23 @@ pub fn image_function(cls: &crate::formats::Class, model: &Model) -> ImageFuncti
             .unwrap_or(Ty::Float)
     });
     ImageFunction { params, ret }
+}
+
+/// Старые имена функций из прежних версий Stratum → нынешние. Найдены
+/// сопоставлением текстов корпуса с байт-кодом оригинала
+/// (`stratum bytecode --aliases`): оригинал исполняет такие имиджи по
+/// сохранённому байт-коду, а новый компилятор этих имён уже не знает.
+pub fn alias(lower: &str) -> Option<&'static str> {
+    super::opcodes::ALIASES.iter().find(|(old, _)| *old == lower).map(|(_, new)| *new)
+}
+
+/// Код операции → имя функции (первое в таблице) — для поиска старых имён.
+pub fn function_names() -> std::collections::HashMap<u16, &'static str> {
+    let mut m = std::collections::HashMap::new();
+    for f in FUNCTIONS {
+        if f.4 != 479 {
+            m.entry(f.4).or_insert(f.0);
+        }
+    }
+    m
 }

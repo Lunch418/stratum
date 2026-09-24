@@ -1045,3 +1045,17 @@ pub static FUNCTIONS: &[(&str, &str, &str, char, u16)] = &[
     ("unregisternetobject", "S", "", 'F', 479),
     ("urlloadfile", "SSF", "", 'F', 479),
 ];
+
+/// Старые имена функций → нынешние (docs/lang/aliases.json, найдены
+/// `stratum bytecode --aliases` по байт-коду корпуса).
+pub static ALIASES: &[(&str, &str)] = &[
+    ("create3dview", "create3dview2d"),
+    ("getobjectsize2dx", "getobjectwidth2d"),
+    ("getobjectsize2dy", "getobjectheight2d"),
+    ("getschemeobject", "gethobjectbyname"),
+    ("getspaceorgx", "getspaceorg2dx"),
+    ("getspaceorgy", "getspaceorg2dy"),
+    ("setbitmapsrcrect", "setbitmapsrcrect2d"),
+    ("setlogstring2d", "setstring2d"),
+    ("videocompressdialog", "videodialog"),
+];
