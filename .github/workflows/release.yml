@@ -83,7 +83,7 @@ jobs:
           dir=$(mktemp -d)
           dpkg-deb -x app/src-tauri/target/release/bundle/deb/*.deb "$dir"
           WEBKIT_DISABLE_DMABUF_RENDERER=1 xvfb-run -a tools/smoke_desktop.sh "$dir/usr/bin/stratum-modern"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: stratum-modern-${{ matrix.name }}
           path: ${{ matrix.out }}
