@@ -765,6 +765,14 @@ impl Space {
                 }
                 None
             }
+            // ломаная ловит точку в пределах 2 единиц от отрезков, а внутри —
+            // только с заливкой; габарит не в счёт (сверено в Wine,
+            // tools/verify/hittest.txt)
+            Shape::Polyline { brush, points, .. } if !points.is_empty() => {
+                let near = points.windows(2).any(|s| segment_distance((x, y), s[0], s[1]) <= 2.0)
+                    || (points.len() == 1 && segment_distance((x, y), points[0], points[0]) <= 2.0);
+                (near || (*brush != 0 && inside_polygon((x, y), points))).then_some(h)
+            }
             _ => {
                 let pad = 2.0;
                 (x >= obj.x - pad && x <= obj.x + obj.w + pad && y >= obj.y - pad && y <= obj.y + obj.h + pad)
@@ -780,6 +788,28 @@ impl Space {
     pub fn to_bottom(&mut self, h: Handle) {
         self.z_move(h, 0);
     }
+}
+
+/// Расстояние от точки до отрезка.
+fn segment_distance(p: (f64, f64), a: (f64, f64), b: (f64, f64)) -> f64 {
+    let (dx, dy) = (b.0 - a.0, b.1 - a.1);
+    let len2 = dx * dx + dy * dy;
+    let t = if len2 > 0.0 { (((p.0 - a.0) * dx + (p.1 - a.1) * dy) / len2).clamp(0.0, 1.0) } else { 0.0 };
+    let (cx, cy) = (a.0 + t * dx, a.1 + t * dy);
+    ((p.0 - cx).powi(2) + (p.1 - cy).powi(2)).sqrt()
+}
+
+/// Точка внутри многоугольника (правило чёт-нечет, как заливка GDI ALTERNATE).
+fn inside_polygon(p: (f64, f64), pts: &[(f64, f64)]) -> bool {
+    let mut inside = false;
+    let n = pts.len();
+    for i in 0..n {
+        let (a, b) = (pts[i], pts[(i + n - 1) % n]);
+        if (a.1 > p.1) != (b.1 > p.1) && p.0 < (b.0 - a.0) * (p.1 - a.1) / (b.1 - a.1) + a.0 {
+            inside = !inside;
+        }
+    }
+    inside
 }
 
 /// Размеры растра из заголовка BMP.

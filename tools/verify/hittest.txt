@@ -1,0 +1,47 @@
+# Попадание точки в объект (GetObjectFromPoint2d): линия, её окрестность,
+# замкнутая ломаная без заливки и с заливкой, габарит, группа, Z-порядок.
+@ fixtures/PROJECTS/samples/BALLS WorkSpace
+% Wait = 1
+! hs := OpenSchemeWindow("W1", "WorkSpace", "")
+! hp := CreatePen2d(~hs, 0, 1, Rgb(0,0,0), 13)
+! hb := CreateBrush2d(~hs, 0, 0, Rgb(255,0,0), #0, 13)
+# отрезок (100,100)-(200,100)
+! ln := CreatePolyLine2d(~hs, ~hp, #0, 100, 100, 200, 100)
+# замкнутый треугольник без заливки
+! tr := CreatePolyLine2d(~hs, ~hp, #0, 300, 100, 400, 100, 350, 200, 300, 100)
+# такой же с заливкой
+! tf := CreatePolyLine2d(~hs, ~hp, ~hb, 500, 100, 600, 100, 550, 200, 500, 100)
+# два пересекающихся отрезка в группе
+! g1 := CreatePolyLine2d(~hs, ~hp, #0, 100, 300, 200, 300)
+! g2 := CreatePolyLine2d(~hs, ~hp, #0, 150, 250, 150, 350)
+! gg := CreateGroup2d(~hs, ~g1, ~g2)
+# два перекрывающихся залитых квадрата: верхний создан позже
+! q1 := CreatePolyLine2d(~hs, ~hp, ~hb, 300, 300, 400, 300, 400, 400, 300, 400, 300, 300)
+! q2 := CreatePolyLine2d(~hs, ~hp, ~hb, 350, 350, 450, 350, 450, 450, 350, 450, 350, 350)
+ln | Float(ln)
+tr | Float(tr)
+tf | Float(tf)
+g1 | Float(g1)
+g2 | Float(g2)
+gg | Float(gg)
+q1 | Float(q1)
+q2 | Float(q2)
+on_line | Float(GetObjectFromPoint2d(hs, 150, 100))
+near1 | Float(GetObjectFromPoint2d(hs, 150, 101))
+near2 | Float(GetObjectFromPoint2d(hs, 150, 102))
+near3 | Float(GetObjectFromPoint2d(hs, 150, 103))
+near5 | Float(GetObjectFromPoint2d(hs, 150, 105))
+end_before | Float(GetObjectFromPoint2d(hs, 98, 100))
+end_after | Float(GetObjectFromPoint2d(hs, 203, 100))
+tri_inside | Float(GetObjectFromPoint2d(hs, 350, 130))
+tri_edge | Float(GetObjectFromPoint2d(hs, 350, 100))
+tri_bbox | Float(GetObjectFromPoint2d(hs, 310, 190))
+fill_inside | Float(GetObjectFromPoint2d(hs, 550, 130))
+fill_bbox | Float(GetObjectFromPoint2d(hs, 510, 190))
+grp_cross | Float(GetObjectFromPoint2d(hs, 150, 300))
+grp_arm | Float(GetObjectFromPoint2d(hs, 120, 300))
+grp_bbox | Float(GetObjectFromPoint2d(hs, 120, 270))
+sq_both | Float(GetObjectFromPoint2d(hs, 375, 375))
+sq_low | Float(GetObjectFromPoint2d(hs, 320, 320))
+sq_edge | Float(GetObjectFromPoint2d(hs, 400, 320))
+empty | Float(GetObjectFromPoint2d(hs, 700, 700))

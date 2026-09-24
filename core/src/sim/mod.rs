@@ -1152,8 +1152,11 @@ impl Vars for Frame<'_> {
                 let var = arg(1).to_lowercase();
                 let value = args.get(2).cloned().unwrap_or(Value::Float(0.0));
                 match self.sim.instances[target].vars.get(&var).copied() {
+                    // SetVar пишет и текущее, и «старое» значение: следующие
+                    // имиджи видят его без тильды (сверено в Wine)
                     Some(c) => {
                         self.sim.cells[c] = value.cast_to(self.sim.types[c]);
+                        self.sim.old[c] = self.sim.cells[c].clone();
                         Value::Float(1.0)
                     }
                     None => Value::Float(0.0),
