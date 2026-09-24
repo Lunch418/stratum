@@ -214,12 +214,27 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
             let count = f(args, 2).max(0.0) as usize;
             Value::Str(text.iter().skip(from).take(count).collect())
         }
+        // n-е вхождение, позиция с нуля; сверено с оригиналом через Wine
+        // (tools/verify/strings.txt): третье «Computer» — 18, а не 19, как в
+        // примере справки
         "pos" => {
             let (haystack, needle) = (s(args, 0), s(args, 1));
-            num(match haystack.find(&needle) {
-                Some(byte) => haystack[..byte].chars().count() as f64,
-                None => -1.0,
-            })
+            let n = if args.len() > 2 { f(args, 2).max(1.0) as usize } else { 1 };
+            let mut from = 0;
+            let mut found = None;
+            for _ in 0..n {
+                match haystack[from..].find(&needle) {
+                    Some(at) if !needle.is_empty() => {
+                        found = Some(from + at);
+                        from += at + needle.len();
+                    }
+                    _ => {
+                        found = None;
+                        break;
+                    }
+                }
+            }
+            num(found.map(|b| haystack[..b].chars().count() as f64).unwrap_or(-1.0))
         }
         "addslash" => {
             let mut p = s(args, 0);

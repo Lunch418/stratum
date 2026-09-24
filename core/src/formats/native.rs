@@ -395,6 +395,7 @@ fn load_class(dir: &Path, stem: &str) -> std::io::Result<Result<Class, FormatErr
         image: read_opt("image.vdr")?,
         scheme: read_opt("scheme.vdr")?,
         bytecode: None,
+        bytecode_text: None,
         sheet: j.get("sheet").map(sheet_from),
         equations: read_opt("eq.bin")?,
         timestamp: j.get("timestamp").and_then(Json::as_f64).map(|t| t as u32),
@@ -409,10 +410,57 @@ pub fn export_stratum2000(dir: &Path, project: &LoadedProject) -> std::io::Resul
     if let Some(state) = &project.state {
         std::fs::write(dir.join("_preload.stt"), super::project::write_state(state))?;
     }
-    for (cls, stem) in project.classes[..project.own_classes].iter().zip(unique_stems(project, "")) {
+    let compiled = compile_classes(project);
+    for (cls, stem) in compiled.iter().zip(unique_stems(project, "")) {
         std::fs::write(dir.join(format!("{stem}.cls")), super::cls::write(cls))?;
     }
     Ok(())
+}
+
+/// Собственные имиджи проекта с байт-кодом для Stratum 2000: оригинал
+/// исполняет байт-код, а не текст. Байт-код, прочитанный из `.cls`,
+/// сохраняется, если текст с тех пор не менялся (в корпусе есть имиджи со
+/// старыми именами функций, которые текущий компилятор не знает). Новые
+/// переменные из текста дописываются в таблицу: оригинал адресует их по
+/// индексам. Имидж, который не компилируется, пишется без байт-кода.
+pub fn compile_classes(project: &LoadedProject) -> Vec<Class> {
+    use crate::lang::compile::{compile, image_function, Env, ImageFunction, Ty};
+    let functions: std::collections::HashMap<String, ImageFunction> = project
+        .classes
+        .iter()
+        .filter_map(|c| {
+            let m = crate::lang::parse(&c.text).ok()?;
+            m.is_function.then(|| (crate::lang::fold(&c.name), image_function(c, &m)))
+        })
+        .collect();
+    let constant = |n: &str| crate::runtime::constants::lookup(n);
+    let function = |n: &str| functions.get(&crate::lang::fold(n)).cloned();
+    let env = Env { constant: &constant, function: &function, fold_minus: true };
+    project.classes[..project.own_classes]
+        .iter()
+        .map(|cls| {
+            let mut out = cls.clone();
+            if cls.bytecode.is_some() && cls.bytecode_text.as_deref() == Some(cls.text.as_str()) {
+                return out;
+            }
+            let Ok(model) = crate::lang::parse(&cls.text) else {
+                out.bytecode = None;
+                return out;
+            };
+            let known: Vec<(String, Ty)> = cls.vars.iter().map(|v| (v.name.clone(), Ty::from_name(&v.var_type))).collect();
+            match compile(&model, &known, &env) {
+                Ok(c) => {
+                    for (name, ty) in &c.vars[known.len()..] {
+                        out.vars.push(Variable { name: name.clone(), description: String::new(), default: String::new(), var_type: ty.name().into(), flags: 0x20000 });
+                    }
+                    out.bytecode = Some(c.code.iter().flat_map(|w| w.to_le_bytes()).collect());
+                    out.bytecode_text = Some(cls.text.clone());
+                }
+                Err(_) => out.bytecode = None,
+            }
+            out
+        })
+        .collect()
 }
 
 pub fn link_style_json(st: &LinkStyle) -> Json {

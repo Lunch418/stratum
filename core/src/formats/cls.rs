@@ -150,8 +150,11 @@ pub struct Class {
     pub icon: Option<Vec<u8>>,
     pub image: Option<Vec<u8>>,
     pub scheme: Option<Vec<u8>>,
-    /// Скомпилированный оригиналом байт-код; мы компилируем текст заново.
+    /// Байт-код текста (секция 0x0d) — его и исполняет Stratum 2000.
     pub bytecode: Option<Vec<u8>>,
+    /// Текст, из которого получен `bytecode`: если текст с тех пор не
+    /// менялся, при экспорте байт-код оригинала сохраняется как есть.
+    pub bytecode_text: Option<String>,
     /// Уравнения библиотек электрических цепей; структура пока не разобрана.
     pub equations: Option<Vec<u8>>,
     pub timestamp: Option<u32>,
@@ -268,6 +271,7 @@ fn read_section(
         section::BYTECODE => {
             let words = r.u32()? as usize;
             cls.bytecode = Some(r.bytes(words * 2)?);
+            cls.bytecode_text = Some(cls.text.clone());
         }
         section::EQUATIONS => {
             // секция всегда последняя в теле; за ней может идти отметка времени
@@ -367,6 +371,11 @@ pub fn write(cls: &Class) -> Vec<u8> {
             w.u32(body.len() as u32 + 4);
             w.bytes(body);
         }
+    }
+    if let Some(code) = &cls.bytecode {
+        begin(&mut w, section::BYTECODE, false);
+        w.u32((code.len() / 2) as u32);
+        w.bytes(code);
     }
     if let Some(file) = &cls.icon_file {
         begin(&mut w, section::ICON_FILE, false);

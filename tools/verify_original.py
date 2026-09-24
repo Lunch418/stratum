@@ -64,7 +64,9 @@ def parse(path):
 
 def run_core(items, work):
     proj = work / 'core_project'
-    native_project(proj, model_text(items, 'C:/verify/out.txt'))
+    native_project(proj, model_text(items, r'C:\verify\out.txt'))
+    # диск C: модели ядро отображает в папку проекта — папка должна быть
+    (proj / 'verify').mkdir(exist_ok=True)
     subprocess.run([str(CORE), 'run', str(proj), '--ticks', '2'], capture_output=True, text=True)
     # диск C: модели ядро отображает в папку проекта
     return parse(proj / 'verify' / 'out.txt')
@@ -72,7 +74,7 @@ def run_core(items, work):
 
 def run_original(items, work, timeout=60):
     src = work / 'orig_native'
-    native_project(src, model_text(items, 'C:/verify/out.txt'))
+    native_project(src, model_text(items, r'C:\verify\out.txt'))
     if WORK.exists():
         shutil.rmtree(WORK)
     r = subprocess.run([str(CORE), 'convert', str(src), str(WORK), '--to', 'stratum2000'], capture_output=True, text=True)
