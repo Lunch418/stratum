@@ -155,12 +155,15 @@ fn load_classes(dir: &Path, out: &mut Vec<Class>) -> std::io::Result<std::result
     Ok(Ok(()))
 }
 
-/// Папки библиотек по умолчанию: `STRATUM_LIBRARY` (список через `:`),
-/// иначе `fixtures/library` и `fixtures/add.lib` рядом с исполняемым файлом
-/// или в текущем каталоге, иначе установленный Stratum в Wine.
+/// Папки библиотек по умолчанию: `STRATUM_LIBRARY` (список, как в PATH:
+/// через `:`, на Windows через `;`), иначе `fixtures/library` и
+/// `fixtures/add.lib` в текущем каталоге или выше, иначе установленный
+/// Stratum — в Wine или в Program Files.
 pub fn default_library_dirs() -> Vec<PathBuf> {
-    if let Ok(env) = std::env::var("STRATUM_LIBRARY") {
-        return env.split(':').filter(|s| !s.is_empty()).map(PathBuf::from).collect();
+    // список папок в STRATUM_LIBRARY — в формате PATH своей системы
+    // (на Windows разделитель «;», пути вида C:\…)
+    if let Some(env) = std::env::var_os("STRATUM_LIBRARY") {
+        return std::env::split_paths(&env).filter(|p| !p.as_os_str().is_empty()).collect();
     }
     let mut candidates = Vec::new();
     for base in [Path::new("."), Path::new(".."), Path::new("../..")] {
@@ -168,10 +171,27 @@ pub fn default_library_dirs() -> Vec<PathBuf> {
             candidates.push(base.join(sub));
         }
     }
+    // установленный Stratum 2000: под Wine или прямо в Program Files
+    let mut installs = Vec::new();
     if let Some(home) = std::env::var_os("HOME") {
-        let wine = Path::new(&home).join(".wine32/drive_c/Program Files/Stratum");
-        candidates.push(wine.join("library"));
-        candidates.push(wine.join("add.lib"));
+        installs.push(Path::new(&home).join(".wine32/drive_c/Program Files/Stratum"));
+    }
+    for var in ["ProgramFiles(x86)", "ProgramFiles", "ProgramW6432"] {
+        if let Some(dir) = std::env::var_os(var) {
+            installs.push(Path::new(&dir).join("Stratum"));
+        }
+    }
+    if cfg!(windows) {
+        installs.push(PathBuf::from(r"C:\Program Files (x86)\Stratum"));
+        installs.push(PathBuf::from(r"C:\Program Files\Stratum"));
+    }
+    for dir in installs {
+        for sub in ["library", "add.lib"] {
+            let p = dir.join(sub);
+            if !candidates.contains(&p) {
+                candidates.push(p);
+            }
+        }
     }
     candidates.into_iter().filter(|p| p.is_dir()).collect()
 }

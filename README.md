@@ -126,8 +126,9 @@ stratum-modern ~/stratum/solar_system           # сразу открыть пр
 
 Библиотека и примеры оригинала в пакет не входят. Библиотечные имиджи
 (`LGSpace`, `NumberView`…) ищутся в `$STRATUM_LIBRARY` (несколько папок через
-`:`), затем в `fixtures/library` рядом с текущей папкой и в
-`~/.wine32/drive_c/Program Files/Stratum`.
+`:`, на Windows через `;`), затем в `fixtures/library` рядом с текущей папкой и
+в установленном Stratum: `~/.wine32/drive_c/Program Files/Stratum` или
+`Program Files (x86)\Stratum`, `Program Files\Stratum` на Windows.
 
 ### Сборка из исходников
 
