@@ -185,6 +185,10 @@ pub struct Space {
     pub scale: (f64, f64),
     pub client: (f64, f64),
     pub visible: bool,
+    /// Из чего открыто окно: имидж (`OpenSchemeWindow`) или файл `.vdr`
+    /// (`LoadSpaceWindow`) — для `GetWindowProp`.
+    pub source_class: String,
+    pub source_file: String,
     /// Маска видимых слоёв 0–31 (`SetSpaceLayers2d`, «Параметры листа → Слои»).
     pub layers: u32,
     /// Размер окна из «Параметров листа»: "max" — на всю вкладку.
@@ -210,6 +214,7 @@ impl Space {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn alloc(&mut self) -> Handle {
         let h = self.next;
         self.next += 1;
@@ -335,7 +340,7 @@ impl Space {
         for d in &pic.dibs {
             let dib = Dib::new(d.bmp.clone(), d.mask.clone(), d.file.clone());
             if d.double {
-                let h = self.alloc();
+                let h = lowest_free(&self.dibs).max(pic.dibs.iter().filter(|x| !x.double).map(|x| x.handle as Handle + 1).max().unwrap_or(1));
                 double_map.insert(d.handle as Handle, h);
                 self.dibs.insert(h, dib);
             } else {
@@ -436,8 +441,24 @@ impl Space {
             .map(|o| o.handle)
     }
 
+    /// Объект с именем внутри группы (рекурсивно, в порядке детей).
+    pub fn find_in_group(&self, group: Handle, name: &str) -> Option<Handle> {
+        let Some(Object { shape: Shape::Group { children }, .. }) = self.objects.get(&group) else { return None };
+        for c in children {
+            if let Some(o) = self.objects.get(c) {
+                if crate::lang::same_name(&o.name, name) {
+                    return Some(*c);
+                }
+            }
+            if let Some(found) = self.find_in_group(*c, name) {
+                return Some(found);
+            }
+        }
+        None
+    }
+
     pub fn add_object(&mut self, mut obj: Object) -> Handle {
-        let h = self.alloc();
+        let h = lowest_free(&self.objects);
         obj.handle = h;
         self.objects.insert(h, obj);
         self.zorder.push(h);
@@ -445,37 +466,37 @@ impl Space {
     }
 
     pub fn add_pen(&mut self, pen: Pen) -> Handle {
-        let h = self.alloc();
+        let h = lowest_free(&self.pens);
         self.pens.insert(h, pen);
         h
     }
 
     pub fn add_brush(&mut self, brush: Brush) -> Handle {
-        let h = self.alloc();
+        let h = lowest_free(&self.brushes);
         self.brushes.insert(h, brush);
         h
     }
 
     pub fn add_font(&mut self, font: Font) -> Handle {
-        let h = self.alloc();
+        let h = lowest_free(&self.fonts);
         self.fonts.insert(h, font);
         h
     }
 
     pub fn add_string(&mut self, s: String) -> Handle {
-        let h = self.alloc();
+        let h = lowest_free(&self.strings);
         self.strings.insert(h, s);
         h
     }
 
     pub fn add_text(&mut self, parts: Vec<TextPart>) -> Handle {
-        let h = self.alloc();
+        let h = lowest_free(&self.texts);
         self.texts.insert(h, parts);
         h
     }
 
     pub fn add_dib(&mut self, dib: Dib) -> Handle {
-        let h = self.alloc();
+        let h = lowest_free(&self.dibs);
         self.dibs.insert(h, dib);
         h
     }
@@ -742,6 +763,12 @@ pub struct Gfx {
     /// ("max" | "min" | "fixed" | …), ширина и высота при "fixed", запрет
     /// изменения размера, видимые слои.
     pub sheets: BTreeMap<String, crate::formats::SheetOptions>,
+    /// Дети схемы каждого имиджа (handle, класс) — чтобы окно схемы
+    /// показывало рисунки дочерних имиджей на месте значков.
+    pub class_children: BTreeMap<String, Vec<(u16, String)>>,
+    /// Вид имиджа на схеме родителя (секция 0x0c): в окне схемы он
+    /// разворачивается на месте значка экземпляра.
+    pub scheme_pictures: BTreeMap<String, Picture>,
     /// История гиперпереходов: (окно, что было открыто) — для кнопки «назад».
     pub hyper_history: Vec<(String, String)>,
     /// Что открыто в каждом окне гипербазы (окно → цель).
@@ -939,4 +966,21 @@ impl Gfx {
         self.hyper_history.pop();
         ok
     }
+}
+
+/// Наименьший свободный дескриптор таблицы. У оригинала у объектов, перьев,
+/// кистей, шрифтов, строк, текстов и растров своя нумерация, и новый элемент
+/// получает наименьший свободный номер (сверено по снимку оригинала:
+/// перья рисунка «Солнечной системы» 19, 21, 41, 43…, строки 1, 2, 3).
+pub(crate) fn lowest_free<T>(table: &BTreeMap<Handle, T>) -> Handle {
+    let mut h: Handle = 1;
+    for &k in table.keys() {
+        if k > h {
+            break;
+        }
+        if k == h {
+            h += 1;
+        }
+    }
+    h
 }

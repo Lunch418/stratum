@@ -23,6 +23,8 @@ fn main() -> ExitCode {
         Some("play") => cmd_play(&args[1..]),
         Some("convert") => cmd_convert(&args[1..]),
         Some("bytecode") => cmd_bytecode(&args[1..]),
+        Some("instrument") => cmd_instrument(&args[1..]),
+        Some("sttdiff") => cmd_sttdiff(&args[1..]),
         Some("--help") | Some("-h") | None => {
             usage();
             Ok(())
@@ -624,4 +626,118 @@ fn cmd_bytecode(args: &[String]) -> Result<(), String> {
         println!("  {n:4}  {r}");
     }
     Ok(())
+}
+
+/// Подготовка примера к сверке траектории с оригиналом: в начало текста
+/// корневого имиджа добавляется счётчик тактов; в начале такта N+1 модель
+/// сохраняет своё состояние (`SaveObjectState`) и завершается (`Quit`).
+/// Остальные имиджи экспортируются с родным байт-кодом оригинала.
+///   stratum instrument проект папка --ticks 100 --state C:\\verify\\state.stt
+fn cmd_instrument(args: &[String]) -> Result<(), String> {
+    let mut paths = Vec::new();
+    let mut ticks = 100u32;
+    let mut state = String::from("C:\\verify\\state.stt");
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--ticks" => {
+                i += 1;
+                ticks = args.get(i).and_then(|v| v.parse().ok()).ok_or("--ticks: нужно число")?;
+            }
+            "--state" => {
+                i += 1;
+                state = args.get(i).cloned().ok_or("--state: нужен путь")?;
+            }
+            other => paths.push(PathBuf::from(other)),
+        }
+        i += 1;
+    }
+    let [src, dest] = paths.as_slice() else { return Err("нужно два пути: проект и папка назначения".into()) };
+    let mut loaded = formats::load_project(src, &formats::default_library_dirs()).map_err(|e| e.to_string())?.map_err(|e| e.to_string())?;
+    let root = loaded.project.root.clone();
+    let cls = loaded.classes[..loaded.own_classes].iter_mut().find(|c| lang::same_name(&c.name, &root)).ok_or("нет корневого имиджа среди имиджей проекта")?;
+    let probe = format!(
+        "__tick := __tick + 1\r\nif (__tick > {ticks})\r\n __r := SaveObjectState(\"\", \"{state}\")\r\n Quit(1)\r\nendif\r\n"
+    );
+    cls.text = probe + &cls.text;
+    for (name, ty) in [("__tick", "FLOAT"), ("__r", "FLOAT")] {
+        if !cls.vars.iter().any(|v| v.name == name) {
+            cls.vars.push(formats::Variable { name: name.into(), description: String::new(), default: String::new(), var_type: ty.into(), flags: 0x20000 });
+        }
+    }
+    formats::native::export_stratum2000(dest, &loaded).map_err(|e| e.to_string())?;
+    // без байт-кода корня оригинал не выполнит счётчик — проверяем
+    let data = std::fs::read(std::fs::read_dir(dest).map_err(|e| e.to_string())?.flatten().map(|e| e.path())
+        .find(|p| p.extension().is_some_and(|x| x.eq_ignore_ascii_case("cls")) && formats::cls::parse(&std::fs::read(p).unwrap_or_default(), "").is_ok_and(|c| lang::same_name(&c.name, &root)))
+        .ok_or("корневой имидж не записан")?).map_err(|e| e.to_string())?;
+    let written = formats::cls::parse(&data, "").map_err(|e| e.to_string())?;
+    if written.bytecode.is_none() {
+        return Err(format!("текст корневого имиджа {root} не компилируется — сверка невозможна"));
+    }
+    println!("подготовлено: {} имиджей, сохранение состояния на такте {} → {state}", loaded.own_classes, ticks);
+    Ok(())
+}
+
+/// Сравнение двух снимков .stt (оригинал и ядро): переменные по имиджам,
+/// числа — с относительным допуском.
+///   stratum sttdiff оригинал.stt ядро.stt [--tol 1e-9]
+fn cmd_sttdiff(args: &[String]) -> Result<(), String> {
+    let mut paths = Vec::new();
+    let mut tol = 1e-9f64;
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--tol" => {
+                i += 1;
+                tol = args.get(i).and_then(|v| v.parse().ok()).ok_or("--tol: нужно число")?;
+            }
+            other => paths.push(PathBuf::from(other)),
+        }
+        i += 1;
+    }
+    let [a, b] = paths.as_slice() else { return Err("нужно два файла .stt".into()) };
+    let read = |p: &PathBuf| -> Result<formats::State, String> {
+        let d = std::fs::read(p).map_err(|e| format!("{}: {e}", p.display()))?;
+        formats::project::parse_state(&d, &p.display().to_string()).map_err(|e| e.to_string())
+    };
+    let (orig, ours) = (read(a)?, read(b)?);
+    let key = |img: &formats::project::StateImage| (lang::fold(&img.class_name), img.handle);
+    let (mut same, mut differ, mut missing) = (0, 0, 0);
+    // типы переменных: дескрипторы считаем отдельно — их нумерация своя
+    let only_numbers = std::env::var_os("STT_SKIP").map(|v| v.to_string_lossy().to_string()).unwrap_or_default();
+    let mut worst: Vec<(f64, String)> = Vec::new();
+    for img in &orig.images {
+        let Some(other) = ours.images.iter().find(|o| key(o) == key(img)) else {
+            missing += 1;
+            continue;
+        };
+        for (name, value) in &img.vars {
+            let Some((_, v2)) = other.vars.iter().find(|(n, _)| lang::same_name(n, name)) else { continue };
+            if !only_numbers.is_empty() && only_numbers.split(',').any(|p| name.to_lowercase().starts_with(p) || name.to_lowercase().starts_with(&format!("_{p}"))) {
+                continue;
+            }
+            // дескрипторы ядро пишет как «#n», оригинал — числом
+            let (value, v2) = (&value.trim_start_matches('#').to_string(), &v2.trim_start_matches('#').to_string());
+            let eq = match (value.parse::<f64>(), v2.parse::<f64>()) {
+                (Ok(x), Ok(y)) => (x - y).abs() <= tol * x.abs().max(y.abs()).max(1.0),
+                _ => value == v2,
+            };
+            if eq {
+                same += 1;
+            } else {
+                differ += 1;
+                let d = match (value.parse::<f64>(), v2.parse::<f64>()) {
+                    (Ok(x), Ok(y)) => (x - y).abs() / x.abs().max(y.abs()).max(1e-300),
+                    _ => f64::INFINITY,
+                };
+                worst.push((d, format!("{}#{} {name}: оригинал {value}, ядро {v2}", img.class_name, img.handle)));
+            }
+        }
+    }
+    worst.sort_by(|x, y| y.0.partial_cmp(&x.0).unwrap_or(std::cmp::Ordering::Equal));
+    println!("переменных совпало: {same}; расходится: {differ}; имиджей оригинала без пары в ядре: {missing}");
+    for (_, w) in worst.iter().take(15) {
+        println!("  {w}");
+    }
+    if differ > 0 { Err("снимки расходятся".into()) } else { Ok(()) }
 }

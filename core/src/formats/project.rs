@@ -205,6 +205,57 @@ pub struct StateImage {
     pub vars: Vec<(String, String)>,
 }
 
+/// Редакция 0x3E8 — её пишет `SaveObjectState` оригинала. Сначала таблица
+/// «классов», куда входят и типы (`HANDLE`, `STRING`, `FLOAT`, `COLORREF` —
+/// у них ненулевой размер): имя, отметка времени, число переменных, число
+/// детей, размер; пары (handle ребёнка, номер класса); переменные (имя, номер
+/// типа в той же таблице). Затем маркер 0x3E9 и значения экземпляров в
+/// обходе дерева от корня: FLOAT — f64, STRING — строка, остальные — u32.
+fn parse_state_typed(r: &mut Reader, root: String) -> Result<State> {
+    struct Entry {
+        name: String,
+        kids: Vec<(u16, u16)>,
+        vars: Vec<(String, u16)>,
+    }
+    let count = r.u16()?;
+    let mut table = Vec::with_capacity(count as usize);
+    for _ in 0..count {
+        let name = r.string()?;
+        let _stamp = r.u32()?;
+        let nvars = r.u16()?;
+        let nkids = r.u16()?;
+        let _size = r.u16()?;
+        let kids = (0..nkids).map(|_| Ok((r.u16()?, r.u16()?))).collect::<Result<Vec<_>>>()?;
+        let vars = (0..nvars).map(|_| Ok((r.string()?, r.u16()?))).collect::<Result<Vec<_>>>()?;
+        table.push(Entry { name, kids, vars });
+    }
+    let marker = r.u16()?;
+    if marker != 0x3e9 {
+        return r.err(format!("старая редакция .stt: ожидался маркер данных 0x3e9, а не {marker:#x}"));
+    }
+    let mut state = State { root, images: Vec::new() };
+    // обход в глубину от корня (запись 0), как пишет оригинал
+    let mut stack: Vec<(usize, u16)> = vec![(0, 0)];
+    while let Some((ci, handle)) = stack.pop() {
+        let Some(e) = table.get(ci) else { return r.err(format!("нет записи класса {ci}")) };
+        let mut vars = Vec::with_capacity(e.vars.len());
+        for (name, ty) in &e.vars {
+            let value = match table.get(*ty as usize).map(|t| t.name.as_str()) {
+                Some("STRING") => r.string()?,
+                Some("FLOAT") => super::super::runtime::value::format_number(r.f64()?),
+                _ => r.u32()?.to_string(),
+            };
+            vars.push((name.clone(), value));
+        }
+        let reference = state.images.len() as u32;
+        state.images.push(StateImage { class_name: e.name.clone(), reference, handle, vars });
+        for (h, k) in e.kids.iter().rev() {
+            stack.push((*k as usize, *h));
+        }
+    }
+    Ok(state)
+}
+
 pub fn parse_state(data: &[u8], path: &str) -> Result<State> {
     let mut r = Reader::new(data, path);
     let magic = r.string()?;
@@ -219,7 +270,10 @@ pub fn parse_state(data: &[u8], path: &str) -> Result<State> {
     if r.peek_u16(r.pos) == Some(cp1251::encode(&root).len() as u16) {
         return r.err("старая редакция .stt: переменные хранятся по индексам");
     }
-    let _id = r.u16()?;
+    let id = r.u16()?;
+    if id == 0x3e8 {
+        return parse_state_typed(&mut r, root);
+    }
     let mut state = State { root, images: Vec::new() };
     // список заканчивается двухбайтовым терминатором
     while r.pos + 6 <= r.data.len() {

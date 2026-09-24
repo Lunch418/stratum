@@ -232,6 +232,14 @@ impl Simulation {
             if let Some(sheet) = &cls.sheet {
                 sim.effects.gfx.sheets.insert(cls.name.to_lowercase(), sheet.clone());
             }
+            // «живой» вид на схеме (флаг класса 0x8000: NumberView, Lamp); у
+            // остальных в 0x0c обычный значок, в окне схемы он не показывается
+            if let Some(pic) = cls.scheme.as_ref().filter(|_| cls.flags.unwrap_or(0) & 0x8000 != 0).and_then(|b| crate::formats::vdr::parse(b, &cls.name).ok()) {
+                sim.effects.gfx.scheme_pictures.insert(crate::lang::fold(&cls.name), pic);
+            }
+            if !cls.children.is_empty() {
+                sim.effects.gfx.class_children.insert(crate::lang::fold(&cls.name), cls.children.iter().map(|c| (c.handle, c.class_name.clone())).collect());
+            }
         }
         sim.class_dirs = project
             .classes
@@ -427,6 +435,16 @@ impl Simulation {
 
     /// Текущие значения всех переменных как снимок `_preload.stt`.
     pub fn snapshot_state(&self, root: &str) -> crate::formats::State {
+        self.snapshot(root, false)
+    }
+
+    /// Снимок значений на начало такта — так пишет `SaveObjectState`
+    /// оригинала (сверено: сохранение на такте 102 даёт счётчик 101).
+    pub fn snapshot_state_old(&self, root: &str) -> crate::formats::State {
+        self.snapshot(root, true)
+    }
+
+    fn snapshot(&self, root: &str, old: bool) -> crate::formats::State {
         let images = self
             .instances
             .iter()
@@ -435,7 +453,14 @@ impl Simulation {
                 class_name: inst.class_name.clone(),
                 reference: i as u32,
                 handle: inst.handle,
-                vars: inst.order.iter().filter_map(|n| self.value(i, n).map(|v| (n.clone(), v.to_string()))).collect(),
+                vars: inst
+                    .order
+                    .iter()
+                    .filter_map(|n| {
+                        let v = if old { inst.vars.get(&crate::lang::fold(n)).map(|&c| &self.old[c]) } else { self.value(i, n) };
+                        v.map(|v| (n.clone(), v.to_string()))
+                    })
+                    .collect(),
             })
             .collect();
         crate::formats::State { root: root.to_string(), images }
@@ -1202,7 +1227,30 @@ impl Vars for Frame<'_> {
                 let kids: Vec<usize> = (0..self.sim.instances.len()).filter(|&i| self.sim.instances[i].parent == Some(target)).collect();
                 Value::Float(kids.iter().position(|&i| self.sim.instances[i].handle == h).map(|p| p as f64 + 1.0).unwrap_or(0.0))
             }
-            "setcalcorder" | "createlink" | "removelink" | "setlinkvars" | "createobject" | "deleteobject" | "createclass" | "deleteclass" | "openclassscheme" | "closeclassscheme" | "loadobjectstate" | "saveobjectstate" | "loadproject" | "unloadproject" | "setactiveproject" => {
+            // состояние имиджа и его потомков в формате .stt
+            "saveobjectstate" | "loadobjectstate" => {
+                let target = self.resolve_arg(args.first())?;
+                let file = arg(1);
+                let file = if file.contains('.') { file } else { format!("{file}.stt") };
+                let save = lower == "saveobjectstate";
+                let Some(path) = crate::runtime::extra::sandboxed(&mut self.sim.effects, &file, save) else { return Some(Value::Float(0.0)) };
+                let in_subtree = |sim: &Simulation, i: usize| i == target || sim.descends_from(i, target);
+                if save {
+                    let root = self.sim.instances[target].class_name.clone();
+                    let mut st = self.sim.snapshot_state_old(&root);
+                    st.images.retain(|img| in_subtree(self.sim, img.reference as usize));
+                    Value::Float(if std::fs::write(&path, crate::formats::project::write_state(&st)).is_ok() { 1.0 } else { 0.0 })
+                } else {
+                    match std::fs::read(&path).ok().and_then(|d| crate::formats::project::parse_state(&d, &file).ok()) {
+                        Some(st) => {
+                            self.sim.load_state(&st);
+                            Value::Float(1.0)
+                        }
+                        None => Value::Float(0.0),
+                    }
+                }
+            }
+            "setcalcorder" | "createlink" | "removelink" | "setlinkvars" | "createobject" | "deleteobject" | "createclass" | "deleteclass" | "openclassscheme" | "closeclassscheme" | "loadproject" | "unloadproject" | "setactiveproject" => {
                 // перестройка схемы на ходу: принимаем без действия, о чём сообщаем один раз
                 *self.sim.effects.missing.entry(name.to_string()).or_insert(0) += 1;
                 Value::Float(0.0)

@@ -278,7 +278,15 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
             fx.exit_requested = true;
             num(0.0)
         }
-        "stop" | "quit" | "closeall" => {
+        // Stop(flag) и Quit(flag) срабатывают только при flag > 0 (справка);
+        // CloseAll — без аргумента
+        "stop" | "quit" => {
+            if f(args, 0) > 0.0 {
+                fx.stop_requested = true;
+            }
+            num(0.0)
+        }
+        "closeall" => {
             fx.stop_requested = true;
             num(0.0)
         }

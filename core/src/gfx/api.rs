@@ -41,10 +41,14 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
             let window = s(args, 0);
             let class = s(args, 1);
             let sp = gfx.open_window(&window);
+            if let Some(space) = gfx.space_mut(sp) {
+                space.source_class = class.clone();
+            }
             if !class.is_empty() {
                 gfx.hyper_current.insert(window.clone(), class.clone());
                 if let Some(pic) = gfx.pictures.get(&class.to_lowercase()).cloned() {
                     gfx.space_mut(sp).unwrap().load(&pic);
+                    embed_children(gfx, sp, &class, 0);
                     gfx.resolve_dibs(sp);
                     gfx.fit_client(sp);
                 }
@@ -65,6 +69,9 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
             let window = s(args, 0);
             let file = s(args, 1);
             let sp = gfx.open_window(&window);
+            if let Some(space) = gfx.space_mut(sp) {
+                space.source_file = file.clone();
+            }
             if !file.is_empty() {
                 if let Some(pic) = gfx.load_picture_file(&file) {
                     gfx.space_mut(sp).unwrap().load(&pic);
@@ -90,7 +97,12 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
         | "setwindowtransparent" | "setwindowtransparentcolor" => ok(window_space(gfx, &s(args, 0)).is_some()),
         "getwindoworgx" | "getwindoworgy" | "getwindowwidth" | "getwindowheight" => num(0.0),
         // GetWindowProp(name, prop): "hwnd" и прочие свойства ОС нам недоступны
-        "getwindowprop" => num(0.0),
+        // GetWindowProp(окно, "Classname" | "Filename") — из чего открыто окно
+        "getwindowprop" => Value::Str(window_space(gfx, &s(args, 0)).map(|sp| match s(args, 1).to_ascii_lowercase().as_str() {
+            "classname" => sp.source_class.clone(),
+            "filename" => sp.source_file.clone(),
+            _ => String::new(),
+        }).unwrap_or_default()),
         "getwindowname" => Value::Str(
             gfx.space(h(args, 0)).map(|sp| sp.window.clone()).unwrap_or_default(),
         ),
@@ -115,9 +127,11 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
 
         // ── объекты: поиск и свойства ─────────────────────────────────────
         // имена работают и для трёхмерных пространств (их дескрипторы общие)
+        // GetObject2dByName(HSpace, HGroup, имя): в группе, если она задана
         "getobject2dbyname" => {
             let name = s(args, 2);
-            handle(gfx.space(h(args, 0)).and_then(|sp| sp.find_by_name(&name))
+            let group = h(args, 1);
+            handle(gfx.space(h(args, 0)).and_then(|sp| if group != 0 { sp.find_in_group(group, &name) } else { sp.find_by_name(&name) })
                 .or_else(|| super::api3d::find_by_name(gfx, h(args, 0), &name))
                 .unwrap_or(0))
         }
@@ -930,6 +944,31 @@ fn text_extent(sp: &Space, text: Handle) -> (f64, f64) {
 /// Вставляет содержимое рисунка в пространство как одну группу, возвращает
 /// её дескриптор (или единственный объект, если он один).
 pub fn insert_picture(sp: &mut Space, pic: &super::Picture, x: f64, y: f64, move_to: bool) -> Handle {
+    let (top, zorder) = insert_objects(sp, pic);
+    let root = if top.len() == 1 {
+        let h = top[0];
+        sp.zorder.push(h);
+        h
+    } else {
+        let g = sp.add_object(Object::new(0, 0.0, 0.0, 0.0, 0.0, Shape::Group { children: zorder.clone() }));
+        for c in &zorder {
+            if let Some(o) = sp.objects.get_mut(c) {
+                o.parent = Some(g);
+            }
+        }
+        sp.update_group_bounds(g);
+        g
+    };
+    if move_to {
+        sp.move_object(root, x, y);
+    }
+    root
+}
+
+/// Объекты и инструменты рисунка — в пространство с новыми дескрипторами
+/// (наименьшими свободными). Возвращает объекты верхнего уровня и их
+/// порядок отрисовки; в z-порядок пространства они не попадают.
+pub fn insert_objects(sp: &mut Space, pic: &super::Picture) -> (Vec<Handle>, Vec<Handle>) {
     let mut sub = Space::new(0, "");
     sub.load(pic);
     // инструменты переносятся с новыми дескрипторами
@@ -957,13 +996,19 @@ pub fn insert_picture(sp: &mut Space, pic: &super::Picture, x: f64, y: f64, move
         }).collect();
         texts.insert(*k, sp.add_text(parts));
     }
-    // объекты: новые дескрипторы, ссылки переписываются
+    // объекты: новые дескрипторы (наименьшие свободные, по порядку старых),
+    // ссылки переписываются
     let mut map = std::collections::HashMap::new();
     let mut order: Vec<Handle> = sub.objects.keys().copied().collect();
     order.sort();
+    let mut taken: std::collections::BTreeSet<Handle> = sp.objects.keys().copied().collect();
+    let mut next: Handle = 1;
     for old in &order {
-        let new = sp.alloc();
-        map.insert(*old, new);
+        while taken.contains(&next) {
+            next += 1;
+        }
+        taken.insert(next);
+        map.insert(*old, next);
     }
     let mut top = Vec::new();
     for old in &order {
@@ -987,22 +1032,56 @@ pub fn insert_picture(sp: &mut Space, pic: &super::Picture, x: f64, y: f64, move
         sp.objects.insert(o.handle, o);
     }
     let zorder: Vec<Handle> = sub.zorder.iter().filter_map(|z| map.get(z).copied()).collect();
-    let root = if top.len() == 1 {
-        let h = top[0];
-        sp.zorder.push(h);
-        h
-    } else {
-        let g = sp.add_object(Object::new(0, 0.0, 0.0, 0.0, 0.0, Shape::Group { children: zorder.clone() }));
+    (top, zorder)
+}
+
+/// Схема в окне: на месте значка каждого дочернего имиджа (группа-элемент
+/// схемы с handle экземпляра) оригинал показывает рисунок этого имиджа —
+/// объекты вставляются в группу с наименьшими свободными номерами, по
+/// порядку детей схемы, рекурсивно. Установлено по снимку оригинала
+/// («Солнечная система»: текст NumberView получает номера 16, 21, 26, а
+/// GetObject2dByName(HSpace, _HObject, "text") находит его внутри значка).
+fn embed_children(gfx: &mut Gfx, sp: Handle, class: &str, depth: usize) {
+    if depth > 8 {
+        return;
+    }
+    let children = gfx.class_children.get(&crate::lang::fold(class)).cloned().unwrap_or_default();
+    for (handle, child_class) in children {
+        let group = handle as Handle;
+        let Some(pic) = gfx.scheme_pictures.get(&crate::lang::fold(&child_class)).cloned() else { continue };
+        let Some(space) = gfx.space_mut(sp) else { return };
+        match space.objects.get(&group) {
+            Some(o) if matches!(o.shape, Shape::Group { .. }) && o.scheme_element => {}
+            _ => continue,
+        }
+        // сначала номер обёртке, затем объектам рисунка — как у оригинала
+        let wrapper = super::lowest_free(&space.objects);
+        space.objects.insert(wrapper, Object::new(wrapper, 0.0, 0.0, 0.0, 0.0, Shape::Group { children: Vec::new() }));
+        let (_, zorder) = insert_objects(space, &pic);
         for c in &zorder {
-            if let Some(o) = sp.objects.get_mut(c) {
-                o.parent = Some(g);
+            if let Some(o) = space.objects.get_mut(c) {
+                o.parent = Some(wrapper);
             }
         }
-        sp.update_group_bounds(g);
-        g
-    };
-    if move_to {
-        sp.move_object(root, x, y);
+        if let Some(o) = space.objects.get_mut(&wrapper) {
+            o.shape = Shape::Group { children: zorder };
+            o.parent = Some(group);
+        }
+        space.update_group_bounds(wrapper);
+        // рисунок — на место значка: левый верхний угол к углу значка
+        let icon_at = match space.objects.get(&group).map(|o| o.shape.clone()) {
+            Some(Shape::Group { children }) => children.iter().filter_map(|c| space.objects.get(c)).map(|o| (o.x, o.y)).next(),
+            _ => None,
+        };
+        if let Some((x, y)) = icon_at {
+            space.move_object(wrapper, x, y);
+        }
+        if let Some(Object { shape: Shape::Group { children }, scheme_element, .. }) = space.objects.get_mut(&group) {
+            children.push(wrapper);
+            // группа видна, собственный значок внутри остаётся скрытым
+            *scheme_element = false;
+        }
+        space.update_group_bounds(group);
+        embed_children(gfx, sp, &child_class, depth + 1);
     }
-    root
 }
