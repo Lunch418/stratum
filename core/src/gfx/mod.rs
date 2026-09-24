@@ -668,7 +668,7 @@ pub fn decode_bmp(bmp: &[u8]) -> Option<(u32, u32, Vec<u8>)> {
     };
     let palette = &bmp[14 + header..];
     let palette = &palette[..(colors * 4).min(palette.len())];
-    let stride = ((w as usize * bpp + 31) / 32) * 4;
+    let stride = (w as usize * bpp).div_ceil(32) * 4;
     let mut out = vec![0u8; (w * h) as usize * 3];
     for row in 0..h as usize {
         let src_row = if top_down { row } else { h as usize - 1 - row };
@@ -701,7 +701,7 @@ pub fn decode_bmp(bmp: &[u8]) -> Option<(u32, u32, Vec<u8>)> {
 
 /// Пиксели RGB (сверху вниз) → 24-битный BMP.
 pub fn encode_bmp24(w: u32, h: u32, rgb: &[u8]) -> Vec<u8> {
-    let stride = ((w as usize * 3 + 3) / 4) * 4;
+    let stride = (w as usize * 3).div_ceil(4) * 4;
     let size = 54 + stride * h as usize;
     let mut out = Vec::with_capacity(size);
     out.extend_from_slice(b"BM");

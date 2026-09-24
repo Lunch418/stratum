@@ -342,6 +342,8 @@ fn cmd_play(args: &[String]) -> Result<(), String> {
         port: opts.port,
         fps: 30,
         static_dir,
+        assets: None,
+        token: None,
     })
 }
 

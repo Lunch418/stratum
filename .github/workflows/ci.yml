@@ -1,0 +1,74 @@
+# Сборка и тесты на трёх ОС. Корпуса fixtures/ в CI нет (файлы оригинала не
+# распространяются), поэтому корпусные тесты пропускаются явно, и это видно
+# в журнале: «корпус пропущен».
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  core:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      STRATUM_SKIP_CORPUS: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core
+      - name: cargo test
+        working-directory: core
+        run: cargo test
+      - name: clippy (ошибки корректности)
+        if: matrix.os == 'ubuntu-latest'
+        working-directory: core
+        run: cargo clippy --all-targets -- -D clippy::correctness -D clippy::suspicious
+
+  app:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - name: npm ci
+        working-directory: app
+        run: npm ci
+      - name: сборка IDE
+        working-directory: app
+        run: npm run build
+      - name: oxlint
+        working-directory: app
+        run: npx oxlint src
+
+  shell:
+    runs-on: ubuntu-latest
+    needs: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri
+      - name: системные библиотеки WebKit
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: сборка IDE для вшивания в оболочку
+        working-directory: app
+        run: npm ci && npm run build
+      - name: cargo check оболочки
+        working-directory: app/src-tauri
+        run: cargo check

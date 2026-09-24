@@ -1,12 +1,12 @@
 {
-  "name": "app",
+  "name": "stratum-modern",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "oxlint",
+    "lint": "oxlint src",
     "preview": "vite preview"
   },
   "dependencies": {

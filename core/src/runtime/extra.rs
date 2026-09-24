@@ -73,6 +73,46 @@ fn resolve_path(fx: &Effects, name: &str) -> std::path::PathBuf {
     if p.is_absolute() { p.to_path_buf() } else { fx.gfx.project_dir.join(p) }
 }
 
+/// Путь без `.` и `..`, от корня файловой системы — чтобы сравнивать папки
+/// до обращения к диску (файла может ещё не быть).
+fn normalize(p: &std::path::Path) -> std::path::PathBuf {
+    use std::path::Component;
+    let abs = if p.is_absolute() { p.to_path_buf() } else { std::env::current_dir().unwrap_or_default().join(p) };
+    let mut out = std::path::PathBuf::new();
+    for c in abs.components() {
+        match c {
+            Component::ParentDir => {
+                out.pop();
+            }
+            Component::CurDir => {}
+            other => out.push(other.as_os_str()),
+        }
+    }
+    out
+}
+
+/// Песочница файловых функций модели (ТЗ §10): писать можно только в папку
+/// проекта и во временную папку, читать — ещё из папок библиотек. Проект,
+/// ещё не сохранённый на диск, пишет только во временную папку. Отказ
+/// попадает в «Сообщения», функция возвращает неудачу.
+pub(crate) fn sandboxed(fx: &mut Effects, name: &str, write: bool) -> Option<std::path::PathBuf> {
+    let path = normalize(&resolve_path(fx, name));
+    let mut roots = vec![normalize(&std::env::temp_dir())];
+    if !fx.gfx.project_dir.as_os_str().is_empty() {
+        roots.push(normalize(&fx.gfx.project_dir));
+    }
+    if !write {
+        roots.extend(fx.gfx.library_dirs.iter().map(|d| normalize(d)));
+        roots.extend(fx.gfx.library_dirs.iter().filter_map(|d| d.parent()).map(|d| normalize(&d.join("ICONS"))));
+    }
+    if roots.iter().any(|r| path.starts_with(r)) {
+        Some(path)
+    } else {
+        fx.log.push(format!("файл вне папки проекта — {}: {}", if write { "запись запрещена" } else { "чтение запрещено" }, path.display()));
+        None
+    }
+}
+
 fn glob_match(pat: &str, name: &str) -> bool {
     fn go(p: &[char], n: &[char]) -> bool {
         match (p.first(), n.first()) {
@@ -114,11 +154,17 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
         "setstringbuffermode" => num(0.0),
 
         // ── файлы и папки ────────────────────────────────────────────────
-        "createdir" => ok(std::fs::create_dir_all(resolve_path(fx, &s(args, 0))).is_ok()),
-        "deletedir" => ok(std::fs::remove_dir_all(resolve_path(fx, &s(args, 0))).is_ok()),
-        "filerename" => ok(std::fs::rename(resolve_path(fx, &s(args, 0)), resolve_path(fx, &s(args, 1))).is_ok()),
-        "filecopy" => ok(std::fs::copy(resolve_path(fx, &s(args, 0)), resolve_path(fx, &s(args, 1))).is_ok()),
-        "filedelete" => ok(std::fs::remove_file(resolve_path(fx, &s(args, 0))).is_ok()),
+        "createdir" => ok(sandboxed(fx, &s(args, 0), true).is_some_and(|p| std::fs::create_dir_all(p).is_ok())),
+        "deletedir" => ok(sandboxed(fx, &s(args, 0), true).is_some_and(|p| std::fs::remove_dir_all(p).is_ok())),
+        "filerename" => {
+            let (a, b) = (sandboxed(fx, &s(args, 0), true), sandboxed(fx, &s(args, 1), true));
+            ok(matches!((&a, &b), (Some(a), Some(b)) if std::fs::rename(a, b).is_ok()))
+        }
+        "filecopy" => {
+            let (a, b) = (sandboxed(fx, &s(args, 0), false), sandboxed(fx, &s(args, 1), true));
+            ok(matches!((&a, &b), (Some(a), Some(b)) if std::fs::copy(a, b).is_ok()))
+        }
+        "filedelete" => ok(sandboxed(fx, &s(args, 0), true).is_some_and(|p| std::fs::remove_file(p).is_ok())),
         "getfilelist" => {
             let spec = s(args, 0).replace('\\', "/");
             let (dir, mask) = match spec.rsplit_once('/') {
@@ -126,7 +172,8 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
                 None => (String::new(), spec.clone()),
             };
             let mask = if mask.is_empty() { "*".to_string() } else { mask };
-            let dir = if dir.is_empty() { fx.gfx.project_dir.clone() } else { resolve_path(fx, &dir) };
+            let dir = if dir.is_empty() { fx.gfx.project_dir.to_string_lossy().to_string() } else { dir };
+            let Some(dir) = sandboxed(fx, &dir, false) else { return Some(string_list(fx, Vec::new())) };
             let mut names: Vec<String> = std::fs::read_dir(&dir)
                 .map(|rd| rd.filter_map(|e| e.ok()).map(|e| e.file_name().to_string_lossy().to_string()).filter(|n| glob_match(&mask, n)).collect())
                 .unwrap_or_default();
@@ -146,7 +193,8 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
             let st = match kind.as_str() {
                 "MEMORY" => Some(Stream { writable: true, ..Default::default() }),
                 "FILE" => {
-                    let path = resolve_path(fx, &name);
+                    let write = flags.contains("CREATE") || !flags.contains("READONLY");
+                    let Some(path) = sandboxed(fx, &name, write) else { return Some(Value::Handle(0.0)) };
                     if flags.contains("CREATE") {
                         Some(Stream { file: Some(path), writable: true, ..Default::default() })
                     } else {
@@ -464,5 +512,27 @@ mod tests {
         let mut fx = Effects::default();
         assert_eq!(call("Right", &[Value::Str("Stratum".into()), Value::Float(3.0)], &mut fx).unwrap().as_string(), "tum");
         assert_eq!(call("Alltrim", &[Value::Str("  a b  ".into())], &mut fx).unwrap().as_string(), "a b");
+    }
+}
+
+#[cfg(test)]
+mod sandbox_tests {
+    use super::*;
+
+    #[test]
+    fn model_files_stay_inside_the_project() {
+        let project = std::env::temp_dir().join(format!("stratum-sandbox-{}", std::process::id())).join("project");
+        std::fs::create_dir_all(&project).unwrap();
+        let mut fx = Effects::default();
+        fx.gfx.project_dir = project.clone();
+        assert!(sandboxed(&mut fx, "data.txt", true).is_some());
+        assert!(sandboxed(&mut fx, "C:\\SC3\\data.txt", true).is_some(), "диск Windows — в папку проекта");
+        // временная папка разрешена, выход через .. — только в её пределах
+        assert!(sandboxed(&mut fx, "../outside.txt", true).is_some());
+        let home = std::env::var("HOME").unwrap_or_else(|_| "/home/user".into());
+        assert!(sandboxed(&mut fx, &format!("{home}/.bashrc"), true).is_none());
+        assert!(sandboxed(&mut fx, "/etc/passwd", false).is_none());
+        assert!(fx.log.iter().any(|l| l.contains("запрещен")));
+        let _ = std::fs::remove_dir_all(project.parent().unwrap());
     }
 }

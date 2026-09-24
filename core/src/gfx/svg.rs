@@ -45,7 +45,7 @@ fn render_object(sp: &Space, h: Handle, out: &mut String, gfx: Option<&super::Gf
         return;
     }
     if o.alpha < 255 {
-        let _ = write!(out, "<g opacity=\"{:.3}\">\n", o.alpha as f64 / 255.0);
+        let _ = writeln!(out, "<g opacity=\"{:.3}\">", o.alpha as f64 / 255.0);
         let mut plain = o.clone();
         plain.alpha = 255;
         let mut tmp = String::new();
@@ -69,9 +69,9 @@ fn render_shape(sp: &Space, o: &super::Object, h: Handle, out: &mut String, gfx:
             match view {
                 Some((s3, cam)) => super::space3d::render_view(s3, cam, o.x, o.y, o.w, o.h, out),
                 None => {
-                    let _ = write!(
+                    let _ = writeln!(
                         out,
-                        "<rect x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" fill=\"#dde\" stroke=\"#99a\" data-handle=\"{h}\"/>\n",
+                        "<rect x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" fill=\"#dde\" stroke=\"#99a\" data-handle=\"{h}\"/>",
                         o.x, o.y, o.w, o.h
                     );
                 }
@@ -102,9 +102,9 @@ fn render_shape(sp: &Space, o: &super::Object, h: Handle, out: &mut String, gfx:
             };
             let pts: Vec<String> = points.iter().map(|p| format!("{:.2},{:.2}", p.0, p.1)).collect();
             let tag = if points.len() > 2 && fill != "none" { "polygon" } else { "polyline" };
-            let _ = write!(
+            let _ = writeln!(
                 out,
-                "<{tag} points=\"{}\" fill=\"{fill}\" stroke=\"{stroke}\" stroke-width=\"{width}\"{dash} data-handle=\"{h}\"{}/>\n",
+                "<{tag} points=\"{}\" fill=\"{fill}\" stroke=\"{stroke}\" stroke-width=\"{width}\"{dash} data-handle=\"{h}\"{}/>",
                 pts.join(" "),
                 name_attr(&o.name)
             );
@@ -125,9 +125,9 @@ fn render_shape(sp: &Space, o: &super::Object, h: Handle, out: &mut String, gfx:
                     String::new()
                 };
                 for line in text.split("\r\n").flat_map(|l| l.split('\n')) {
-                    let _ = write!(
+                    let _ = writeln!(
                         out,
-                        "<text x=\"{:.2}\" y=\"{:.2}\" font-size=\"{size}\" font-family=\"{}\" fill=\"{}\"{weight}{style}{transform} data-handle=\"{h}\"{}>{}</text>\n",
+                        "<text x=\"{:.2}\" y=\"{:.2}\" font-size=\"{size}\" font-family=\"{}\" fill=\"{}\"{weight}{style}{transform} data-handle=\"{h}\"{}>{}</text>",
                         o.x,
                         y + size * 0.8,
                         esc(family),
@@ -159,9 +159,9 @@ fn render_shape(sp: &Space, o: &super::Object, h: Handle, out: &mut String, gfx:
                     );
                 }
                 _ => {
-                    let _ = write!(
+                    let _ = writeln!(
                         out,
-                        "<rect x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" fill=\"#e0e0e0\" stroke=\"#999\" data-handle=\"{h}\"{}/>\n",
+                        "<rect x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" fill=\"#e0e0e0\" stroke=\"#999\" data-handle=\"{h}\"{}/>",
                         o.x, o.y, o.w, o.h, name_attr(&o.name)
                     );
                 }
@@ -170,9 +170,9 @@ fn render_shape(sp: &Space, o: &super::Object, h: Handle, out: &mut String, gfx:
         Shape::Control { class, .. } => {
             // сам контрол рисует страница поверх SVG (см. player); здесь —
             // только место под него, чтобы статический рендер что-то показывал
-            let _ = write!(
+            let _ = writeln!(
                 out,
-                "<rect x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" fill=\"#f0f0f0\" stroke=\"#b0b0b0\" data-handle=\"{h}\" data-class=\"{}\"{}/>\n",
+                "<rect x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" fill=\"#f0f0f0\" stroke=\"#b0b0b0\" data-handle=\"{h}\" data-class=\"{}\"{}/>",
                 o.x, o.y, o.w, o.h, esc(class), name_attr(&o.name)
             );
         }

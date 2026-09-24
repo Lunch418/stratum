@@ -7,6 +7,7 @@
 
 pub mod api;
 pub mod editor;
+pub mod guard;
 
 use crate::formats::{self, Class, LoadedProject};
 use crate::gfx::svg;
@@ -336,6 +337,26 @@ pub struct Options {
     pub fps: u32,
     /// Папка со сборкой IDE (`app/dist`); без неё отдаётся страница плеера.
     pub static_dir: Option<PathBuf>,
+    /// Файлы IDE, вшитые в оболочку (Tauri): путь → (MIME, байты). Проверяются
+    /// раньше `static_dir`, поэтому установленной программе папка не нужна.
+    pub assets: Option<Assets>,
+    /// Токен сессии; `None` — сгенерировать случайный.
+    pub token: Option<String>,
+}
+
+pub type Assets = Arc<dyn Fn(&str) -> Option<(String, Vec<u8>)> + Send + Sync>;
+
+/// Наибольшее тело запроса: правки растров идут hex-строкой, 32 МБ хватает.
+const MAX_BODY: usize = 32 << 20;
+/// Одновременных соединений не больше этого — остальные получают 503.
+const MAX_CONNECTIONS: usize = 64;
+
+/// Что нужно обработчику запроса кроме общего состояния.
+struct Server {
+    static_dir: Option<PathBuf>,
+    assets: Option<Assets>,
+    token: String,
+    port: u16,
 }
 
 fn load(project: &PathBuf, libraries: &[PathBuf]) -> Result<LoadedProject, String> {
@@ -362,12 +383,12 @@ fn empty_project() -> LoadedProject {
 
 /// Запускает плеер и не возвращается, пока сервер жив.
 pub fn serve(opts: Options) -> Result<(), String> {
-    serve_with(opts, |_| {})
+    serve_with(opts, |_, _| {})
 }
 
 /// То же, но с уведомлением о фактическом порте (при `port = 0` порт
 /// выбирает система) — нужно оболочке Tauri, чтобы открыть окно.
-pub fn serve_with(opts: Options, on_ready: impl FnOnce(u16)) -> Result<(), String> {
+pub fn serve_with(opts: Options, on_ready: impl FnOnce(u16, &str)) -> Result<(), String> {
     let project = load(&opts.project, &opts.libraries)?;
     let sim = Simulation::build(&project).map_err(|e| e.to_string())?;
     let models = project
@@ -426,18 +447,29 @@ pub fn serve_with(opts: Options, on_ready: impl FnOnce(u16)) -> Result<(), Strin
 
     let listener = TcpListener::bind(("127.0.0.1", opts.port)).map_err(|e| format!("порт {}: {e}", opts.port))?;
     let port = listener.local_addr().map(|a| a.port()).unwrap_or(opts.port);
+    let token = opts.token.clone().unwrap_or_else(guard::new_token);
     println!(
-        "{}: http://127.0.0.1:{}/  (Ctrl+C — выход)",
-        if static_dir.is_some() { "IDE" } else { "плеер" },
-        port
+        "{}: http://127.0.0.1:{}/?token={}  (Ctrl+C — выход)",
+        if static_dir.is_some() || opts.assets.is_some() { "IDE" } else { "плеер" },
+        port,
+        token
     );
-    on_ready(port);
+    on_ready(port, &token);
+    let server = Arc::new(Server { static_dir, assets: opts.assets.clone(), token, port });
+    let active = Arc::new(std::sync::atomic::AtomicUsize::new(0));
     for stream in listener.incoming() {
-        let Ok(stream) = stream else { continue };
-        let shared = Arc::clone(&shared);
-        let static_dir = static_dir.clone();
+        let Ok(mut stream) = stream else { continue };
+        use std::sync::atomic::Ordering;
+        if active.load(Ordering::SeqCst) >= MAX_CONNECTIONS {
+            let _ = stream.write_all(b"HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+            continue;
+        }
+        active.fetch_add(1, Ordering::SeqCst);
+        let (shared, server, active) = (Arc::clone(&shared), Arc::clone(&server), Arc::clone(&active));
         std::thread::spawn(move || {
-            let _ = handle(stream, &shared, static_dir.as_deref());
+            let _ = stream.set_read_timeout(Some(Duration::from_secs(30)));
+            let _ = handle(stream, &shared, &server);
+            active.fetch_sub(1, Ordering::SeqCst);
         });
     }
     Ok(())
@@ -538,7 +570,7 @@ fn apply_event(s: &mut Shared, ev: Event) {
     }
 }
 
-fn handle(mut stream: TcpStream, shared: &Arc<Mutex<Shared>>, static_dir: Option<&std::path::Path>) -> std::io::Result<()> {
+fn handle(mut stream: TcpStream, shared: &Arc<Mutex<Shared>>, server: &Server) -> std::io::Result<()> {
     let mut reader = BufReader::new(stream.try_clone()?);
     let mut request_line = String::new();
     reader.read_line(&mut request_line)?;
@@ -546,14 +578,24 @@ fn handle(mut stream: TcpStream, shared: &Arc<Mutex<Shared>>, static_dir: Option
     let method = parts.next().unwrap_or("").to_string();
     let target = parts.next().unwrap_or("/").to_string();
     let mut content_length = 0usize;
+    let mut headers = guard::Headers::default();
+    let mut header_count = 0;
     loop {
         let mut line = String::new();
         if reader.read_line(&mut line)? == 0 || line == "\r\n" || line == "\n" {
             break;
         }
+        header_count += 1;
+        if header_count > 100 || line.len() > 16 << 10 {
+            return reply(&mut stream, "431 Request Header Fields Too Large", "text/plain", b"", None);
+        }
         if let Some(v) = line.to_ascii_lowercase().strip_prefix("content-length:") {
             content_length = v.trim().parse().unwrap_or(0);
         }
+        guard::Headers::read(&line, &mut headers);
+    }
+    if content_length > MAX_BODY {
+        return reply(&mut stream, "413 Payload Too Large", "text/plain", b"", None);
     }
     let mut body_bytes = vec![0; content_length];
     if content_length > 0 {
@@ -565,9 +607,23 @@ fn handle(mut stream: TcpStream, shared: &Arc<Mutex<Shared>>, static_dir: Option
         Some((p, q)) => (p.to_string(), q.to_string()),
         None => (target.clone(), String::new()),
     };
+
+    // чужой Host (DNS rebinding) или чужой Origin — отказ для любого пути
+    if !guard::host_ok(&headers, server.port) || !guard::origin_ok(&headers, server.port) {
+        return reply(&mut stream, "403 Forbidden", "text/plain", "чужой адрес".as_bytes(), None);
+    }
+    let query_token = param(&query, "token");
+    let authorized = guard::token_ok(&headers, query_token, &server.token);
+    // страница IDE с верным токеном в ссылке: запомнить его в cookie
+    let set_cookie = (authorized && query_token.is_some()).then(|| format!("{}={}; Path=/; HttpOnly; SameSite=Strict", guard::COOKIE, server.token));
+    let is_api = path == "/frame" || path == "/event" || path.starts_with("/api/");
+    if is_api && !authorized {
+        return reply(&mut stream, "401 Unauthorized", "application/json; charset=utf-8", "{\"error\":\"нет токена сессии: откройте IDE по ссылке из консоли\"}".as_bytes(), None);
+    }
+
     let (status, mime, body): (&str, &str, Vec<u8>) = match (method.as_str(), path.as_str()) {
         ("GET", "/frame") => ("200 OK", "application/json; charset=utf-8", frame_json(shared).into_bytes()),
-        ("POST", "/event") | ("GET", "/event") => {
+        ("POST", "/event") => {
             if let Some(ev) = parse_event(&query) {
                 shared.lock().unwrap().events.push_back(ev);
             }
@@ -603,23 +659,45 @@ fn handle(mut stream: TcpStream, shared: &Arc<Mutex<Shared>>, static_dir: Option
             let r = api::handle(m, p, &query, &body_text, shared);
             (r.status, r.mime, r.body.into_bytes())
         }
-        ("GET", p) => match static_file(static_dir, p) {
-            Some((mime, data)) => ("200 OK", mime, data),
-            // одностраничное приложение: любой путь ведёт на index.html;
-            // без сборки IDE отдаётся встроенная страница плеера
-            None => match static_file(static_dir, "/index.html") {
-                Some((mime, data)) => ("200 OK", mime, data),
+        ("GET", p) => {
+            let found = asset(server, p).or_else(|| asset(server, "/index.html"));
+            match found {
+                Some((mime, data)) => return reply(&mut stream, "200 OK", &mime, &data, set_cookie.as_deref()),
+                // без сборки IDE — встроенная страница плеера
                 None => ("200 OK", "text/html; charset=utf-8", PAGE.as_bytes().to_vec()),
-            },
-        },
-        _ => ("404 Not Found", "text/plain", "нет такой страницы".as_bytes().to_vec()),
+            }
+        }
+        _ => ("405 Method Not Allowed", "text/plain", "метод не поддерживается".as_bytes().to_vec()),
+    };
+    reply(&mut stream, status, mime, &body, set_cookie.as_deref())
+}
+
+/// Файл IDE: сначала вшитый в оболочку, потом из папки сборки.
+fn asset(server: &Server, path: &str) -> Option<(String, Vec<u8>)> {
+    if let Some(f) = &server.assets {
+        if let Some(found) = f(path) {
+            return Some(found);
+        }
+    }
+    static_file(server.static_dir.as_deref(), path).map(|(m, d)| (m.to_string(), d))
+}
+
+/// Ответ с запретом кэша, встраивания в чужие страницы и подмены типа.
+fn reply(stream: &mut TcpStream, status: &str, mime: &str, body: &[u8], set_cookie: Option<&str>) -> std::io::Result<()> {
+    let cookie = set_cookie.map(|c| format!("Set-Cookie: {c}\r\n")).unwrap_or_default();
+    // страница IDE: скрипты только свои (Monaco — из воркеров blob:), шрифты Google
+    let csp = if mime.starts_with("text/html") {
+        "Content-Security-Policy: default-src 'self'; script-src 'self' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'\r\n"
+    } else {
+        ""
     };
     let response = format!(
-        "HTTP/1.1 {status}\r\nContent-Type: {mime}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
+        "HTTP/1.1 {status}\r\nContent-Type: {mime}\r\nContent-Length: {}\r\nCache-Control: no-store\r\n\
+         X-Content-Type-Options: nosniff\r\nX-Frame-Options: DENY\r\nReferrer-Policy: no-referrer\r\n{csp}{cookie}Connection: close\r\n\r\n",
         body.len()
     );
     stream.write_all(response.as_bytes())?;
-    stream.write_all(&body)?;
+    stream.write_all(body)?;
     stream.flush()
 }
 

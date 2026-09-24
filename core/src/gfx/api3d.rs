@@ -177,7 +177,7 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx, ms: &mut Matrices, output
                 }
             }
             let done = gfx.spaces3d.get_mut(&space).and_then(|s| s.cameras.get_mut(&camera)).map(|cam| match mode {
-                1 | 2 | 3 => cam.orbit(mode, p1),
+                1..=3 => cam.orbit(mode, p1),
                 10 => {
                     if p1 > 0.0 {
                         cam.extent /= p1;

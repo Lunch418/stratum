@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useWindowEvent } from './hooks';
 import { api } from './api';
 import { useStore } from './store';
 import { SchemeCanvas } from './components/SchemeCanvas';
@@ -83,8 +84,7 @@ export default function App() {
   }, [s.tab]);
 
   // горячие клавиши транспорта и переключения вкладок
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
+  useWindowEvent('keydown', (e: KeyboardEvent) => {
       if ((e.target as HTMLElement).closest('.monaco-editor, input, textarea')) return;
       if ((e.code === 'F5' && e.shiftKey) || (e.code === 'F2' && e.ctrlKey)) { e.preventDefault(); api.event('type=reset').then(() => s.refreshInstances()); }
       else if (e.code === 'F5' || (e.code === 'F9' && e.ctrlKey)) { e.preventDefault(); api.event(frame?.running ? 'type=pause' : 'type=run'); }
@@ -102,22 +102,15 @@ export default function App() {
       else if ((e.key.toLowerCase() === 'p' && e.ctrlKey && e.shiftKey) || (e.key.toLowerCase() === 'k' && e.ctrlKey)) { e.preventDefault(); s.setPaletteOpen(true); }
       else if (e.key.toLowerCase() === 'z' && e.ctrlKey && !e.shiftKey) { e.preventDefault(); s.undo(); }
       else if ((e.key.toLowerCase() === 'z' && e.ctrlKey && e.shiftKey) || (e.key.toLowerCase() === 'y' && e.ctrlKey)) { e.preventDefault(); s.redo(); }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [frame?.running, s.tab, s.project?.native, s.selectedClass, dialog]);
+  });
 
   // Ctrl+S внутри Monaco принимает текст имиджа; проект сохраняем по Ctrl+Shift+S;
   // палитра открывается отовсюду
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
+  useWindowEvent('keydown', (e: KeyboardEvent) => {
       if (e.key.toLowerCase() === 's' && e.ctrlKey && e.shiftKey) { e.preventDefault(); save(); }
       else if ((e.key.toLowerCase() === 'p' && e.ctrlKey && e.shiftKey) || (e.key.toLowerCase() === 'k' && e.ctrlKey)) { e.preventDefault(); s.setPaletteOpen(true); }
       else if (e.key.toLowerCase() === 'f' && e.ctrlKey && e.shiftKey) { e.preventDefault(); s.setBottomTab('search'); }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [s.project?.native]);
+  });
 
   // автосохранение: проект в родном формате пишется сам через 30 с после правки
   useEffect(() => {

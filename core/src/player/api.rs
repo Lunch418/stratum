@@ -176,11 +176,11 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
             if svg.is_none() {
                 if let Some(file) = &c.icon_file {
                     if file.to_lowercase().ends_with(".vdr") {
-                        svg = gfx.load_picture_file(file).and_then(|pic| {
+                        svg = gfx.load_picture_file(file).map(|pic| {
                             let mut sp = Space::new(1, &name);
                             sp.load(&pic);
                             fit(&mut sp);
-                            Some(svg::render(&sp))
+                            svg::render(&sp)
                         });
                     } else if let Some(path) = gfx.find_file(file) {
                         svg = std::fs::read(path).ok().and_then(|bmp| sheet_icon(&bmp, c.icon_index.unwrap_or(0)));
@@ -374,7 +374,7 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
                 return error("400 Bad Request", "нужны class и name");
             };
             let picked: Vec<u16> = body.lines().filter_map(|l| l.trim().parse().ok()).collect();
-            if picked.len() < 1 {
+            if picked.is_empty() {
                 return error("400 Bad Request", "выберите хотя бы один блок");
             }
             let mut s = shared.lock().unwrap();
@@ -895,7 +895,8 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
             json(format!("[{}]", items.join(",")))
         }
         // вычислить выражение в контексте экземпляра (окно наблюдения)
-        ("GET", ["eval", index]) => {
+        // выражение может вызвать функцию с побочным эффектом — только POST
+        ("POST", ["eval", index]) => {
             let Ok(i) = index.parse::<usize>() else { return error("400 Bad Request", "нужен номер экземпляра") };
             let Some(expr) = super::param(query, "expr").map(super::url_decode) else {
                 return error("400 Bad Request", "нужно выражение expr");

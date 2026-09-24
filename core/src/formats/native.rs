@@ -415,39 +415,6 @@ pub fn export_stratum2000(dir: &Path, project: &LoadedProject) -> std::io::Resul
     Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn link_style_and_sheet_survive_round_trip() {
-        let dir = std::env::temp_dir().join(format!("stratum-native-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
-        let mut cls = Class { name: "Лист".into(), version: 0x3003, ..Default::default() };
-        cls.links.push(Link {
-            source: 1,
-            target: 2,
-            handle: 1,
-            flags: 0,
-            vars: vec![("a".into(), "b".into())],
-            style: LinkStyle { color: "#ff0000".into(), width: 2, disabled: true, arrows: true, layer: 3 },
-        });
-        cls.sheet = Some(SheetOptions { grid_visible: true, grid_step: (20.0, 25.0), layers: 0xffff_fffe, window_size: "fixed".into(), window_wh: (300.0, 200.0), ..Default::default() });
-        save_class(&dir, "list", &cls).unwrap();
-        let back = load_class(&dir, "list").unwrap().unwrap();
-        assert_eq!(back.links[0].style, cls.links[0].style);
-        assert_eq!(back.sheet, cls.sheet);
-        let _ = std::fs::remove_dir_all(&dir);
-    }
-
-    #[test]
-    fn file_names_are_safe() {
-        assert_eq!(file_stem("Root2787"), "Root2787");
-        assert_eq!(file_stem("a/b:c?"), "a_b_c_");
-        assert_eq!(file_stem("..."), "image");
-    }
-}
-
 pub fn link_style_json(st: &LinkStyle) -> Json {
     object(vec![
         ("color", Json::Str(st.color.clone())),
@@ -510,5 +477,38 @@ pub fn sheet_from(j: &Json) -> SheetOptions {
         // из JS маска может прийти со знаком (-1 = все слои)
         layers: (j.num_or("layers", d.layers as f64) as i64) as u32,
         no_subwindows: flag("noSubwindows", d.no_subwindows),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn link_style_and_sheet_survive_round_trip() {
+        let dir = std::env::temp_dir().join(format!("stratum-native-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let mut cls = Class { name: "Лист".into(), version: 0x3003, ..Default::default() };
+        cls.links.push(Link {
+            source: 1,
+            target: 2,
+            handle: 1,
+            flags: 0,
+            vars: vec![("a".into(), "b".into())],
+            style: LinkStyle { color: "#ff0000".into(), width: 2, disabled: true, arrows: true, layer: 3 },
+        });
+        cls.sheet = Some(SheetOptions { grid_visible: true, grid_step: (20.0, 25.0), layers: 0xffff_fffe, window_size: "fixed".into(), window_wh: (300.0, 200.0), ..Default::default() });
+        save_class(&dir, "list", &cls).unwrap();
+        let back = load_class(&dir, "list").unwrap().unwrap();
+        assert_eq!(back.links[0].style, cls.links[0].style);
+        assert_eq!(back.sheet, cls.sheet);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn file_names_are_safe() {
+        assert_eq!(file_stem("Root2787"), "Root2787");
+        assert_eq!(file_stem("a/b:c?"), "a_b_c_");
+        assert_eq!(file_stem("..."), "image");
     }
 }

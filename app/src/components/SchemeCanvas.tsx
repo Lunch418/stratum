@@ -2,6 +2,7 @@
 // панорама, зум к курсору, перетаскивание блоков, вход в подсхему.
 // Правка: перетаскивание имиджа из иерархии добавляет экземпляр, тяга от
 // порта к блоку создаёт связь, контекстное меню и Delete удаляют.
+import { useWindowEvent } from '../hooks';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, type ClassInfo } from '../api';
 import { classByName, useStore } from '../store';
@@ -108,8 +109,7 @@ export function SchemeCanvas() {
   }, [klass?.name, bounds?.x0, bounds?.y0]);
 
   // Delete / Escape
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
+  useWindowEvent('keydown', (e: KeyboardEvent) => {
       if ((e.target as HTMLElement).closest('input, textarea, select, .monaco-editor')) return;
       if (e.key === 'Escape') { setMenu(null); setWire(null); setRenaming(null); }
       if ((e.key === 'Delete' || e.key === 'Backspace') && editable && klass) {
@@ -131,10 +131,7 @@ export function SchemeCanvas() {
         e.preventDefault();
         pasteBlocks(clipboard);
       }
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [selNode, selLink, selSet, editable, klass?.name]);
+  });
 
   function fitAll() {
     const el = svgRef.current;

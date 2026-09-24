@@ -1,5 +1,13 @@
 //! Проверки на корпусе из `fixtures/` (собирается локально, см. README).
-//! Без корпуса тесты молча пропускаются.
+//!
+//! Без корпуса тесты **падают** с объяснением, а не проходят молча: иначе
+//! «зелёный» прогон в чистом клоне ничего не значит. Пропустить их явно —
+//! `STRATUM_SKIP_CORPUS=1 cargo test`; так делает CI, где корпуса нет, и в
+//! выводе остаётся строка «корпус пропущен».
+//!
+//! Важно: эталонные числа здесь получены этим же ядром. Они ловят
+//! регрессии, но не доказывают совпадения с Stratum 2000 — для этого нужна
+//! сверка с оригиналом (см. docs/verification.md).
 
 use std::path::{Path, PathBuf};
 use stratum_core::formats::{self, cls};
@@ -8,7 +16,14 @@ use stratum_core::sim::Simulation;
 
 fn fixtures() -> Option<PathBuf> {
     let p = Path::new(env!("CARGO_MANIFEST_DIR")).join("../fixtures");
-    p.is_dir().then_some(p)
+    if p.is_dir() {
+        return Some(p);
+    }
+    if std::env::var_os("STRATUM_SKIP_CORPUS").is_some() {
+        eprintln!("корпус пропущен: нет fixtures/ и задан STRATUM_SKIP_CORPUS");
+        return None;
+    }
+    panic!("нет корпуса fixtures/: соберите его `make corpus` (см. README) или пропустите явно: STRATUM_SKIP_CORPUS=1 cargo test");
 }
 
 fn libraries(root: &Path) -> Vec<PathBuf> {
@@ -27,8 +42,8 @@ fn collect(dir: &Path, out: &mut Vec<PathBuf>) {
 }
 
 /// Критерий приёмки этапа 1: «Солнечная система» считается, и значения
-/// на такте 100 воспроизводимы. Числа получены этим же ядром и зафиксированы
-/// как ожидание; сверка с оригиналом через Wine — отдельный шаг.
+/// на такте 100 воспроизводимы. ВНИМАНИЕ: числа получены этим же ядром
+/// (регрессионный эталон), с оригиналом ещё не сверены.
 #[test]
 fn solar_system_runs_100_ticks() {
     let Some(root) = fixtures() else { return };

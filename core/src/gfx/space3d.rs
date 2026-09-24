@@ -491,9 +491,9 @@ pub fn render_view(sp: &Space3d, cam: &Camera, x: f64, y: f64, w: f64, h: f64, o
         fitted = c;
         &fitted
     };
-    let _ = write!(
+    let _ = writeln!(
         out,
-        "<rect x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" fill=\"{}\"/>\n",
+        "<rect x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" fill=\"{}\"/>",
         x, y, w, h, color(cam.background)
     );
     let mut drawn: Vec<Drawn> = Vec::new();
@@ -531,7 +531,7 @@ pub fn render_view(sp: &Space3d, cam: &Camera, x: f64, y: f64, w: f64, h: f64, o
         }
     }
     drawn.sort_by(|a, b| b.depth.partial_cmp(&a.depth).unwrap_or(std::cmp::Ordering::Equal));
-    let _ = write!(out, "<clipPath id=\"v3d{}\"><rect x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\"/></clipPath><g clip-path=\"url(#v3d{})\">\n", sp.handle, x, y, w, h, sp.handle);
+    let _ = writeln!(out, "<clipPath id=\"v3d{}\"><rect x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\"/></clipPath><g clip-path=\"url(#v3d{})\">", sp.handle, x, y, w, h, sp.handle);
     for d in drawn {
         out.push_str(&d.svg);
     }

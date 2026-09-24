@@ -125,7 +125,7 @@ export const api = {
     fetch(`/api/breakpoint/add?${'index' in target ? 'index=' + target.index : 'class=' + encodeURIComponent(target.class)}&expr=${encodeURIComponent(expr)}`, { method: 'POST' }).then(r => r.json()),
   breakpointRemove: (id: number) => fetch(`/api/breakpoint/remove?id=${id}`, { method: 'POST' }),
   breakpointToggle: (id: number) => fetch(`/api/breakpoint/toggle?id=${id}`, { method: 'POST' }),
-  eval: (index: number, expr: string) => get<{ ok: boolean; value?: string; error?: string }>(`/api/eval/${index}?expr=${encodeURIComponent(expr)}`),
+  eval: (index: number, expr: string) => fetch(`/api/eval/${index}?expr=${encodeURIComponent(expr)}`, { method: 'POST' }).then(r => r.json() as Promise<{ ok: boolean; value?: string; error?: string }>),
   profile: () => get<{ tick: number; total: number; items: { index: number; path: string; class: string; ns: number }[] }>('/api/profile'),
   helpSearch: (q: string) => get<string[]>(`/api/help?q=${encodeURIComponent(q)}`),
   browse: (dir: string, ext = '') => get<{ dir: string; parent: string | null; entries: { name: string; path: string; kind: 'dir' | 'project' | 'file' }[] }>(`/api/browse?dir=${encodeURIComponent(dir)}${ext ? '&ext=' + ext : ''}`),

@@ -308,7 +308,7 @@ fn read_item(r: &mut Reader, ctx: &Ctx, id: u16, pic: &mut Picture) -> Result<()
 }
 
 fn read_object(r: &mut Reader, ctx: &Ctx, kind: u16) -> Result<ObjectKind> {
-    if matches!(kind, 3 | 4 | 5) {
+    if matches!(kind, 3..=5) {
         let mut children = Vec::new();
         if r.peek_u16(r.pos) == Some(chunk::ZORDER) {
             r.u16()?;

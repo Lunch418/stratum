@@ -286,6 +286,9 @@ pub const CONSTANTS: [(&str, f64); 414] = [
     ("pfc_setframe", 8192.0), // Paste from Clipboard
     ("pfc_strings", 16.0), // Paste from Clipboard
     ("pfc_texts", 64.0), // Paste from Clipboard
+    // значение из таблицы компилятора оригинала, не точное π — ради
+    // совпадения чисел со Stratum 2000
+    #[allow(clippy::approx_constant)]
     ("pi", 3.1415926536), // PI
     ("pm_points", 1.0), // Ogre Wrapper
     ("pm_solid", 3.0), // Ogre Wrapper

@@ -109,7 +109,7 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
         "arccos" => num(f(args, 0).clamp(-1.0, 1.0).acos()),
         "arctan" | "atan" => num(f(args, 0).atan()),
         "getanglebyxy" => num(f(args, 1).atan2(f(args, 0))),
-        "fileexist" => num(if std::path::Path::new(&s(args, 0)).exists() { 1.0 } else { 0.0 }),
+        "fileexist" => num(if super::extra::sandboxed(fx, &s(args, 0), false).is_some_and(|p| p.exists()) { 1.0 } else { 0.0 }),
         // диалог ввода строки: без окна возвращаем значение по умолчанию
         "inputbox" => {
             let d = s(args, 2);
@@ -426,7 +426,7 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
         }
         "msaveas" => {
             if f(args, 2) <= 0.0 { return Some(num(0.0)); }
-            let path = fx.gfx.project_dir.join(s(args, 1));
+            let Some(path) = super::extra::sandboxed(fx, &s(args, 1), true) else { return Some(boolean(false)) };
             boolean(fx.matrices.get(data::idx(f(args, 0)))
                 .is_some_and(|m| std::fs::write(&path, data::to_text(m)).is_ok()))
         }
