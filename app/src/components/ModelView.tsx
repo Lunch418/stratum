@@ -57,7 +57,12 @@ export function ModelView() {
   }, [frame]);
 
   if (!frame?.windows.length) return <div className="model"><div className="muted" style={{ color: '#eee' }}>Модель не открыла окон — нажмите Пуск или Шаг.</div>{frame?.dialog && <ModelDialogBox d={frame.dialog} />}</div>;
+  const unsupported = frame.unsupported ?? [];
   return <>
+    {unsupported.length > 0 && <div className="unsupported" role="status"
+      title={unsupported.map(u => `${u.name} — ${u.count} раз`).join('\n')}>
+      Модель вызывает функции, которых здесь нет: {unsupported.slice(0, 3).map(u => u.name).join(', ')}{unsupported.length > 3 ? ` и ещё ${unsupported.length - 3}` : ''}. Результат может отличаться от Stratum 2000.
+    </div>}
     {frame.canHyperBack && <button className="small hyper-back" onClick={() => api.event('type=hyperback')} title="Гипербаза: предыдущая страница">‹ Назад</button>}
     <div className="model" ref={host} tabIndex={0} title="Alt+щелчок — свойства объекта в инспекторе"
       onKeyDown={e => { e.preventDefault(); api.event(`type=key&msg=256&vk=${e.keyCode}`); }}

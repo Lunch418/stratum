@@ -358,5 +358,8 @@ button.attention { border-color: var(--state-pause); }
 .icon-grid .icon-cell:hover { border-color: var(--accent); }
 
 .hyper-back { position: absolute; z-index: 5; margin: 8px; }
+.unsupported { position: absolute; z-index: 5; right: 8px; bottom: 8px; max-width: 420px; padding: 6px 10px; border-radius: 6px;
+  font-size: 12px; line-height: 1.4; background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--state-pause);
+  border-left-width: 4px; box-shadow: var(--shadow-pop); }
 
 .scheme .band { fill: var(--accent-soft); stroke: var(--accent); stroke-dasharray: 4 3; opacity: .7; }

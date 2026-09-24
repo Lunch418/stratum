@@ -25,6 +25,8 @@ export interface Breakpoint { id: number; index: number | null; path: string; cl
 export interface ModelDialog { kind: 'message' | 'input' | 'open' | 'save' | 'folder' | 'color'; title: string; text: string; style: number; default: string }
 export interface Frame {
   tick: number; running: boolean; stopped: boolean; canBack: boolean; canHyperBack?: boolean; halt: Halt | null; dialog: ModelDialog | null;
+  /// вызовы, которые ядро не выполняет (базы данных, Ogre3D, анализатор текста…)
+  unsupported?: { name: string; count: number }[];
   windows: { id: number; name: string; w: number; h: number; size?: string; style?: string; svg: string; controls: Control[] }[];
   sounds: { cmd: 'play' | 'stop'; file: string; loop: boolean }[];
   log: string[];

@@ -475,16 +475,29 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
         "openvideo" | "createvideoframe2d" | "framegetvideo2d" => Value::Handle(0.0),
         "videosetpos2d" | "framesetpos2d" | "videoplay2d" | "videopause2d" | "videoresume2d" | "videostop2d" | "framesetsrcrect2d" | "videogetpos2d" | "getvideomarker" => num(0.0),
 
-        // ── базы данных, анализатор текста, плагины: нет ─────────────────
+        // ── базы данных, анализатор текста, ключи, NUI: подсистем нет ─────
+        // Отвечаем неудачей и считаем вызовы — плеер покажет их списком
+        // неподдерживаемых, а не будет молча делать вид, что всё работает.
         n if n.starts_with("db") => {
+            *fx.missing.entry(name.to_string()).or_insert(0) += 1;
             if n.ends_with("str") || n.contains("name") || n == "dbgetfield" { text("") } else { num(0.0) }
         }
-        "analyseword" | "getsentancetree" | "morphdivide" | "worddivide" | "getwordform" | "getwordinfo" | "getwordproperty" | "getwordpropertyinsent" | "getwordinsentbyrole" | "getanswer" => text(""),
-        "setmorphdivide" | "findnextword" | "findprevword" | "getwordformcount" | "searchwords" => num(0.0),
-        "getuserkeyvalue" | "getuserkeyfullvalue" => text(""),
-        "senduserresult" | "copyuserresult" | "userkeyisautorized" | "readuserkey" | "readprojectkey" => num(0.0),
-        "nui_destroyinstance" | "nui_getskeletonpositions" => num(0.0),
-        "nui_getdevicename" => text(""),
+        // InitAnalyzer: 0 — подключились к базе MySQL, 1 — нет
+        "initanalyzer" => {
+            *fx.missing.entry(name.to_string()).or_insert(0) += 1;
+            num(1.0)
+        }
+        "analyseword" | "getsentancetree" | "morphdivide" | "worddivide" | "getwordform" | "getwordinfo" | "getwordproperty" | "getwordpropertyinsent" | "getwordinsentbyrole" | "getanswer"
+        | "getuserkeyvalue" | "getuserkeyfullvalue" | "nui_getdevicename" => {
+            *fx.missing.entry(name.to_string()).or_insert(0) += 1;
+            text("")
+        }
+        "setmorphdivide" | "findnextword" | "findprevword" | "getwordformcount" | "searchwords"
+        | "senduserresult" | "copyuserresult" | "userkeyisautorized" | "readuserkey" | "readprojectkey"
+        | "nui_destroyinstance" | "nui_getskeletonpositions" => {
+            *fx.missing.entry(name.to_string()).or_insert(0) += 1;
+            num(0.0)
+        }
         // Ogre3D — отдельный движок; в ядре не поддерживается, считаем вызовы
         n if is_ogre(n) => {
             *fx.missing.entry(name.to_string()).or_insert(0) += 1;

@@ -916,8 +916,13 @@ fn frame_json(shared: &Arc<Mutex<Shared>>) -> String {
         ),
         None => "null".into(),
     };
+    // вызовы, которые ядро не выполняет (подсистем нет): плеер показывает
+    // их списком, чтобы модель не выглядела работающей, когда это не так
+    let mut unsupported: Vec<(&String, &u32)> = s.sim.effects.missing.iter().collect();
+    unsupported.sort();
+    let unsupported: Vec<String> = unsupported.iter().map(|(n, c)| format!("{{\"name\":{},\"count\":{c}}}", json_string(n))).collect();
     format!(
-        "{{\"tick\":{},\"running\":{},\"stopped\":{},\"canBack\":{},\"canHyperBack\":{},\"halt\":{},\"dialog\":{},\"windows\":[{}],\"sounds\":[{}],\"log\":[{}]}}",
+        "{{\"tick\":{},\"running\":{},\"stopped\":{},\"canBack\":{},\"canHyperBack\":{},\"halt\":{},\"dialog\":{},\"unsupported\":[{}],\"windows\":[{}],\"sounds\":[{}],\"log\":[{}]}}",
         s.sim.tick_number(),
         s.running,
         s.sim.stopped,
@@ -925,6 +930,7 @@ fn frame_json(shared: &Arc<Mutex<Shared>>) -> String {
         !s.sim.effects.gfx.hyper_history.is_empty(),
         halt,
         dialog,
+        unsupported.join(","),
         windows.join(","),
         sounds.join(","),
         log.join(",")
