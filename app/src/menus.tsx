@@ -94,7 +94,7 @@ export function buildMenus(ctx: MenuContext): Menu[] {
       { label: 'Имидж…', hint: 'перетащить из иерархии', run: () => { s.setTab('scheme'); s.showToast('Перетащите имидж из иерархии на схему'); } },
       { label: 'Связь', run: () => { s.setTab('scheme'); s.showToast('Потяните от порта блока к другому блоку'); } },
       { label: 'Создать и вставить новый имидж', run: ctx.newClassOnScheme, disabled: noProject || lib },
-      { label: 'Контактная площадка', disabled: true, why: 'Не реализовано: контактные площадки схемы' },
+      { label: 'Контактная площадка', hint: 'щелчок на схеме', disabled: noProject || lib, run: () => { if (s.tab !== 'scheme') s.setTab('scheme'); setTimeout(() => window.dispatchEvent(new CustomEvent('insert-pad')), 50); } },
       { sep: true },
       { label: 'Новый двухмерный объект', sub: [
         drawTool('Линия', 'line'), drawTool('Полилиния', 'polyline', 'Ctrl+P'), drawTool('Прямоугольник', 'rect', 'Ctrl+B'), drawTool('Скруглённый прямоугольник', 'roundrect', 'Ctrl+U'), drawTool('Эллипс', 'ellipse', 'Ctrl+E'),

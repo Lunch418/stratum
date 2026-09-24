@@ -5,7 +5,10 @@ export interface Variable {
 }
 export interface Child { handle: number; class: string; name: string; x: number; y: number }
 export interface LinkStyle { color: string; width: number; disabled: boolean; arrows: boolean; layer: number }
-export interface Link { handle: number; source: number; target: number; vars: [string, string][]; style: LinkStyle }
+/// pad — контактная площадка со стороны самого имиджа (handle 0); 0 — не указана
+export interface Link { handle: number; source: number; target: number; vars: [string, string][]; style: LinkStyle; pad: number }
+/// Контактная площадка схемы: через неё связи идут к переменным самого имиджа.
+export interface Pad { id: number; x: number; y: number }
 /// Параметры листа (диалог «Параметры листа»): сетка, окно модели, слои.
 export interface Sheet {
   gridOrigin: [number, number]; gridStep: [number, number]; gridVisible: boolean; gridSnap: boolean;
@@ -14,7 +17,7 @@ export interface Sheet {
 }
 export interface ClassInfo {
   name: string; library: boolean; description: string; vars: Variable[];
-  declared: { name: string; type: string }[]; text: string; children: Child[]; links: Link[];
+  declared: { name: string; type: string }[]; text: string; children: Child[]; links: Link[]; pads: Pad[];
   hasIcon: boolean; hasScheme: boolean; hasImage: boolean; source: string; flags: number; sheet: Sheet;
 }
 export interface ProjectProperty { key: string; int?: number; text?: string }
@@ -99,10 +102,16 @@ export const api = {
   renameChild: (klass: string, handle: number, name: string) =>
     fetch(`/api/child/rename?class=${encodeURIComponent(klass)}&handle=${handle}&name=${encodeURIComponent(name)}`, { method: 'POST' }),
   // handle 0 — новая связь; пустой список пар удаляет связь
-  setLink: async (klass: string, handle: number, source: number, target: number, pairs: [string, string][]) => {
-    const r = await fetch(`/api/link/set?class=${encodeURIComponent(klass)}&handle=${handle}&source=${source}&target=${target}`, { method: 'POST', body: pairs.map(p => p.join('\t')).join('\n') });
+  setLink: async (klass: string, handle: number, source: number, target: number, pairs: [string, string][], pad = 0) => {
+    const r = await fetch(`/api/link/set?class=${encodeURIComponent(klass)}&handle=${handle}&source=${source}&target=${target}${pad ? '&pad=' + pad : ''}`, { method: 'POST', body: pairs.map(p => p.join('\t')).join('\n') });
     return r.json() as Promise<{ ok: boolean; handle: number }>;
   },
+  padAdd: (klass: string, x: number, y: number) =>
+    fetch(`/api/pad/add?class=${encodeURIComponent(klass)}&x=${x}&y=${y}`, { method: 'POST' }).then(r => r.json() as Promise<{ ok: boolean; id: number }>),
+  padMove: (klass: string, id: number, x: number, y: number) =>
+    fetch(`/api/pad/move?class=${encodeURIComponent(klass)}&id=${id}&x=${x}&y=${y}`, { method: 'POST' }),
+  padRemove: (klass: string, id: number) =>
+    fetch(`/api/pad/remove?class=${encodeURIComponent(klass)}&id=${id}`, { method: 'POST' }).then(r => r.json() as Promise<{ ok: boolean; links: number }>),
   removeLink: (klass: string, handle: number) =>
     fetch(`/api/link/remove?class=${encodeURIComponent(klass)}&handle=${handle}`, { method: 'POST' }),
   newClass: async (name: string) => {

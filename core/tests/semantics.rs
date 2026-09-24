@@ -73,7 +73,7 @@ fn class(name: &str, vars: Vec<Variable>, text: &str, children: &[(&str, &str, u
         vars,
         text: text.into(),
         children: children.iter().map(|&(c, n, h)| Child { class_name: c.into(), handle: h, name: n.into(), x: 0.0, y: 0.0, flags: 0 }).collect(),
-        links: links.iter().map(|&(s, t, a, b)| Link { source: s, target: t, handle: 100 + s, flags: 0, vars: vec![(a.into(), b.into())], style: Default::default() }).collect(),
+        links: links.iter().map(|&(s, t, a, b)| Link { source: s, target: t, handle: 100 + s, flags: 0, vars: vec![(a.into(), b.into())], ..Default::default() }).collect(),
         ..Default::default()
     }
 }

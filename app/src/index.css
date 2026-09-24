@@ -221,6 +221,15 @@ table.vars input:focus { border-color: var(--accent); background: var(--bg-surfa
 .scheme .port { cursor: crosshair; }
 .scheme .port:hover { r: 6; }
 .scheme .node.self rect.box { stroke-dasharray: 4 3; fill: var(--bg-canvas); }
+/* контактная площадка: кольцо тянет связь, середина — перемещает */
+.scheme .pad { cursor: crosshair; }
+.scheme .pad .pad-ring { fill: var(--bg-surface); stroke: var(--accent); stroke-width: 2; filter: drop-shadow(0 1px 0 rgba(20,23,31,.08)); }
+.scheme .pad .pad-core { fill: var(--accent); cursor: move; }
+.scheme .pad:hover .pad-ring { stroke-width: 3; }
+.scheme .pad.selected .pad-ring { stroke-width: 3; filter: drop-shadow(0 0 3px var(--accent)); }
+.scheme .pad .pad-label { font-size: 11px; font-weight: 600; fill: var(--accent-ink, var(--accent)); font-family: var(--font-mono); pointer-events: none; paint-order: stroke; stroke: var(--bg-canvas); stroke-width: 3px; stroke-linejoin: round; }
+.scheme.placing svg.canvas { cursor: copy; }
+.scheme .toolbar button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 .scheme .hint { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); font-size: 12px; pointer-events: none; }
 .context { position: fixed; z-index: 30; background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-panel); box-shadow: var(--shadow-pop); padding: 4px; min-width: 180px; display: flex; flex-direction: column; }
 .context button { border: 0; background: transparent; text-align: left; padding: 6px 10px; border-radius: 3px; display: flex; justify-content: space-between; gap: 12px; }

@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 
 use super::json::{self, object, Json};
 use super::project::{Project, ProjectVariable, Property, PropertyValue, State, StateImage};
-use super::{Child, Class, FormatError, Link, LinkStyle, LoadedProject, SheetOptions, Variable};
+use super::{Child, Class, FormatError, Link, LinkStyle, LoadedProject, Pad, SheetOptions, Variable};
 
 pub const FORMAT: &str = "stratum-modern/1";
 pub const PROJECT_FILE: &str = "project.json";
@@ -198,6 +198,9 @@ fn save_class(dir: &Path, stem: &str, cls: &Class) -> std::io::Result<()> {
             if !l.style.is_default() {
                 pairs.push(("style", link_style_json(&l.style)));
             }
+            if l.pad != 0 {
+                pairs.push(("pad", Json::Number(l.pad as f64)));
+            }
             object(pairs)
         })
         .collect();
@@ -213,6 +216,10 @@ fn save_class(dir: &Path, stem: &str, cls: &Class) -> std::io::Result<()> {
     }
     if let Some(sh) = &cls.sheet {
         pairs.push(("sheet", sheet_json(sh)));
+    }
+    if !cls.pads.is_empty() {
+        let pads = cls.pads.iter().map(|p| object(vec![("id", Json::Number(p.id as f64)), ("x", Json::Number(p.x)), ("y", Json::Number(p.y))])).collect();
+        pairs.push(("pads", Json::Array(pads)));
     }
     if let Some(f) = &cls.icon_file {
         pairs.push(("iconFile", Json::Str(f.clone())));
@@ -377,10 +384,19 @@ fn load_class(dir: &Path, stem: &str) -> std::io::Result<Result<Class, FormatErr
             flags: l.num_or("flags", 0.0) as u32,
             vars: pairs_from(l.get("vars")),
             style: l.get("style").map(link_style_from).unwrap_or_default(),
+            pad: l.num_or("pad", 0.0) as u16,
         })
         .collect();
+    let pads: Vec<Pad> = j
+        .get("pads")
+        .and_then(Json::as_array)
+        .into_iter()
+        .flatten()
+        .map(|p| Pad { id: p.num_or("id", 0.0) as u16, x: p.num_or("x", 0.0), y: p.num_or("y", 0.0) })
+        .collect();
+    let has_pads = j.get("pads").is_some();
 
-    Ok(Ok(Class {
+    let mut cls = Class {
         name: j.str_or("name", stem),
         source: meta_path.display().to_string(),
         version: 0x3003,
@@ -400,7 +416,13 @@ fn load_class(dir: &Path, stem: &str) -> std::io::Result<Result<Class, FormatErr
         equations: read_opt("eq.bin")?,
         timestamp: j.get("timestamp").and_then(Json::as_f64).map(|t| t as u32),
         flags: j.get("flags").and_then(Json::as_f64).map(|f| f as u32),
-    }))
+        pads,
+    };
+    // проекты, сконвертированные до появления площадок: найти их по графике
+    if !has_pads {
+        cls.detect_pads();
+    }
+    Ok(Ok(cls))
 }
 
 /// Экспорт в формат Stratum 2000: `project.spj` и `.cls` рядом.
@@ -562,12 +584,17 @@ mod tests {
             flags: 0,
             vars: vec![("a".into(), "b".into())],
             style: LinkStyle { color: "#ff0000".into(), width: 2, disabled: true, arrows: true, layer: 3 },
+            pad: 0,
         });
+        cls.links.push(Link { source: 0, target: 2, handle: 3, vars: vec![("x".into(), "y".into())], pad: 4, ..Default::default() });
+        cls.pads.push(Pad { id: 4, x: -16.0, y: 40.5 });
         cls.sheet = Some(SheetOptions { grid_visible: true, grid_step: (20.0, 25.0), layers: 0xffff_fffe, window_size: "fixed".into(), window_wh: (300.0, 200.0), ..Default::default() });
         save_class(&dir, "list", &cls).unwrap();
         let back = load_class(&dir, "list").unwrap().unwrap();
         assert_eq!(back.links[0].style, cls.links[0].style);
         assert_eq!(back.sheet, cls.sheet);
+        assert_eq!(back.links[1].pad, 4);
+        assert_eq!(back.pads, cls.pads);
         let _ = std::fs::remove_dir_all(&dir);
     }
 

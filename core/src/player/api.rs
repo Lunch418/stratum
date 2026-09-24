@@ -61,12 +61,13 @@ fn class_json(c: &cls::Class, library: bool, model: Option<&lang::Model>) -> Str
         .map(|l| {
             let pairs: Vec<String> = l.vars.iter().map(|(a, b)| format!("[{},{}]", json_string(a), json_string(b))).collect();
             format!(
-                "{{\"handle\":{},\"source\":{},\"target\":{},\"vars\":[{}],\"style\":{}}}",
+                "{{\"handle\":{},\"source\":{},\"target\":{},\"vars\":[{}],\"style\":{},\"pad\":{}}}",
                 l.handle,
                 l.source,
                 l.target,
                 pairs.join(","),
-                crate::formats::native::link_style_json(&l.style).compact()
+                crate::formats::native::link_style_json(&l.style).compact(),
+                l.pad
             )
         })
         .collect();
@@ -79,8 +80,9 @@ fn class_json(c: &cls::Class, library: bool, model: Option<&lang::Model>) -> Str
                 .collect()
         })
         .unwrap_or_default();
+    let pads: Vec<String> = c.pads.iter().map(|p| format!("{{\"id\":{},\"x\":{},\"y\":{}}}", p.id, num(p.x), num(p.y))).collect();
     format!(
-        "{{\"name\":{},\"library\":{},\"description\":{},\"vars\":[{}],\"declared\":[{}],\"text\":{},\"children\":[{}],\"links\":[{}],\"hasIcon\":{},\"hasScheme\":{},\"hasImage\":{},\"source\":{},\"flags\":{},\"sheet\":{}}}",
+        "{{\"name\":{},\"library\":{},\"description\":{},\"vars\":[{}],\"declared\":[{}],\"text\":{},\"children\":[{}],\"links\":[{}],\"pads\":[{}],\"hasIcon\":{},\"hasScheme\":{},\"hasImage\":{},\"source\":{},\"flags\":{},\"sheet\":{}}}",
         json_string(&c.name),
         library,
         json_string(&c.description),
@@ -89,6 +91,7 @@ fn class_json(c: &cls::Class, library: bool, model: Option<&lang::Model>) -> Str
         json_string(&c.text),
         children.join(","),
         links.join(","),
+        pads.join(","),
         c.icon.is_some() || c.icon_file.is_some(),
         c.scheme.is_some(),
         c.image.is_some(),
@@ -96,6 +99,12 @@ fn class_json(c: &cls::Class, library: bool, model: Option<&lang::Model>) -> Str
         c.flags.unwrap_or(0),
         crate::formats::native::sheet_json(c.sheet.as_ref().unwrap_or(&Default::default())).compact()
     )
+}
+
+/// Свободный дескриптор на листе: не занят ни блоком, ни связью, ни площадкой.
+fn free_handle(c: &cls::Class) -> u16 {
+    let used = c.children.iter().map(|x| x.handle).chain(c.links.iter().map(|l| l.handle)).chain(c.pads.iter().map(|p| p.id));
+    used.max().unwrap_or(0).saturating_add(1).max(1)
 }
 
 fn parse_error_json(e: &lang::ParseError) -> String {
@@ -196,7 +205,11 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
             let Some(c) = s.project.class(&name) else { return error("404 Not Found", "нет такого имиджа") };
             let blob = c.image.as_deref().or(c.scheme.as_deref());
             match blob.and_then(|b| vdr::parse(b, &name).ok()) {
-                Some(pic) => {
+                Some(mut pic) => {
+                    // растры контактных площадок IDE рисует сама
+                    let is_pad = |h: u16| c.pads.iter().any(|p| p.id == h);
+                    pic.zorder.retain(|h| !is_pad(*h));
+                    pic.objects.retain(|o| !is_pad(o.handle));
                     let mut sp = Space::new(1, &name);
                     sp.load(&pic);
                     let bounds = bounds_json(&sp);
@@ -422,7 +435,7 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
                                 new_cls.vars.push(cls::Variable { name: inner_var.clone(), description: format!("из {inner_class}"), default: String::new(), var_type: var_type(&s, &inner_class, inner_var), flags: 0 });
                             }
                             // внутри: сам имидж (handle 0) ↔ блок
-                            new_cls.links.push(cls::Link { source: 0, target: inner, handle: next_inner, flags: 0, vars: vec![(inner_var.clone(), inner_var.clone())], style: Default::default() });
+                            new_cls.links.push(cls::Link { source: 0, target: inner, handle: next_inner, flags: 0, vars: vec![(inner_var.clone(), inner_var.clone())], ..Default::default() });
                             next_inner += 1;
                             outer_pairs.push(if src_in { (inner_var.clone(), outer_var.clone()) } else { (outer_var.clone(), inner_var.clone()) });
                         }
@@ -471,6 +484,8 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
             let source: u16 = src.parse().unwrap_or(0);
             let target: u16 = dst.parse().unwrap_or(0);
             let handle: u16 = get("handle").and_then(|v| v.parse().ok()).unwrap_or(0);
+            // контактная площадка со стороны самого имиджа (handle 0)
+            let pad: Option<u16> = get("pad").and_then(|v| v.parse().ok());
             let vars: Vec<(String, String)> = body
                 .lines()
                 .filter_map(|l| {
@@ -494,16 +509,63 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
                     cls.links[k].source = source;
                     cls.links[k].target = target;
                     cls.links[k].vars = vars;
+                    if let Some(p) = pad {
+                        cls.links[k].pad = p;
+                    }
                     handle
                 }
                 (None, true) => 0,
                 (None, false) => {
-                    let h = cls.links.iter().map(|l| l.handle).max().unwrap_or(0) + 1;
-                    cls.links.push(cls::Link { source, target, handle: h, flags: 0, vars, style: Default::default() });
+                    // дескрипторы связей, блоков и площадок в оригинале — из одного
+                    // пространства объектов листа: новый не должен совпасть ни с одним
+                    let h = free_handle(cls);
+                    cls.links.push(cls::Link { source, target, handle: h, flags: 0, vars, pad: pad.unwrap_or(0), ..Default::default() });
                     h
                 }
             };
             json(format!("{{\"ok\":true,\"handle\":{result_handle}}}"))
+        }
+        // контактная площадка: добавить (class, x, y), передвинуть (class, id, x, y),
+        // удалить (class, id) — вместе со связями, которые к ней подходят
+        ("POST", ["pad", op]) => {
+            let get = |k: &str| super::param(query, k).map(super::url_decode);
+            let Some(class) = get("class") else { return error("400 Bad Request", "нужен class") };
+            let f = |k: &str| get(k).and_then(|v| v.parse::<f64>().ok()).filter(|v| v.is_finite());
+            let id: u16 = get("id").and_then(|v| v.parse().ok()).unwrap_or(0);
+            let mut s = shared.lock().unwrap();
+            let Some(i) = s.project.classes.iter().position(|c| c.name.eq_ignore_ascii_case(&class)) else {
+                return error("404 Not Found", "нет такого имиджа");
+            };
+            if *op != "add" && !s.project.classes[i].pads.iter().any(|p| p.id == id) {
+                return error("404 Not Found", "нет такой площадки");
+            }
+            match *op {
+                "add" => {
+                    s.remember();
+                    let cls = &mut s.project.classes[i];
+                    let id = free_handle(cls);
+                    cls.pads.push(cls::Pad { id, x: f("x").unwrap_or(0.0), y: f("y").unwrap_or(0.0) });
+                    json(format!("{{\"ok\":true,\"id\":{id}}}"))
+                }
+                "move" => {
+                    s.remember();
+                    let (x, y) = (f("x"), f("y"));
+                    if let Some(p) = s.project.classes[i].pads.iter_mut().find(|p| p.id == id) {
+                        p.x = x.unwrap_or(p.x);
+                        p.y = y.unwrap_or(p.y);
+                    }
+                    json("{\"ok\":true}".into())
+                }
+                "remove" => {
+                    s.remember();
+                    let cls = &mut s.project.classes[i];
+                    cls.pads.retain(|p| p.id != id);
+                    let before = cls.links.len();
+                    cls.links.retain(|l| !(l.pad == id && (l.source == 0 || l.target == 0)));
+                    json(format!("{{\"ok\":true,\"links\":{}}}", before - cls.links.len()))
+                }
+                _ => error("404 Not Found", "неизвестная операция"),
+            }
         }
         // оформление связи: class, handle; тело — JSON стиля
         ("POST", ["link", "style"]) => {

@@ -32,7 +32,7 @@ fn resistor_ring_is_solved_each_tick() {
         text: "f = 0\n?f".into(),
         ..Default::default()
     };
-    let link = |handle, source, target, a: &str, b: &str| Link { handle, source, target, flags: 0, vars: vec![(a.into(), b.into())], style: Default::default() };
+    let link = |handle, source, target, a: &str, b: &str| Link { handle, source, target, flags: 0, vars: vec![(a.into(), b.into())], ..Default::default() };
     let root = Class {
         name: "Root".into(),
         version: 0x3003,

@@ -90,6 +90,20 @@ pub struct Link {
     pub flags: u32,
     pub vars: Vec<(String, String)>,
     pub style: LinkStyle,
+    /// Контактная площадка, к которой подходит связь со стороны самого
+    /// имиджа (`source` или `target` = 0); 0 — площадка не указана.
+    pub pad: u16,
+}
+
+/// Контактная площадка схемы: точка, через которую связи идут к переменным
+/// самого имиджа (в связях это handle 0). В `.cls` площадка — отдельный
+/// растр на листе, к которому подходит линия связи; `id` — handle этого
+/// растра, `x`, `y` — левый верхний угол.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Pad {
+    pub id: u16,
+    pub x: f64,
+    pub y: f64,
 }
 
 /// Параметры листа (диалог «Параметры листа»: сетка, окно, слои).
@@ -161,6 +175,8 @@ pub struct Class {
     pub flags: Option<u32>,
     /// Параметры листа; `None` — по умолчанию (в `.cls` не хранятся).
     pub sheet: Option<SheetOptions>,
+    /// Контактные площадки схемы.
+    pub pads: Vec<Pad>,
 }
 
 impl Class {
@@ -172,6 +188,62 @@ impl Class {
     /// Имя экземпляра на схеме: собственное, иначе имя класса.
     pub fn instance_name(child: &Child) -> &str {
         if child.name.is_empty() { &child.class_name } else { &child.name }
+    }
+
+    /// Найти контактные площадки по графике листа оригинала: линия связи с
+    /// handle самой связи одним концом приходит к блоку, другим — к растру вне
+    /// групп; этот растр и есть площадка.
+    pub fn detect_pads(&mut self) {
+        if !self.links.iter().any(|l| l.source == 0 || l.target == 0) {
+            return;
+        }
+        let pics: Vec<super::vdr::Picture> = [self.image.as_deref(), self.scheme.as_deref()]
+            .into_iter()
+            .flatten()
+            .filter_map(|b| super::vdr::parse(b, &self.name).ok())
+            .collect();
+        for pic in &pics {
+            let grouped: std::collections::HashSet<u16> = pic
+                .objects
+                .iter()
+                .flat_map(|o| match &o.kind {
+                    super::vdr::ObjectKind::Group { children } => children.clone(),
+                    _ => Vec::new(),
+                })
+                .collect();
+            let bitmap_at = |p: (f64, f64)| {
+                pic.objects.iter().find_map(|o| match o.kind {
+                    super::vdr::ObjectKind::Bitmap { x, y, w, h, .. }
+                        if !grouped.contains(&o.handle) && p.0 >= x - 2.0 && p.0 <= x + w + 2.0 && p.1 >= y - 2.0 && p.1 <= y + h + 2.0 =>
+                    {
+                        Some(Pad { id: o.handle, x, y })
+                    }
+                    _ => None,
+                })
+            };
+            for i in 0..self.links.len() {
+                let l = &self.links[i];
+                if l.pad != 0 || (l.source != 0 && l.target != 0) {
+                    continue;
+                }
+                let Some(super::vdr::ObjectKind::Polyline { points, .. }) = pic.object(l.handle).map(|o| &o.kind) else { continue };
+                let (Some(&first), Some(&last)) = (points.first(), points.last()) else { continue };
+                // конец, дальний от блока; если блока не видно — любой подходящий
+                let other = if l.source == 0 { l.target } else { l.source };
+                let ends = match self.child(other) {
+                    Some(c) => {
+                        let d = |p: (f64, f64)| (p.0 - c.x - 16.0).powi(2) + (p.1 - c.y - 16.0).powi(2);
+                        if d(first) > d(last) { [first, last] } else { [last, first] }
+                    }
+                    None => [first, last],
+                };
+                let Some(pad) = ends.into_iter().find_map(bitmap_at) else { continue };
+                self.links[i].pad = pad.id;
+                if !self.pads.iter().any(|p| p.id == pad.id) {
+                    self.pads.push(pad);
+                }
+            }
+        }
     }
 }
 
@@ -194,6 +266,7 @@ pub fn parse(data: &[u8], path: &str) -> Result<Class> {
         }
         read_section(&mut r, id, version, index_at, &mut cls)?;
     }
+    cls.detect_pads();
     Ok(cls)
 }
 
@@ -239,7 +312,7 @@ fn read_section(
                 for _ in 0..pairs {
                     vars.push((r.string()?, r.string()?));
                 }
-                cls.links.push(Link { source, target, handle, flags, vars, style: LinkStyle::default() });
+                cls.links.push(Link { source, target, handle, flags, vars, ..Default::default() });
             }
         }
         section::CHILDREN => {
@@ -421,7 +494,7 @@ mod tests {
             vars: vec![Variable { name: "x".into(), description: String::new(), default: "1.5".into(), var_type: "FLOAT".into(), flags: 0x100 }],
             text: "x := ~x + 1".into(),
             children: vec![Child { class_name: "Луна".into(), handle: 3, name: String::new(), x: -12.0, y: 48.5, flags: 0 }],
-            links: vec![Link { source: 0, target: 3, handle: 1, flags: 0, vars: vec![("x".into(), "y".into())], style: LinkStyle::default() }],
+            links: vec![Link { source: 0, target: 3, handle: 1, flags: 0, vars: vec![("x".into(), "y".into())], ..Default::default() }],
             icon: Some(vec![1, 2, 3]),
             timestamp: Some(7),
             flags: Some(0x200),
@@ -453,6 +526,15 @@ mod tests {
         assert_eq!(cls.version, 0x3003);
         assert!(cls.vars.iter().any(|v| v.name == "WindowName" && v.var_type == "STRING"));
         assert!(cls.text.contains("SetControlText2d"));
+    }
+
+    #[test]
+    fn finds_contact_pad_by_link_line() {
+        // «Двигатель»: связь 110 от блока 105 к самому имиджу подходит к растру 85
+        let Some(data) = fixture("PROJECTS/samples/ENGINE/ENGI2642.cls") else { return };
+        let cls = parse(&data, "ENGI2642.cls").unwrap();
+        assert_eq!(cls.pads, vec![Pad { id: 85, x: 480.0, y: 96.0 }]);
+        assert_eq!(cls.links.iter().find(|l| l.handle == 110).unwrap().pad, 85);
     }
 
     #[test]
