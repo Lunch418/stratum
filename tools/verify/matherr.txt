@@ -1,0 +1,15 @@
+# математические ошибки в режиме «Не замечать» (MathMode = 3): что получает
+# модель вместо окна «Математическая ошибка»
+% MathMode = 3
+div0         | 1/0
+div0_neg     | -1/0
+zero_zero    | 0/0
+mod0         | 5%0
+sqrt_neg     | sqrt(-1)
+ln0          | ln(0)
+ln_neg       | ln(-1)
+lg0          | lg(0)
+exp_big      | exp(1000)
+pow_neg      | (-8)^(1/3)
+div0_use     | 1/0 + 1
+div0_cmp     | 1/0 > 5

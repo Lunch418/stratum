@@ -62,6 +62,10 @@ pub struct Effects {
     pub outputs: Vec<(usize, Value)>,
     /// Команды звука для плеера: (`play`|`stop`, файл, зациклить).
     pub sounds: Vec<(String, String, bool)>,
+    /// Математические ошибки такта (деление на ноль, логарифм неположительного,
+    /// переполнение…): ядро подставляет значение, как оригинал, а плеер
+    /// решает по MathMode — остановиться, предупредить или записать.
+    pub math_errors: Vec<String>,
     /// Диалоги модели (`MessageBox`, `InputBox`): такт выполняется заново
     /// после ответа пользователя, ответы подставляются по порядку вызовов.
     pub dialog_answers: Vec<Value>,
@@ -117,14 +121,29 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
         }
         "change" => Value::Str(s(args, 0).replace(&s(args, 1), &s(args, 2))),
         "replicate" => Value::Str(s(args, 0).repeat(f(args, 1).max(0.0) as usize)),
-        "exp" => num(f(args, 0).exp()),
-        "ln" => num(safe_ln(f(args, 0))),
-        "lg" => num(safe_log10(f(args, 0))),
+        // подставные значения при ошибке — как у оригинала (сверено в Wine,
+        // tools/verify/matherr.txt, power.txt): exp с переполнением — 1.7e308,
+        // ln и lg неположительного — -1.7e308 и -1.7e308/ln(10)
+        "exp" => {
+            let v = f(args, 0).exp();
+            if v.is_finite() { num(v) } else { fx.math_errors.push("exp: переполнение".into()); num(MATH_HUGE) }
+        }
+        "ln" => {
+            let x = f(args, 0);
+            if x > 0.0 { num(x.ln()) } else { fx.math_errors.push(format!("ln({}): аргумент не положителен", super::value::format_g(x))); num(-MATH_HUGE) }
+        }
+        "lg" => {
+            let x = f(args, 0);
+            if x > 0.0 { num(x.log10()) } else { fx.math_errors.push(format!("lg({}): аргумент не положителен", super::value::format_g(x))); num(-MATH_HUGE / std::f64::consts::LN_10) }
+        }
         "log" => {
             let (base, x) = (f(args, 0), f(args, 1));
             if base > 0.0 && base != 1.0 && x > 0.0 { num(x.log(base)) } else { num(0.0) }
         }
-        "sqrt" => num(if f(args, 0) >= 0.0 { f(args, 0).sqrt() } else { 0.0 }),
+        "sqrt" => {
+            let x = f(args, 0);
+            if x >= 0.0 { num(x.sqrt()) } else { fx.math_errors.push(format!("sqrt({}): отрицательный аргумент", super::value::format_g(x))); num(0.0) }
+        }
         "sqr" => num(f(args, 0) * f(args, 0)),
         "abs" => num(f(args, 0).abs()),
         "sgn" => num(match f(args, 0) {
@@ -558,10 +577,15 @@ pub fn call_stub(name: &str, fx: &mut Effects) -> Value {
     Value::Float(0.0)
 }
 
+/// «Бесконечность» оригинала: подставляется при переполнении.
+pub const MATH_HUGE: f64 = 1.7e308;
+
+#[allow(dead_code)]
 fn safe_ln(x: f64) -> f64 {
     if x > 0.0 { x.ln() } else { 0.0 }
 }
 
+#[allow(dead_code)]
 fn safe_log10(x: f64) -> f64 {
     if x > 0.0 { x.log10() } else { 0.0 }
 }

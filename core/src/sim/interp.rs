@@ -260,7 +260,11 @@ impl Interpreter {
             Expr::Binary(op, l, r) => {
                 let a = self.eval_in(l, vars, phase)?;
                 let b = self.eval_in(r, vars, phase)?;
-                binary(*op, a, b)
+                let (v, err) = checked_binary(*op, a, b);
+                if let Some(e) = err {
+                    vars.effects().math_errors.push(e);
+                }
+                v
             }
             Expr::Call(name, args) => {
                 // старые имена функций (GetObjectSize2dy…) — как нынешние
@@ -297,6 +301,43 @@ fn var_name(e: &Expr) -> Option<&str> {
         Expr::Var(name) => Some(name),
         Expr::Unary(UnOp::Old, inner) => var_name(inner),
         _ => None,
+    }
+}
+
+/// Операция с ошибками арифметики, как у оригинала (сверено в Wine,
+/// tools/verify/matherr.txt, power.txt): деление на ноль — 0; переполнение
+/// `+ - * /` — левый операнд; степень отрицательного числа в дробной
+/// степени — от модуля; `0^0` и `0` в отрицательной степени — 0.
+fn checked_binary(op: BinOp, a: Value, b: Value) -> (Value, Option<String>) {
+    use BinOp::*;
+    let strings = matches!(a, Value::Str(_)) || matches!(b, Value::Str(_));
+    if strings || !matches!(op, Add | Sub | Mul | Div | Mod | Pow) {
+        return (binary(op, a, b), None);
+    }
+    let (x, y) = (a.as_float(), b.as_float());
+    let sign = match op {
+        Add => "+",
+        Sub => "-",
+        Mul => "*",
+        Div => "/",
+        Mod => "%",
+        _ => "^",
+    };
+    if matches!(op, Div | Mod) && y == 0.0 {
+        return (Value::Float(0.0), Some(format!("{sign}: деление на ноль")));
+    }
+    if op == Pow {
+        if x == 0.0 && y <= 0.0 {
+            return (Value::Float(0.0), Some("^: ноль в неположительной степени".into()));
+        }
+        if x < 0.0 && y.fract() != 0.0 {
+            return (Value::Float(x.abs().powf(y)), Some("^: отрицательное число в дробной степени".into()));
+        }
+    }
+    let v = binary(op, a, b);
+    match v {
+        Value::Float(r) if !r.is_finite() && x.is_finite() && y.is_finite() => (Value::Float(x), Some(format!("{sign}: переполнение"))),
+        _ => (v, None),
     }
 }
 

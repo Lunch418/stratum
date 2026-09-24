@@ -40,3 +40,27 @@ fn latin_names_ignore_case() {
     let sim = run(&[("Speed", "FLOAT"), ("x", "FLOAT")], "SPEED := 2\nx := ~speed * 3");
     assert_eq!(value(&sim, "x"), "6");
 }
+
+/// Подставные значения при математических ошибках — эталоны получены от
+/// Stratum 2000 в режиме «Не замечать» (tools/verify/matherr.txt, power.txt).
+#[test]
+fn math_errors_give_the_originals_values() {
+    let cases = [
+        ("1/0", "0"),
+        ("5%0", "0"),
+        ("sqrt(-1)", "0"),
+        ("ln(0)", "-1.7e+308"),
+        ("lg(0)", "-7.38301e+307"),
+        ("exp(1000)", "1.7e+308"),
+        ("(-4)^0.5", "2"),
+        ("(-2)^3", "-8"),
+        ("0^0", "0"),
+        ("1e308 * 10", "1e+308"),
+        ("10 * 5e307", "10"),
+    ];
+    for (expr, want) in cases {
+        let sim = run(&[("x", "STRING")], &format!("x := String({expr})"));
+        assert_eq!(value(&sim, "x"), want, "{expr}");
+        assert!(!sim.effects.math_errors.is_empty() || expr == "(-2)^3", "{expr}: ошибка должна регистрироваться");
+    }
+}

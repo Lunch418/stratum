@@ -20,7 +20,7 @@ export interface ClassInfo {
 export interface ProjectProperty { key: string; int?: number; text?: string }
 export interface Project { root: string; dir: string; empty: boolean; native: boolean; unsaved: boolean; canUndo: boolean; canRedo: boolean; classes: ClassInfo[] }
 export interface Instance { index: number; path: string; name: string; class: string; parent: number | null; handle: number }
-export interface Halt { kind: 'error' | 'breakpoint' | 'warning'; message: string; instance: number | null; path: string; class: string; line: number }
+export interface Halt { kind: 'error' | 'breakpoint' | 'warning' | 'math'; message: string; instance: number | null; path: string; class: string; line: number }
 export interface Breakpoint { id: number; index: number | null; path: string; class: string; expr: string; enabled: boolean }
 export interface ModelDialog { kind: 'message' | 'input' | 'open' | 'save' | 'folder' | 'color'; title: string; text: string; style: number; default: string }
 export interface Frame {

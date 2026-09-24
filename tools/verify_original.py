@@ -36,6 +36,10 @@ def probes(path):
         line = line.strip()
         if not line or line.startswith('#'):
             continue
+        if line.startswith('%'):
+            key, value = [p.strip() for p in line[1:].split('=', 1)]
+            PROPERTIES.append({'key': key, 'int': int(value)})
+            continue
         if line.startswith('>'):
             out.append((None, line[1:].strip()))
             continue
@@ -69,10 +73,14 @@ def write_class(dir, name, vars, text, children=()):
     (dir / 'classes' / f'{name}.strat').write_text(text, encoding='utf-8')
 
 
+# Свойства проекта для проб: строка `% MathMode = 3` в файле проб
+PROPERTIES = []
+
+
 def native_project(dir, text, compiler=False):
     (dir / 'classes').mkdir(parents=True, exist_ok=True)
     classes = [{'name': 'Main', 'file': 'Main'}] + ([{'name': 'Probe', 'file': 'Probe'}] if compiler else [])
-    (dir / 'project.json').write_text(json.dumps({'format': 'stratum-modern/1', 'root': 'Main', 'properties': [], 'variables': [], 'libraries': [], 'classes': classes}), encoding='utf-8')
+    (dir / 'project.json').write_text(json.dumps({'format': 'stratum-modern/1', 'root': 'Main', 'properties': PROPERTIES, 'variables': [], 'libraries': [], 'classes': classes}), encoding='utf-8')
     if not compiler:
         write_class(dir, 'Main', PROBE_VARS, text)
         return

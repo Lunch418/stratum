@@ -1,0 +1,11 @@
+# возведение в степень и переполнение (MathMode = 3)
+% MathMode = 3
+neg_cube     | (-2)^3
+neg_square   | (-2)^2
+neg_half     | (-4)^0.5
+zero_pow     | 0^0
+zero_neg     | 0^(-1)
+big_mul      | 1e308 * 10
+neg_exp_big  | -exp(1000)
+exp_small    | exp(-1000)
+ln_tiny      | ln(1e-300)

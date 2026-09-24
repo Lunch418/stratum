@@ -35,6 +35,8 @@ enum Event {
     Dialog { answer: String },
     /// Гипербаза: предыдущая страница.
     HyperBack,
+    /// «Больше не замечать» в предупреждении о математической ошибке.
+    IgnoreMath,
     Mouse { window: String, msg: u32, x: f64, y: f64, keys: u32 },
     Key { msg: u32, vk: u32 },
     /// Действие в контроле окна модели: код уведомления и новое значение.
@@ -139,6 +141,32 @@ impl Shared {
         Ok(())
     }
 
+    /// Математические ошибки такта по MathMode: 0 — остановка, 1 —
+    /// предупреждение (пауза с выбором, как окно «Математическая ошибка»
+    /// оригинала), 2 — запись в сообщения, 3 — не замечать. Значения уже
+    /// подставлены ядром так же, как в оригинале.
+    fn handle_math_errors(&mut self) {
+        let errors = std::mem::take(&mut self.sim.effects.math_errors);
+        let Some(first) = errors.first() else { return };
+        let more = if errors.len() > 1 { format!(" (и ещё {})", errors.len() - 1) } else { String::new() };
+        match self.math_mode {
+            0 => {
+                self.running = false;
+                self.halt = Some(Halt { kind: "error", message: format!("математическая ошибка — {first}{more}"), instance: None, line: 0 });
+            }
+            1 => {
+                self.running = false;
+                self.halt = Some(Halt { kind: "math", message: format!("{first}{more}"), instance: None, line: 0 });
+            }
+            2 => {
+                for e in errors {
+                    self.sim.effects.log.push(format!("такт {}: математическая ошибка — {e}", self.sim.tick_number()));
+                }
+            }
+            _ => {}
+        }
+    }
+
     /// Свойства проекта, влияющие на выполнение: режим ошибок и таймер.
     pub fn apply_project_options(&mut self) {
         use crate::formats::project::PropertyValue;
@@ -146,7 +174,9 @@ impl Shared {
             Some(PropertyValue::Int(i)) => Some(*i),
             _ => None,
         };
-        self.math_mode = int("MathMode").unwrap_or(0).min(3);
+        // без свойства — как настройка среды оригинала по умолчанию:
+        // окно-предупреждение
+        self.math_mode = int("MathMode").unwrap_or(1).min(3);
         if let Some(n) = int("newton_iter") {
             self.sim.newton_iterations = n.clamp(1, 1000) as usize;
         }
@@ -181,6 +211,7 @@ impl Shared {
             return;
         }
         self.dialog_answers.clear();
+        self.handle_math_errors();
         if let Err(e) = result {
             match self.math_mode {
                 0 => {
@@ -503,6 +534,11 @@ fn apply_event(s: &mut Shared, ev: Event) {
             Err(e) => s.error = Some(e.to_string()),
         },
         Event::Speed(fps) => s.fps = fps.clamp(1, 1000),
+        Event::IgnoreMath => {
+            s.math_mode = 3;
+            s.halt = None;
+            s.running = true;
+        }
         Event::HyperBack => {
             s.sim.effects.gfx.hyper_back();
         }
@@ -767,6 +803,7 @@ fn parse_event(query: &str) -> Option<Event> {
         "speed" => Event::Speed(num("fps")? as u32),
         "dialog" => Event::Dialog { answer: param(query, "answer").map(url_decode).unwrap_or_default() },
         "hyperback" => Event::HyperBack,
+        "ignoremath" => Event::IgnoreMath,
         "mouse" => Event::Mouse {
             window: url_decode(param(query, "win")?),
             msg: num("msg")? as u32,

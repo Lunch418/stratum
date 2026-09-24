@@ -296,6 +296,7 @@ button.attention { border-color: var(--state-pause); }
 
 .halt { display: flex; align-items: center; gap: 8px; padding: 6px 12px; font-size: 12px; font-weight: 600; border-bottom: 1px solid var(--border); background: var(--accent-soft); border-left: 3px solid var(--accent); }
 .halt.error { background: rgba(214, 59, 59, 0.10); color: var(--state-error); border-left-color: var(--state-error); }
+.halt.math { background: rgba(214, 150, 40, 0.12); border-left-color: #d69628; }
 .halt .spacer { flex: 1; }
 .line-error { background: rgba(201, 59, 59, 0.18); }
 .line-halt { background: var(--accent-soft); }

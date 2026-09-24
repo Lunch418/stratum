@@ -498,6 +498,7 @@ impl Simulation {
         self.old.clone_from(&self.cells);
         self.effects.dialog_ordinal = 0;
         self.effects.dialog_request = None;
+        self.effects.math_errors.clear();
         self.solve_equations()?;
         let order = self.order.clone();
         let mut disabled_roots: Vec<usize> = Vec::new();
@@ -513,7 +514,13 @@ impl Simulation {
                 continue;
             }
             let started = std::time::Instant::now();
+            let errors_before = self.effects.math_errors.len();
             self.run_instance(index)?;
+            // математические ошибки — с путём экземпляра, как в окне оригинала
+            let path = &self.instances[index].path;
+            for e in &mut self.effects.math_errors[errors_before..] {
+                *e = format!("{path}: {e}");
+            }
             if self.profile.len() != self.instances.len() {
                 self.profile.resize(self.instances.len(), 0);
             }
