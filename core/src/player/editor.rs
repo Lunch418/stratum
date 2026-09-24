@@ -96,7 +96,7 @@ pub fn state_json(sp: &Space, kind: Kind) -> String {
     shown.client = ((x1 - x0).max(1.0), (y1 - y0).max(1.0));
     let svg = svg::render(&shown);
     let view = format!("[{},{},{},{}]", num(x0), num(y0), num(shown.client.0), num(shown.client.1));
-    let objects: Vec<String> = sp.zorder.iter().filter_map(|h| sp.objects.get(h)).filter(|o| editable(o)).map(|o| super::api::object_json(sp, o)).collect();
+    let objects: Vec<String> = sp.top_order().iter().filter_map(|h| sp.objects.get(h)).filter(|o| editable(o)).map(|o| super::api::object_json(sp, o)).collect();
     let kind_name = match kind {
         Kind::Image => "image",
         Kind::Scheme => "scheme",
@@ -296,8 +296,8 @@ pub fn apply(sp: &mut Space, op: &Json) -> Result<Handle, String> {
                 return Err("для группы нужны хотя бы два объекта".into());
             }
             let g = sp.add_object(Object::new(0, 0.0, 0.0, 0.0, 0.0, Shape::Group { children: children.clone() }));
+            // объекты остаются на своих местах в Z-порядке
             for c in &children {
-                sp.zorder.retain(|z| z != c);
                 if let Some(o) = sp.objects.get_mut(c) {
                     o.parent = Some(g);
                 }
@@ -307,28 +307,25 @@ pub fn apply(sp: &mut Space, op: &Json) -> Result<Handle, String> {
         }
         "ungroup" => {
             let Some(Shape::Group { children }) = sp.objects.get(&handle).map(|o| o.shape.clone()) else { return Err("не группа".into()) };
-            let pos = sp.zorder.iter().position(|z| *z == handle).unwrap_or(sp.zorder.len());
-            sp.zorder.retain(|z| *z != handle);
-            for (i, c) in children.iter().enumerate() {
+            for c in &children {
                 if let Some(o) = sp.objects.get_mut(c) {
                     o.parent = None;
                 }
-                sp.zorder.insert((pos + i).min(sp.zorder.len()), *c);
             }
             sp.objects.remove(&handle);
             Ok(0)
         }
         "zorder" => {
             let to = op.str_or("to", "top");
-            let Some(i) = sp.zorder.iter().position(|z| *z == handle) else { return Err("объект не в списке".into()) };
-            let h = sp.zorder.remove(i);
+            let tops = sp.top_order();
+            let Some(i) = tops.iter().position(|z| *z == handle) else { return Err("объект не в списке".into()) };
             let at = match to.as_str() {
-                "top" => sp.zorder.len(),
+                "top" => tops.len(),
                 "bottom" => 0,
-                "up" => (i + 1).min(sp.zorder.len()),
+                "up" => (i + 1).min(tops.len() - 1),
                 _ => i.saturating_sub(1),
             };
-            sp.zorder.insert(at, h);
+            sp.move_among_tops(handle, at);
             Ok(handle)
         }
         "duplicate" => {

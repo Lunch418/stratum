@@ -276,7 +276,7 @@ fn cmd_render(args: &[String]) -> Result<(), String> {
         std::fs::write(&file, stratum_core::gfx::svg::render_in(space, Some(&sim.effects.gfx)))
             .map_err(|e| format!("{}: {e}", file.display()))?;
         if opts.dump {
-            for h in &space.zorder {
+            for h in &space.top_order() {
                 dump_object(space, *h, 0);
             }
             let mut pens: Vec<_> = space.pens.iter().collect();

@@ -146,6 +146,10 @@ pub struct Object {
 }
 
 impl Object {
+    pub fn is_group(&self) -> bool {
+        matches!(self.shape, Shape::Group { .. })
+    }
+
     pub fn new(handle: Handle, x: f64, y: f64, w: f64, h: f64, shape: Shape) -> Self {
         Object {
             handle,
@@ -173,7 +177,9 @@ pub struct Space {
     pub handle: Handle,
     pub window: String,
     pub objects: BTreeMap<Handle, Object>,
-    /// Порядок отрисовки объектов верхнего уровня, снизу вверх.
+    /// Z-порядок, снизу вверх: только простые объекты, в том числе вложенные
+    /// в группы, — как в файле рисунка и в оригинале. Группа своего места в
+    /// нём не имеет (`GetZOrder2d` группы — 0), она лишь объединяет объекты.
     pub zorder: Vec<Handle>,
     pub pens: BTreeMap<Handle, Pen>,
     pub brushes: BTreeMap<Handle, Brush>,
@@ -419,11 +425,11 @@ impl Space {
         for (g, _) in &groups {
             self.update_group_bounds(*g);
         }
-        self.zorder = pic.zorder.iter().map(|z| *z as Handle).collect();
-        // объекты, не попавшие в Z-порядок (и не в группах) — в конец
+        self.zorder = pic.zorder.iter().map(|z| *z as Handle).filter(|h| self.objects.get(h).is_some_and(|o| !o.is_group())).collect();
+        // простые объекты, не попавшие в Z-порядок файла, — в конец
         for o in &pic.objects {
             let h = o.handle as Handle;
-            if !self.zorder.contains(&h) && self.objects.get(&h).is_some_and(|o| o.parent.is_none()) {
+            if !self.zorder.contains(&h) && self.objects.get(&h).is_some_and(|o| !o.is_group()) {
                 self.zorder.push(h);
             }
         }
@@ -477,9 +483,114 @@ impl Space {
     pub fn add_object(&mut self, mut obj: Object) -> Handle {
         let h = lowest_free(&self.objects);
         obj.handle = h;
+        let group = obj.is_group();
         self.objects.insert(h, obj);
-        self.zorder.push(h);
+        if !group {
+            self.zorder.push(h);
+        }
         h
+    }
+
+    /// Простые объекты группы (или сам объект) в Z-порядке.
+    pub fn primitives(&self, h: Handle) -> Vec<Handle> {
+        match self.objects.get(&h).map(|o| &o.shape) {
+            Some(Shape::Group { .. }) => self.zorder.iter().copied().filter(|&z| self.descends(z, h)).collect(),
+            Some(_) => vec![h],
+            None => Vec::new(),
+        }
+    }
+
+    /// Лежит ли объект `h` внутри группы `ancestor` (на любой глубине).
+    pub fn descends(&self, h: Handle, ancestor: Handle) -> bool {
+        let mut cur = self.objects.get(&h).and_then(|o| o.parent);
+        let mut guard = 0;
+        while let Some(p) = cur {
+            if p == ancestor {
+                return true;
+            }
+            guard += 1;
+            if guard > 64 {
+                break;
+            }
+            cur = self.objects.get(&p).and_then(|o| o.parent);
+        }
+        false
+    }
+
+    /// Самая внешняя группа, в которую входит объект (или он сам).
+    pub fn top_ancestor(&self, h: Handle) -> Handle {
+        let mut top = h;
+        let mut guard = 0;
+        while let Some(p) = self.objects.get(&top).and_then(|o| o.parent) {
+            top = p;
+            guard += 1;
+            if guard > 64 {
+                break;
+            }
+        }
+        top
+    }
+
+    /// Виден ли объект с учётом групп, в которые он вложен.
+    pub fn shown(&self, h: Handle) -> bool {
+        let mut cur = Some(h);
+        let mut guard = 0;
+        while let Some(c) = cur {
+            let Some(o) = self.objects.get(&c) else { return false };
+            if !o.visible || o.scheme_element || (self.layers >> (o.layer & 31)) & 1 == 0 {
+                return false;
+            }
+            cur = o.parent;
+            guard += 1;
+            if guard > 64 {
+                break;
+            }
+        }
+        true
+    }
+
+    /// Объекты верхнего уровня (группы и одиночные объекты) снизу вверх —
+    /// по первому их простому объекту в Z-порядке.
+    pub fn top_order(&self) -> Vec<Handle> {
+        let mut seen = std::collections::HashSet::new();
+        let mut out = Vec::new();
+        for &z in &self.zorder {
+            let t = self.top_ancestor(z);
+            if seen.insert(t) {
+                out.push(t);
+            }
+        }
+        out
+    }
+
+    /// Ставит объект верхнего уровня на место `index` среди объектов
+    /// верхнего уровня (0 — в самый низ).
+    pub fn move_among_tops(&mut self, h: Handle, index: usize) {
+        let others: Vec<Handle> = self.top_order().into_iter().filter(|&t| t != h).collect();
+        let block = self.primitives(h);
+        self.zorder.retain(|z| !block.contains(z));
+        // встаём перед первым объектом того, кто займёт место следом
+        let at = others
+            .get(index)
+            .and_then(|&next| self.zorder.iter().position(|&z| self.top_ancestor(z) == next))
+            .unwrap_or(self.zorder.len());
+        for (i, b) in block.into_iter().enumerate() {
+            self.zorder.insert(at + i, b);
+        }
+    }
+
+    /// Ставит объекты группы (или объект) блоком на место `at` в Z-порядке,
+    /// сохраняя их взаимный порядок.
+    pub fn z_move(&mut self, h: Handle, at: usize) {
+        let block = self.primitives(h);
+        if block.is_empty() {
+            return;
+        }
+        self.zorder.retain(|z| !block.contains(z));
+        let at = at.min(self.zorder.len());
+        for (i, b) in block.into_iter().enumerate() {
+            self.zorder.insert(at + i, b);
+        }
     }
 
     pub fn add_pen(&mut self, pen: Pen) -> Handle {
@@ -626,11 +737,15 @@ impl Space {
         }
     }
 
-    /// Верхний видимый объект под точкой (в координатах пространства).
+    /// Верхний видимый объект под точкой (в координатах пространства);
+    /// для объекта внутри группы — самая внешняя группа.
     pub fn object_at(&self, x: f64, y: f64) -> Option<Handle> {
         for &h in self.zorder.iter().rev() {
-            if let Some(found) = self.hit(h, x, y) {
-                return Some(found);
+            if self.objects.get(&h).is_some_and(|o| o.flags & 0x8000 != 0) || !self.shown(h) {
+                continue;
+            }
+            if self.hit(h, x, y).is_some() {
+                return Some(self.top_ancestor(h));
             }
         }
         None
@@ -659,13 +774,11 @@ impl Space {
     }
 
     pub fn to_top(&mut self, h: Handle) {
-        self.zorder.retain(|z| *z != h);
-        self.zorder.push(h);
+        self.z_move(h, usize::MAX);
     }
 
     pub fn to_bottom(&mut self, h: Handle) {
-        self.zorder.retain(|z| *z != h);
-        self.zorder.insert(0, h);
+        self.z_move(h, 0);
     }
 }
 

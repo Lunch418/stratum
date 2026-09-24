@@ -48,7 +48,7 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
                 gfx.hyper_current.insert(window.clone(), class.clone());
                 if let Some(pic) = gfx.pictures.get(&class.to_lowercase()).cloned() {
                     gfx.space_mut(sp).unwrap().load(&pic);
-                    embed_children(gfx, sp, &class, 0);
+                    embed_children(gfx, sp, &class);
                     gfx.resolve_dibs(sp);
                     gfx.fit_client(sp);
                 }
@@ -196,18 +196,22 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
         "deleteobject2d" => ok(gfx.space_mut(h(args, 0)).is_some_and(|sp| sp.delete_object(h(args, 1))) || super::api3d::delete(gfx, h(args, 0), h(args, 1))),
         "objecttotop2d" => ok(gfx.space_mut(h(args, 0)).map(|sp| sp.to_top(h(args, 1))).is_some()),
         "objecttobottom2d" => ok(gfx.space_mut(h(args, 0)).map(|sp| sp.to_bottom(h(args, 1))).is_some()),
+        // место в плоском Z-списке простых объектов; у группы места нет — 0
+        // (сверено в Wine, tools/verify/zorder.txt)
         "getzorder2d" => num(gfx.space(h(args, 0))
             .and_then(|sp| sp.zorder.iter().position(|z| *z == h(args, 1)))
             .map(|i| i as f64 + 1.0)
             .unwrap_or(0.0)),
         "setzorder2d" => {
             let pos = f(args, 2).max(1.0) as usize - 1;
-            ok(gfx.space_mut(h(args, 0)).map(|sp| {
-                let obj = h(args, 1);
-                sp.zorder.retain(|z| *z != obj);
-                let at = pos.min(sp.zorder.len());
-                sp.zorder.insert(at, obj);
-            }).is_some())
+            let obj = h(args, 1);
+            ok(gfx.space_mut(h(args, 0)).is_some_and(|sp| {
+                if !sp.zorder.contains(&obj) {
+                    return false;
+                }
+                sp.z_move(obj, pos);
+                true
+            }))
         }
         "getobjectfrompoint2d" | "getobjectfrompoint2dex" => {
             let (x, y) = (f(args, 1), f(args, 2));
@@ -432,8 +436,8 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
             let children: Vec<Handle> = (1..args.len()).map(|i| h(args, i)).filter(|c| *c != 0).collect();
             handle(gfx.space_mut(h(args, 0)).map(|sp| {
                 let g = sp.add_object(Object::new(0, 0.0, 0.0, 0.0, 0.0, Shape::Group { children: children.clone() }));
+                // объекты остаются на своих местах в Z-порядке
                 for c in &children {
-                    sp.zorder.retain(|z| z != c);
                     if let Some(o) = sp.objects.get_mut(c) {
                         o.parent = Some(g);
                     }
@@ -449,7 +453,6 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
                 if !children.contains(&item) {
                     children.push(item);
                 }
-                sp.zorder.retain(|z| *z != item);
                 if let Some(o) = sp.objects.get_mut(&item) {
                     o.parent = Some(g);
                 }
@@ -465,7 +468,6 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
                 if let Some(o) = sp.objects.get_mut(&item) {
                     o.parent = None;
                 }
-                sp.zorder.push(item);
                 true
             }))
         }
@@ -696,10 +698,13 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
         "deletegroup2d" => {
             let g = h(args, 1);
             ok(gfx.space_mut(h(args, 0)).is_some_and(|sp| {
+                // группа распадается, её объекты остаются на своих местах
                 let Some(Shape::Group { children }) = sp.objects.get(&g).map(|o| o.shape.clone()) else { return false };
                 for c in &children {
                     if let Some(o) = sp.objects.get_mut(c) { o.parent = None; }
-                    if !sp.zorder.contains(c) { sp.zorder.push(*c); }
+                }
+                if let Some(o) = sp.objects.get_mut(&g) {
+                    o.shape = Shape::Group { children: Vec::new() };
                 }
                 sp.delete_object(g)
             }))
@@ -962,13 +967,12 @@ fn text_extent(sp: &Space, text: Handle) -> (f64, f64) {
 /// её дескриптор (или единственный объект, если он один).
 pub fn insert_picture(sp: &mut Space, pic: &super::Picture, x: f64, y: f64, move_to: bool) -> Handle {
     let (top, zorder) = insert_objects(sp, pic);
+    sp.zorder.extend(zorder);
     let root = if top.len() == 1 {
-        let h = top[0];
-        sp.zorder.push(h);
-        h
+        top[0]
     } else {
-        let g = sp.add_object(Object::new(0, 0.0, 0.0, 0.0, 0.0, Shape::Group { children: zorder.clone() }));
-        for c in &zorder {
+        let g = sp.add_object(Object::new(0, 0.0, 0.0, 0.0, 0.0, Shape::Group { children: top.clone() }));
+        for c in &top {
             if let Some(o) = sp.objects.get_mut(c) {
                 o.parent = Some(g);
             }
@@ -983,8 +987,9 @@ pub fn insert_picture(sp: &mut Space, pic: &super::Picture, x: f64, y: f64, move
 }
 
 /// Объекты и инструменты рисунка — в пространство с новыми дескрипторами
-/// (наименьшими свободными). Возвращает объекты верхнего уровня и их
-/// порядок отрисовки; в z-порядок пространства они не попадают.
+/// (наименьшими свободными). Возвращает объекты верхнего уровня и простые
+/// объекты в Z-порядке рисунка; в Z-порядок пространства их дописывает
+/// вызывающий.
 pub fn insert_objects(sp: &mut Space, pic: &super::Picture) -> (Vec<Handle>, Vec<Handle>) {
     let mut sub = Space::new(0, "");
     sub.load(pic);
@@ -1055,13 +1060,11 @@ pub fn insert_objects(sp: &mut Space, pic: &super::Picture) -> (Vec<Handle>, Vec
 /// Схема в окне: на месте значка каждого дочернего имиджа (группа-элемент
 /// схемы с handle экземпляра) оригинал показывает рисунок этого имиджа —
 /// объекты вставляются в группу с наименьшими свободными номерами, по
-/// порядку детей схемы, рекурсивно. Установлено по снимку оригинала
+/// порядку детей схемы. Вглубь не идёт: рисунок ребёнка — его собственный,
+/// значков его схемы в нём нет. Установлено по снимку оригинала
 /// («Солнечная система»: текст NumberView получает номера 16, 21, 26, а
 /// GetObject2dByName(HSpace, _HObject, "text") находит его внутри значка).
-fn embed_children(gfx: &mut Gfx, sp: Handle, class: &str, depth: usize) {
-    if depth > 8 {
-        return;
-    }
+fn embed_children(gfx: &mut Gfx, sp: Handle, class: &str) {
     let children = gfx.class_children.get(&crate::lang::fold(class)).cloned().unwrap_or_default();
     for (handle, child_class) in children {
         let group = handle as Handle;
@@ -1071,34 +1074,50 @@ fn embed_children(gfx: &mut Gfx, sp: Handle, class: &str, depth: usize) {
             Some(o) if matches!(o.shape, Shape::Group { .. }) && o.scheme_element => {}
             _ => continue,
         }
-        // сначала номер обёртке, затем объектам рисунка — как у оригинала
-        let wrapper = super::lowest_free(&space.objects);
-        space.objects.insert(wrapper, Object::new(wrapper, 0.0, 0.0, 0.0, 0.0, Shape::Group { children: Vec::new() }));
-        let (_, zorder) = insert_objects(space, &pic);
-        for c in &zorder {
+        // рисунок из одного объекта ложится в группу значка как есть; из
+        // нескольких — в обёртку, которая получает номер раньше объектов
+        // (сверено в Wine: «Солнечная система», tools/verify/zorder.txt)
+        let single = pic.objects.iter().filter(|o| !pic.objects.iter().any(|g| matches!(&g.kind, crate::formats::vdr::ObjectKind::Group { children } if children.contains(&o.handle)))).count() == 1;
+        let wrapper = if single {
+            None
+        } else {
+            let w = super::lowest_free(&space.objects);
+            space.objects.insert(w, Object::new(w, 0.0, 0.0, 0.0, 0.0, Shape::Group { children: Vec::new() }));
+            Some(w)
+        };
+        let (top, zorder) = insert_objects(space, &pic);
+        // простые объекты рисунка — поверх всего, что уже есть в окне
+        space.zorder.extend(zorder);
+        let holder = wrapper.unwrap_or(group);
+        for c in &top {
             if let Some(o) = space.objects.get_mut(c) {
-                o.parent = Some(wrapper);
+                o.parent = Some(holder);
             }
         }
-        if let Some(o) = space.objects.get_mut(&wrapper) {
-            o.shape = Shape::Group { children: zorder };
-            o.parent = Some(group);
-        }
-        space.update_group_bounds(wrapper);
+        let placed = match wrapper {
+            Some(w) => {
+                if let Some(o) = space.objects.get_mut(&w) {
+                    o.shape = Shape::Group { children: top.clone() };
+                    o.parent = Some(group);
+                }
+                space.update_group_bounds(w);
+                w
+            }
+            None => top[0],
+        };
         // рисунок — на место значка: левый верхний угол к углу значка
         let icon_at = match space.objects.get(&group).map(|o| o.shape.clone()) {
             Some(Shape::Group { children }) => children.iter().filter_map(|c| space.objects.get(c)).map(|o| (o.x, o.y)).next(),
             _ => None,
         };
         if let Some((x, y)) = icon_at {
-            space.move_object(wrapper, x, y);
+            space.move_object(placed, x, y);
         }
         if let Some(Object { shape: Shape::Group { children }, scheme_element, .. }) = space.objects.get_mut(&group) {
-            children.push(wrapper);
+            children.push(placed);
             // группа видна, собственный значок внутри остаётся скрытым
             *scheme_element = false;
         }
         space.update_group_bounds(group);
-        embed_children(gfx, sp, &child_class, depth + 1);
     }
 }

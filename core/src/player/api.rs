@@ -1429,10 +1429,10 @@ pub(crate) fn set_object_field(space: &mut Space, handle: u32, field: &str, valu
         }
         "enabled" | "checked" => space.objects.get_mut(&handle).map(|o| if let crate::gfx::Shape::Control { enabled, checked, .. } = &mut o.shape { if field == "enabled" { *enabled = num != 0.0 } else { *checked = num != 0.0 } }).is_some(),
         "zorder" => {
-            let n = (num.max(0.0) as usize).min(space.zorder.len().saturating_sub(1));
-            if let Some(pos) = space.zorder.iter().position(|&h| h == handle) {
-                let h = space.zorder.remove(pos);
-                space.zorder.insert(n, h);
+            let tops = space.top_order();
+            let n = (num.max(0.0) as usize).min(tops.len().saturating_sub(1));
+            if tops.contains(&handle) {
+                space.move_among_tops(handle, n);
                 true
             } else {
                 false
@@ -1493,7 +1493,7 @@ pub(crate) fn object_json(sp: &Space, o: &crate::gfx::Object) -> String {
         Shape::Group { children } => extra.push_str(&format!(",\"children\":{}", children.len())),
         _ => {}
     }
-    let z = sp.zorder.iter().position(|&h| h == o.handle).map(|z| z.to_string()).unwrap_or("null".into());
+    let z = sp.top_order().iter().position(|&h| h == o.handle).map(|z| z.to_string()).unwrap_or("null".into());
     format!(
         "{{\"handle\":{},\"name\":{},\"kind\":{},\"x\":{},\"y\":{},\"w\":{},\"h\":{},\"angle\":{},\"visible\":{},\"alpha\":{},\"zorder\":{},\"parent\":{}{}}}",
         o.handle, json_string(&o.name), json_string(kind), num(o.x), num(o.y), num(o.w), num(o.h), num(o.angle), o.visible, o.alpha, z,

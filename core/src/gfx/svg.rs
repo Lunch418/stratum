@@ -32,8 +32,12 @@ pub fn render_in(sp: &Space, gfx: Option<&super::Gfx>) -> String {
          <g transform=\"translate({} {}) scale({k})\">\n",
         -ox, -oy
     );
+    // Z-порядок плоский: только простые объекты; видимость групп-предков
+    // проверяет render_object
     for &hh in &sp.zorder {
-        render_object(sp, hh, &mut out, gfx);
+        if sp.shown(hh) {
+            render_object(sp, hh, &mut out, gfx);
+        }
     }
     out.push_str("</g>\n</svg>\n");
     out

@@ -232,9 +232,10 @@ impl Simulation {
             if let Some(sheet) = &cls.sheet {
                 sim.effects.gfx.sheets.insert(cls.name.to_lowercase(), sheet.clone());
             }
-            // «живой» вид на схеме (флаг класса 0x8000: NumberView, Lamp); у
-            // остальных в 0x0c обычный значок, в окне схемы он не показывается
-            if let Some(pic) = cls.scheme.as_ref().filter(|_| cls.flags.unwrap_or(0) & 0x8000 != 0).and_then(|b| crate::formats::vdr::parse(b, &cls.name).ok()) {
+            // собственный рисунок имиджа (0x0c): в окне схемы родителя он
+            // встаёт на место значка экземпляра — у всех имиджей, а не только
+            // с флагом 0x8000 (сверено в Wine: BALLS, tools/verify/zorder.txt)
+            if let Some(pic) = cls.scheme.as_ref().and_then(|b| crate::formats::vdr::parse(b, &cls.name).ok()) {
                 sim.effects.gfx.scheme_pictures.insert(crate::lang::fold(&cls.name), pic);
             }
             if !cls.children.is_empty() {
@@ -858,6 +859,12 @@ impl Simulation {
         }
     }
 
+    fn set_current(&mut self, instance: usize, name: &str, value: Value) {
+        if let Some(&cell) = self.instances[instance].vars.get(&name.to_lowercase()) {
+            self.cells[cell] = value.cast_to(self.types[cell]);
+        }
+    }
+
     /// `SendMessage` от `sender`: переменные копируются в приёмник, его
     /// текст исполняется, значения копируются обратно.
     fn send_message(&mut self, sender: usize, object: &str, class: &str, pairs: &[(String, String)]) -> Result<(), RuntimeError> {
@@ -867,21 +874,30 @@ impl Simulation {
                 targets.push(t);
             }
         } else if !class.is_empty() {
-            targets.extend((0..self.instances.len()).filter(|&i| crate::lang::same_name(&self.instances[i].class_name, class)));
+            // рассылка по классу идёт с конца: последний созданный имидж
+            // получает сообщение первым (сверено в Wine, tools/verify_messages.py)
+            targets.extend((0..self.instances.len()).rev().filter(|&i| crate::lang::same_name(&self.instances[i].class_name, class)));
         }
         for target in targets {
             if target == sender {
                 continue;
             }
+            // переданное значение получатель видит и без тильды; после
+            // исполнения его текущие значения становятся «старыми», а
+            // обратная передача пишет отправителю только текущие (сверено
+            // в Wine: снимки BALLS, tools/verify_phases.py)
             for (from, to) in pairs {
                 if let Some(v) = self.get_var_value(sender, from) {
                     self.set_var(target, to, v);
                 }
             }
             self.run_instance(target)?;
+            for &cell in self.instances[target].vars.values() {
+                self.old[cell] = self.cells[cell].clone();
+            }
             for (from, to) in pairs {
                 if let Some(v) = self.get_var_value(target, to) {
-                    self.set_var(sender, from, v);
+                    self.set_current(sender, from, v);
                 }
             }
         }
