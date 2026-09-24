@@ -292,11 +292,11 @@ pub struct Element {
 
 impl Element {
     pub fn get(&self, field: &str) -> Option<&Value> {
-        self.fields.get(&field.to_ascii_lowercase())
+        self.fields.get(&field.to_lowercase())
     }
 
     pub fn set(&mut self, field: &str, value: Value) {
-        self.fields.insert(field.to_ascii_lowercase(), value);
+        self.fields.insert(field.to_lowercase(), value);
     }
 }
 

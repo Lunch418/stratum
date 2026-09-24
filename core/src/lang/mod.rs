@@ -7,13 +7,27 @@ pub mod parser;
 pub use ast::{BinOp, Expr, Model, Stmt, UnOp};
 pub use parser::{parse, ParseError};
 
+/// Ключ имени переменной или имиджа. Регистр не различается ни для
+/// латиницы, ни для кириллицы («Скорость» и «скорость» — одно имя), как в
+/// Windows с русской локалью, где работал оригинал. В корпусе нет имиджа,
+/// где одно имя записано в двух регистрах, поэтому поведение оригинала для
+/// кириллицы прямо не подтверждено — см. docs/verification.md.
+pub fn fold(name: &str) -> String {
+    name.to_lowercase()
+}
+
+/// Совпадение имён без учёта регистра (латиница и кириллица).
+pub fn same_name(a: &str, b: &str) -> bool {
+    a.eq_ignore_ascii_case(b) || (!a.is_ascii() || !b.is_ascii()) && a.to_lowercase() == b.to_lowercase()
+}
+
 /// Зависимости переменных внутри текста: для каждого присваивания `x := e`
 /// пары (переменная из `e`, `x`); условия управляющих конструкций тоже
 /// считаются причинами присваиваний в их теле.
 pub fn dependencies(model: &Model) -> Vec<(String, String)> {
     fn vars(e: &Expr, out: &mut Vec<String>) {
         match e {
-            Expr::Var(v) => out.push(v.to_ascii_lowercase()),
+            Expr::Var(v) => out.push(v.to_lowercase()),
             Expr::Unary(_, a) => vars(a, out),
             Expr::Binary(_, a, b) => {
                 vars(a, out);
@@ -29,7 +43,7 @@ pub fn dependencies(model: &Model) -> Vec<(String, String)> {
                 Stmt::Assign { target, value } | Stmt::AssignDeferred { target, value } => {
                     let mut from = context.to_vec();
                     vars(value, &mut from);
-                    let target = target.to_ascii_lowercase();
+                    let target = target.to_lowercase();
                     for f in from {
                         if f != target {
                             out.push((f, target.clone()));

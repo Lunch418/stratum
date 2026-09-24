@@ -71,7 +71,7 @@ pub struct Instance {
 impl Instance {
     /// Номер описания имиджа в проекте (по имени класса).
     fn class_index_in(&self, project: &LoadedProject) -> Option<usize> {
-        project.classes.iter().position(|c| c.name.eq_ignore_ascii_case(&self.class_name))
+        project.classes.iter().position(|c| crate::lang::same_name(&c.name, &self.class_name))
     }
 
     pub fn var_names(&self) -> &[String] {
@@ -157,12 +157,12 @@ impl Simulation {
 
     /// Значение переменной экземпляра.
     pub fn value(&self, instance: usize, var: &str) -> Option<&Value> {
-        let cell = *self.instances[instance].vars.get(&var.to_ascii_lowercase())?;
+        let cell = *self.instances[instance].vars.get(&var.to_lowercase())?;
         Some(&self.cells[cell])
     }
 
     pub fn set_value(&mut self, instance: usize, var: &str, value: Value) -> bool {
-        let Some(&cell) = self.instances[instance].vars.get(&var.to_ascii_lowercase()) else {
+        let Some(&cell) = self.instances[instance].vars.get(&var.to_lowercase()) else {
             return false;
         };
         self.cells[cell] = value.cast_to(self.types[cell]);
@@ -173,10 +173,10 @@ impl Simulation {
     pub fn find(&self, needle: &str) -> Option<usize> {
         self.instances
             .iter()
-            .position(|i| i.path.eq_ignore_ascii_case(needle))
-            .or_else(|| self.instances.iter().position(|i| i.name.eq_ignore_ascii_case(needle)))
+            .position(|i| crate::lang::same_name(&i.path, needle))
+            .or_else(|| self.instances.iter().position(|i| crate::lang::same_name(&i.name, needle)))
             .or_else(|| {
-                self.instances.iter().position(|i| i.class_name.eq_ignore_ascii_case(needle))
+                self.instances.iter().position(|i| crate::lang::same_name(&i.class_name, needle))
             })
     }
 
@@ -273,7 +273,7 @@ impl Simulation {
     }
 
     fn class_index(&self, name: &str) -> Option<usize> {
-        self.classes.iter().position(|c| c.name.eq_ignore_ascii_case(name))
+        self.classes.iter().position(|c| crate::lang::same_name(&c.name, name))
     }
 
     fn add_instance(
@@ -315,7 +315,7 @@ impl Simulation {
             let cell = self.cells.len();
             self.cells.push(value);
             self.types.push(ty);
-            let key = v.name.to_ascii_lowercase();
+            let key = v.name.to_lowercase();
             if instance.vars.insert(key, cell).is_none() {
                 instance.order.push(v.name.clone());
             }
@@ -325,7 +325,7 @@ impl Simulation {
         for decl in declarations {
             let ty = ValueType::from_name(&decl.var_type);
             for var_name in &decl.names {
-                let key = var_name.to_ascii_lowercase();
+                let key = var_name.to_lowercase();
                 if instance.vars.contains_key(&key) {
                     continue;
                 }
@@ -392,7 +392,7 @@ impl Simulation {
     }
 
     fn cell_of(&self, instance: usize, var: &str) -> Option<usize> {
-        self.instances[instance].vars.get(&var.to_ascii_lowercase()).copied()
+        self.instances[instance].vars.get(&var.to_lowercase()).copied()
     }
 
     /// Сливает связанные ячейки: обе стороны связи начинают указывать в одну.
@@ -443,9 +443,9 @@ impl Simulation {
     /// Загружает снимок в работающую модель (по классу и handle на схеме).
     pub fn load_state(&mut self, state: &crate::formats::State) {
         for image in &state.images {
-            let Some(index) = self.instances.iter().position(|i| i.class_name.eq_ignore_ascii_case(&image.class_name) && (i.handle == image.handle || i.parent.is_none())) else { continue };
+            let Some(index) = self.instances.iter().position(|i| crate::lang::same_name(&i.class_name, &image.class_name) && (i.handle == image.handle || i.parent.is_none())) else { continue };
             for (name, text) in &image.vars {
-                let Some(&cell) = self.instances[index].vars.get(&name.to_ascii_lowercase()) else { continue };
+                let Some(&cell) = self.instances[index].vars.get(&name.to_lowercase()) else { continue };
                 self.cells[cell] = Value::parse_default(text, self.types[cell]);
                 self.old[cell] = self.cells[cell].clone();
             }
@@ -458,7 +458,7 @@ impl Simulation {
             let class = self.instances[i].class;
             let Some(meta) = self.class_meta.get(class).cloned() else { continue };
             for v in &meta.vars {
-                if let Some(&c) = self.instances[i].vars.get(&v.name.to_ascii_lowercase()) {
+                if let Some(&c) = self.instances[i].vars.get(&v.name.to_lowercase()) {
                     self.cells[c] = Value::parse_default(&v.default, self.types[c]);
                     self.old[c] = self.cells[c].clone();
                 }
@@ -475,14 +475,14 @@ impl Simulation {
                 .instances
                 .iter()
                 .position(|i| {
-                    i.class_name.eq_ignore_ascii_case(&image.class_name)
+                    crate::lang::same_name(&i.class_name, &image.class_name)
                         && (i.handle == image.handle || i.parent.is_none())
                 })
             else {
                 continue;
             };
             for (name, text) in &image.vars {
-                let Some(&cell) = self.instances[index].vars.get(&name.to_ascii_lowercase()) else {
+                let Some(&cell) = self.instances[index].vars.get(&name.to_lowercase()) else {
                     continue;
                 };
                 self.cells[cell] = Value::parse_default(text, self.types[cell]);
@@ -670,7 +670,7 @@ impl Simulation {
             for decl in &declarations {
                 let ty = ValueType::from_name(&decl.var_type);
                 for var_name in &decl.names {
-                    let key = var_name.to_ascii_lowercase();
+                    let key = var_name.to_lowercase();
                     if self.instances[i].vars.contains_key(&key) {
                         continue;
                     }
@@ -782,7 +782,7 @@ impl Simulation {
 
     /// Устанавливает переменную, если она есть у экземпляра (обе фазы).
     fn set_var(&mut self, instance: usize, name: &str, value: Value) {
-        if let Some(&cell) = self.instances[instance].vars.get(&name.to_ascii_lowercase()) {
+        if let Some(&cell) = self.instances[instance].vars.get(&name.to_lowercase()) {
             let v = value.cast_to(self.types[cell]);
             self.cells[cell] = v.clone();
             self.old[cell] = v;
@@ -798,7 +798,7 @@ impl Simulation {
                 targets.push(t);
             }
         } else if !class.is_empty() {
-            targets.extend((0..self.instances.len()).filter(|&i| self.instances[i].class_name.eq_ignore_ascii_case(class)));
+            targets.extend((0..self.instances.len()).filter(|&i| crate::lang::same_name(&self.instances[i].class_name, class)));
         }
         for target in targets {
             if target == sender {
@@ -820,7 +820,7 @@ impl Simulation {
     }
 
     fn get_var_value(&self, instance: usize, name: &str) -> Option<Value> {
-        let cell = *self.instances[instance].vars.get(&name.to_ascii_lowercase())?;
+        let cell = *self.instances[instance].vars.get(&name.to_lowercase())?;
         Some(self.cells[cell].clone())
     }
 
@@ -931,12 +931,12 @@ struct Frame<'a> {
 
 impl Vars for Frame<'_> {
     fn get(&self, name: &str) -> Option<Value> {
-        let cell = *self.sim.instances[self.instance].vars.get(&name.to_ascii_lowercase())?;
+        let cell = *self.sim.instances[self.instance].vars.get(&name.to_lowercase())?;
         Some(self.sim.cells[cell].clone())
     }
 
     fn get_old(&self, name: &str) -> Option<Value> {
-        let cell = *self.sim.instances[self.instance].vars.get(&name.to_ascii_lowercase())?;
+        let cell = *self.sim.instances[self.instance].vars.get(&name.to_lowercase())?;
         Some(self.sim.old[cell].clone())
     }
 
@@ -949,7 +949,7 @@ impl Vars for Frame<'_> {
     }
 
     fn set(&mut self, name: &str, value: Value) {
-        let key = name.to_ascii_lowercase();
+        let key = name.to_lowercase();
         match self.sim.instances[self.instance].vars.get(&key).copied() {
             Some(cell) => {
                 self.sim.cells[cell] = value.cast_to(self.sim.types[cell]);
@@ -980,7 +980,7 @@ impl Vars for Frame<'_> {
 
     fn call_special(&mut self, name: &str, args: &[Value]) -> Option<Value> {
         let arg = |i: usize| args.get(i).map(|v| v.as_string()).unwrap_or_default();
-        let lower = name.to_ascii_lowercase();
+        let lower = name.to_lowercase();
         Some(match lower.as_str() {
             // GetClassName("") — имя своего класса, ".." — родителя
             "getclassname" => {
@@ -1053,7 +1053,7 @@ impl Vars for Frame<'_> {
             }
             "getvarf" | "getvars" | "getvarh" | "getvarc" => {
                 let target = self.resolve_arg(args.first())?;
-                let var = arg(1).to_ascii_lowercase();
+                let var = arg(1).to_lowercase();
                 let cell = self.sim.instances[target].vars.get(&var).copied();
                 match (lower.as_str(), cell) {
                     (_, None) => Value::Float(0.0),
@@ -1064,7 +1064,7 @@ impl Vars for Frame<'_> {
             }
             "setvar" => {
                 let target = self.resolve_arg(args.first())?;
-                let var = arg(1).to_ascii_lowercase();
+                let var = arg(1).to_lowercase();
                 let value = args.get(2).cloned().unwrap_or(Value::Float(0.0));
                 match self.sim.instances[target].vars.get(&var).copied() {
                     Some(c) => {
@@ -1106,19 +1106,19 @@ impl Vars for Frame<'_> {
             }
             "getclassfile" => {
                 let class = arg(0);
-                Value::Str(self.sim.class_meta.iter().find(|c| c.name.eq_ignore_ascii_case(&class)).map(|c| {
+                Value::Str(self.sim.class_meta.iter().find(|c| crate::lang::same_name(&c.name, &class)).map(|c| {
                     std::path::Path::new(&c.source).file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default()
                 }).unwrap_or_default())
             }
             "getvarcount" => {
                 let class = arg(0);
-                Value::Float(self.sim.class_meta.iter().find(|c| c.name.eq_ignore_ascii_case(&class)).map(|c| c.vars.len() as f64).unwrap_or(0.0))
+                Value::Float(self.sim.class_meta.iter().find(|c| crate::lang::same_name(&c.name, &class)).map(|c| c.vars.len() as f64).unwrap_or(0.0))
             }
             // GetVarInfo(class, n, &name, &type, &default, &description)
             "getvarinfo" => {
                 let class = arg(0);
                 let n = args.get(1).map(|v| v.as_float()).unwrap_or(0.0) as usize;
-                match self.sim.class_meta.iter().find(|c| c.name.eq_ignore_ascii_case(&class)).and_then(|c| c.vars.get(n)).cloned() {
+                match self.sim.class_meta.iter().find(|c| crate::lang::same_name(&c.name, &class)).and_then(|c| c.vars.get(n)).cloned() {
                     Some(v) => {
                         let fx = &mut self.sim.effects;
                         fx.outputs.push((2, Value::Str(v.name)));
@@ -1146,7 +1146,7 @@ impl Vars for Frame<'_> {
             "getmodeltext" => {
                 let class = arg(0);
                 let h = args.get(1).map(|v| v.as_float()).unwrap_or(0.0) as u32;
-                let text = self.sim.class_meta.iter().find(|c| c.name.eq_ignore_ascii_case(&class)).map(|c| c.text.clone());
+                let text = self.sim.class_meta.iter().find(|c| crate::lang::same_name(&c.name, &class)).map(|c| c.text.clone());
                 match (text, self.sim.effects.streams.items.get_mut(&h)) {
                     (Some(t), Some(st)) => {
                         let bytes = crate::formats::cp1251::encode(&t);
@@ -1164,7 +1164,7 @@ impl Vars for Frame<'_> {
                 let Some(text) = self.sim.effects.streams.items.get(&h).map(|st| crate::formats::cp1251::decode(&st.data)) else { return Some(Value::Float(0.0)) };
                 match crate::lang::parse(&text) {
                     Ok(m) => {
-                        if let Some(c) = self.sim.class_meta.iter_mut().find(|c| c.name.eq_ignore_ascii_case(&class)) {
+                        if let Some(c) = self.sim.class_meta.iter_mut().find(|c| crate::lang::same_name(&c.name, &class)) {
                             c.text = text;
                         }
                         Value::Float(if self.sim.hot_swap_text(&class, m) { 1.0 } else { 0.0 })
@@ -1181,7 +1181,7 @@ impl Vars for Frame<'_> {
                 let meta = self.sim.class_meta.get(class).cloned();
                 if let Some(meta) = meta {
                     for v in &meta.vars {
-                        if let Some(&c) = self.sim.instances[target].vars.get(&v.name.to_ascii_lowercase()) {
+                        if let Some(&c) = self.sim.instances[target].vars.get(&v.name.to_lowercase()) {
                             self.sim.cells[c] = Value::parse_default(&v.default, self.sim.types[c]);
                         }
                     }
@@ -1203,14 +1203,14 @@ impl Vars for Frame<'_> {
             "getuniqueclassname" => {
                 let base = arg(0);
                 let mut n = 1;
-                while self.sim.class_meta.iter().any(|c| c.name.eq_ignore_ascii_case(&format!("{base}{n}"))) {
+                while self.sim.class_meta.iter().any(|c| crate::lang::same_name(&c.name, &format!("{base}{n}"))) {
                     n += 1;
                 }
                 Value::Str(format!("{base}{n}"))
             }
             "isprojectexist" => Value::Float(1.0),
             _ => {
-                let class = self.sim.classes.iter().position(|c| c.model.is_function && c.name.eq_ignore_ascii_case(name))?;
+                let class = self.sim.classes.iter().position(|c| c.model.is_function && crate::lang::same_name(&c.name, name))?;
                 return Some(self.sim.call_function(class, args));
             }
         })
@@ -1269,14 +1269,14 @@ impl Simulation {
             self.cells.push(Value::parse_default(&v.default, ty));
             self.old.push(ty.default_value());
             self.types.push(ty);
-            if instance.vars.insert(v.name.to_ascii_lowercase(), cell).is_none() {
+            if instance.vars.insert(v.name.to_lowercase(), cell).is_none() {
                 instance.order.push(v.name.clone());
             }
         }
         for decl in self.classes[class].model.declarations.clone() {
             let ty = ValueType::from_name(&decl.var_type);
             for name in &decl.names {
-                let key = name.to_ascii_lowercase();
+                let key = name.to_lowercase();
                 if instance.vars.contains_key(&key) {
                     continue;
                 }

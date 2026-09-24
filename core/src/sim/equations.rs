@@ -17,7 +17,7 @@ pub fn collect(body: &[Stmt]) -> ClassEquations {
         for st in body {
             match st {
                 Stmt::Equation { left, right } => out.equations.push((left.clone(), right.clone())),
-                Stmt::Unknowns(names) => out.unknowns.extend(names.iter().map(|n| n.to_ascii_lowercase())),
+                Stmt::Unknowns(names) => out.unknowns.extend(names.iter().map(|n| n.to_lowercase())),
                 Stmt::If { then_body, else_body, .. } => {
                     walk(then_body, out);
                     walk(else_body, out);

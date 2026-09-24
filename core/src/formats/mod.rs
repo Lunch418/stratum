@@ -35,7 +35,7 @@ pub struct LoadedProject {
 impl LoadedProject {
     /// Имидж по имени, без учёта регистра — язык регистронезависим.
     pub fn class(&self, name: &str) -> Option<&Class> {
-        self.classes.iter().find(|c| c.name.eq_ignore_ascii_case(name))
+        self.classes.iter().find(|c| crate::lang::same_name(&c.name, name))
     }
 
     pub fn root(&self) -> Option<&Class> {
