@@ -129,7 +129,7 @@ def run_original(items, work, timeout=60, compiler=False):
     # без байт-кода оригинал исполнит пустоту — значит, текст не скомпилирован
     d = subprocess.run([sys.executable, str(ROOT / 'tools' / 'disasm.py'), str(WORK / 'Main.cls')], capture_output=True, text=True)
     if d.returncode:
-        sys.exit('модель не скомпилирована нашим компилятором (оригинал её тоже не примет): проверьте пробы')
+        sys.exit('модель не скомпилирована нашим компилятором (оригинал её тоже не примет): проверьте пробы\n' + r.stderr)
     if compiler:
         (WORK / 'probe.mdl').write_bytes(text.replace('\n', '\r\n').encode('cp1251'))
     out = WORK / 'out.txt'

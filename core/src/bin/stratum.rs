@@ -91,6 +91,17 @@ fn cmd_convert(args: &[String]) -> Result<(), String> {
     let loaded = formats::load_project(src, &libraries).map_err(|e| e.to_string())?.map_err(|e| e.to_string())?;
     if to_stratum2000 {
         formats::native::export_stratum2000(dest, &loaded).map_err(|e| e.to_string())?;
+        // имидж, который компилятор не принял, уходит без байт-кода —
+        // оригинал его исполнять не станет; об этом надо сказать
+        for cls in &loaded.classes[..loaded.own_classes] {
+            let failure = match lang::parse(&cls.text) {
+                Ok(model) => formats::native::check_text(&loaded, cls, &model).err().map(|e| format!("строка {}: {}", e.line, e.message)),
+                Err(e) => Some(format!("{e:?}")),
+            };
+            if let Some(msg) = failure {
+                eprintln!("предупреждение: {} не скомпилирован, {msg}", cls.name);
+            }
+        }
         println!("экспортировано в Stratum 2000: {} имиджей → {}", loaded.own_classes, dest.display());
     } else {
         std::fs::create_dir_all(dest).map_err(|e| e.to_string())?;

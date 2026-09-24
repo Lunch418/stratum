@@ -303,14 +303,17 @@ impl Element {
 #[derive(Debug, Default, Clone)]
 pub struct Arrays {
     pub items: HashMap<u32, Vec<Element>>,
-    next: u32,
 }
+
+/// Первый дескриптор динамического массива в оригинале; дальше —
+/// наименьший свободный (сверено в Wine, tools/verify/arrays.txt)
+pub const FIRST_ARRAY: u32 = 16384;
 
 impl Arrays {
     pub fn new_array(&mut self) -> u32 {
-        self.next += 1;
-        self.items.insert(self.next, Vec::new());
-        self.next
+        let h = (FIRST_ARRAY..).find(|h| !self.items.contains_key(h)).unwrap_or(FIRST_ARRAY);
+        self.items.insert(h, Vec::new());
+        h
     }
 
     pub fn delete(&mut self, h: u32) -> bool {

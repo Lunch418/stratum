@@ -180,22 +180,14 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
         "xor" => boolean((f(args, 0) != 0.0) ^ (f(args, 1) != 0.0)),
         "notbin" => num(!(f(args, 0) as i64) as f64),
         "xorbin" => num(((f(args, 0) as i64) ^ (f(args, 1) as i64)) as f64),
-        // rnd(x) — случайное число в [0, x); зерно фиксировано, чтобы прогон
-        // повторялся от запуска к запуску
-        "rnd" => {
-            if fx.rng == 0 {
-                fx.rng = 0x2545_F491_4F6C_DD1D;
-            }
-            let mut x = fx.rng;
-            x ^= x << 13;
-            x ^= x >> 7;
-            x ^= x << 17;
-            fx.rng = x;
-            let unit = (x >> 11) as f64 / (1u64 << 53) as f64;
-            num(unit * f(args, 0))
-        }
+        // rnd(x) = x·rand()/32767, где rand() — генератор Borland C:
+        // seed = seed·22695477 + 1, результат (seed >> 16) & 0x7FFF. Зерно 1,
+        // и среда оригинала при запуске один раз уже вызывает rand(): первые
+        // значения 130, 10982, 1090… (сверено в Wine, tools/verify/random.txt)
+        "rnd" => num(f(args, 0) * borland_rand(fx) as f64 / 32767.0),
+        // randomize(x) — srand(x)
         "randomize" => {
-            fx.rng = (f(args, 0) as u64).wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407) | 1;
+            fx.rng = (f(args, 0) as i64 as u32) as u64 | RNG_SEEDED;
             num(0.0)
         }
 
@@ -502,8 +494,9 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
                 _ => {}
             }
             match fx.arrays.get_mut(f(args, 0) as u32) {
-                Some(a) => { a.push(el); num((a.len() - 1) as f64) }
-                None => num(-1.0),
+                // оригинал возвращает новое число элементов, для чужого дескриптора 0
+                Some(a) => { a.push(el); num(a.len() as f64) }
+                None => num(0.0),
             }
         }
         "vdelete" => {
@@ -583,6 +576,18 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
 pub fn call_stub(name: &str, fx: &mut Effects) -> Value {
     *fx.missing.entry(name.to_ascii_lowercase()).or_insert(0) += 1;
     Value::Float(0.0)
+}
+
+/// Отметка «зерно задано» в старшем слове `Effects::rng` (само зерно — 32 бита).
+const RNG_SEEDED: u64 = 1 << 40;
+
+/// rand() библиотеки Borland C с состоянием в `Effects::rng`. Неинициализированный
+/// генератор — это srand(1) и один уже сделанный вызов, как в среде оригинала.
+fn borland_rand(fx: &mut Effects) -> u32 {
+    let mut seed = if fx.rng & RNG_SEEDED == 0 { 22_695_478 } else { fx.rng as u32 };
+    seed = seed.wrapping_mul(22_695_477).wrapping_add(1);
+    fx.rng = seed as u64 | RNG_SEEDED;
+    (seed >> 16) & 0x7FFF
 }
 
 /// «Бесконечность» оригинала: подставляется при переполнении.
