@@ -4,6 +4,7 @@
 // Рисует ядро (SVG), страница держит только выбор и текущий инструмент.
 import { useEffect, useRef, useState } from 'react';
 import { type ObjectProps } from '../api';
+import { ObjectDialog } from './ObjectDialog';
 import { classByName, useStore } from '../store';
 import { Icon } from './Icon';
 import { FilePickDialog } from './Options';
@@ -47,6 +48,8 @@ export function PictureEditor({ kind }: { kind: Kind }) {
   const [textAsk, setTextAsk] = useState<{ at: [number, number]; value: string } | null>(null);
   const [insertAsk, setInsertAsk] = useState(false);
   const [bitmapEdit, setBitmapEdit] = useState<number | null>(null);
+  // диалог «Параметры объекта» (двойной щелчок по объекту или «Свойства…»)
+  const [objDialog, setObjDialog] = useState<number | null>(null);
   const sheet = klass?.sheet;
   const grid = sheet?.gridVisible ? { step: sheet.gridStep, origin: sheet.gridOrigin } : null;
   const svgRef = useRef<SVGSVGElement>(null);
@@ -257,7 +260,7 @@ export function PictureEditor({ kind }: { kind: Kind }) {
         <span className="muted small mono">{cursor ? `${Math.round(cursor[0])}, ${Math.round(cursor[1])}` : ''}</span>
         <button className="small ghost mono" onClick={() => setView({ x: 40, y: 40, k: 1 })} title="Масштаб 100 %">{Math.round(view.k * 100)}%</button>
       </div>
-      <svg ref={svgRef} className="canvas" onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp} onContextMenu={e => e.preventDefault()} onDoubleClick={() => tool === 'polyline' && finishPolyline()}>
+      <svg ref={svgRef} className="canvas" onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp} onContextMenu={e => e.preventDefault()} onDoubleClick={() => { if (tool === 'polyline') finishPolyline(); else if (tool === 'select' && one) setObjDialog(one.handle); }}>
         <g transform={`translate(${view.x} ${view.y}) scale(${view.k})`}>
           <rect x={state.origin[0] - state.view[0]} y={state.origin[1] - state.view[1]} width={state.client[0]} height={state.client[1]} className="page" />
           {grid && <g className="page-grid">
@@ -311,8 +314,17 @@ export function PictureEditor({ kind }: { kind: Kind }) {
           {one.brush && <label>Заливка <input type="color" value={one.brush.color} onChange={e => op({ op: 'set', handle: one.handle, field: 'brush.color', value: e.target.value })} />
             <select value={one.brush.style} onChange={e => op({ op: 'set', handle: one.handle, field: 'brush.style', value: Number(e.target.value) })}><option value={0}>сплошная</option><option value={1}>нет</option></select></label>}
           {one.points && <span className="muted">точек: {one.points.length}</span>}
+          {one.hyper && <span className="muted" title="Гиперссылка">↗ {one.hyper.target || '—'}</span>}
+          <button className="small" onClick={() => setObjDialog(one.handle)} title="Параметры объекта: положение, линия, заливка, текст, гипербаза (двойной щелчок)">Свойства…</button>
         </div>
       )}
+      {objDialog !== null && (() => {
+        const o = state.objects.find(x => x.handle === objDialog);
+        if (!o) return null;
+        return <ObjectDialog o={o} onClose={() => setObjDialog(null)}
+          set={(field, value) => { if (editable) op({ op: 'set', handle: o.handle, field, value }); }}
+          resize={p => { if (editable) op({ op: 'resize', handle: o.handle, ...p }); }} />;
+      })()}
       {!editable && <div className="hint muted">Библиотечный имидж: только просмотр.</div>}
       {bitmapEdit !== null && klass && <BitmapEditor klass={klass.name} kind={kind} handle={bitmapEdit} onClose={() => setBitmapEdit(null)} onSaved={() => { load(); markUnsaved(); }} />}
       {insertAsk && (

@@ -138,8 +138,9 @@ pub struct Object {
     pub flags: u16,
     /// Иконка имиджа или линия связи: показывается только в редакторе схемы.
     pub scheme_element: bool,
-    /// Гиперссылка (`SetHyperJump2d`): режим, цель (файл .vdr или имидж), окно.
-    pub hyper: Option<(i32, String, String)>,
+    /// Гиперссылка (закладка «Гипербаза», `SetHyperJump2d`): режим, цель
+    /// (файл .vdr или имидж), окно, имидж для WM_HYPERJUMP, эффект.
+    pub hyper: Option<crate::formats::vdr::Hyper>,
     /// Прозрачность 0–255 (`SetObjectAlpha2d`); 255 — непрозрачный.
     pub alpha: u8,
     pub shape: Shape,
@@ -313,6 +314,9 @@ impl Space {
                 Shape::View3d { .. } | Shape::Unknown => continue,
             };
             pic.objects.push(vdr::Object { handle: *h as u16, name: o.name.clone(), flags: o.flags, kind });
+            if let Some(hy) = &o.hyper {
+                pic.hypers.push((*h as u16, hy.clone()));
+            }
         }
         pic
     }
@@ -404,6 +408,7 @@ impl Space {
             // 0x1000 — элемент схемы (иконка имиджа, линия связи 0x1800):
             // виден в редакторе, но не в окне модели
             obj.scheme_element = o.flags & 0x1000 != 0;
+            obj.hyper = pic.hypers.iter().find(|(hh, _)| *hh == o.handle).map(|(_, hy)| hy.clone());
             self.objects.insert(h, obj);
         }
         // родители по спискам групп, габариты групп по детям

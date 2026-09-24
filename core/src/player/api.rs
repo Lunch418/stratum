@@ -1489,6 +1489,21 @@ pub(crate) fn set_object_field(space: &mut Space, handle: u32, field: &str, valu
                 _ => false,
             }
         }
+        // гипербаза: hyper.mode (-1 — снять ссылку), hyper.target/window/object/effect
+        "hyper.mode" | "hyper.target" | "hyper.window" | "hyper.object" | "hyper.effect" => space.objects.get_mut(&handle).map(|o| {
+            if field == "hyper.mode" && num < 0.0 {
+                o.hyper = None;
+                return;
+            }
+            let h = o.hyper.get_or_insert_with(Default::default);
+            match field {
+                "hyper.mode" => h.mode = num as i32,
+                "hyper.target" => h.target = value.to_string(),
+                "hyper.window" => h.window = value.to_string(),
+                "hyper.object" => h.object = value.to_string(),
+                _ => h.effect = value.to_string(),
+            }
+        }).is_some(),
         "enabled" | "checked" => space.objects.get_mut(&handle).map(|o| if let crate::gfx::Shape::Control { enabled, checked, .. } = &mut o.shape { if field == "enabled" { *enabled = num != 0.0 } else { *checked = num != 0.0 } }).is_some(),
         "zorder" => {
             let tops = space.top_order();
@@ -1554,6 +1569,12 @@ pub(crate) fn object_json(sp: &Space, o: &crate::gfx::Object) -> String {
         Shape::Control { class, text, enabled, checked, .. } => extra.push_str(&format!(",\"class\":{},\"text\":{},\"enabled\":{enabled},\"checked\":{checked}", json_string(class), json_string(text))),
         Shape::Group { children } => extra.push_str(&format!(",\"children\":{}", children.len())),
         _ => {}
+    }
+    if let Some(h) = &o.hyper {
+        extra.push_str(&format!(
+            ",\"hyper\":{{\"mode\":{},\"target\":{},\"window\":{},\"object\":{},\"effect\":{}}}",
+            h.mode, json_string(&h.target), json_string(&h.window), json_string(&h.object), json_string(&h.effect)
+        ));
     }
     let z = sp.top_order().iter().position(|&h| h == o.handle).map(|z| z.to_string()).unwrap_or("null".into());
     format!(

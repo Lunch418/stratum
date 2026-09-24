@@ -22,6 +22,106 @@ pub struct Picture {
     pub dibs: Vec<Dib>,
     /// Параметры листа (запись типа 34 чанка 1022) как есть — пишутся обратно.
     pub page: Option<Vec<u8>>,
+    /// Гиперссылки объектов (закладка «Гипербаза»): handle объекта → ссылка.
+    pub hypers: Vec<(u16, Hyper)>,
+}
+
+/// Гиперссылка графического объекта. Хранится в блоке данных объекта
+/// `0x03FE`: в 3.x — блок расширения в конце записи объекта, в 2.x — список
+/// после инструментов (`u16 1, u16 handle, u16 0x03FE, данные`; запись
+/// `u16 2` без handle — данные самого листа; `u16 0` — конец списка).
+/// Данные: `u16 версия, u16 5, u16 2, u8 число элементов`, элементы
+/// `u16 номер, u16 длина, байты`. Гиперссылка — элемент `0x0a`, в нём поля
+/// `u16 номер` + значение: 1 — цель (строка), 4 — режим (`u16`);
+/// отсутствующее поле — значение по умолчанию (режим 0 «открыть окно»).
+/// Номера 2, 3, 5 (окно, объект, эффект) в корпусе не встречаются и приняты
+/// по порядку аргументов `SetHyperJump2d`.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Hyper {
+    /// 0 — открыть окно, 1 — запустить приложение, 2 — загрузить проект,
+    /// 3 — ничего не делать, 4 — системная команда.
+    pub mode: i32,
+    pub target: String,
+    pub window: String,
+    pub object: String,
+    pub effect: String,
+}
+
+const HYPER_TAG: u16 = 0x03FE;
+const HYPER_HEAD: [u8; 7] = [1, 0, 5, 0, 2, 0, 1];
+
+/// Длина данных объекта (блок `0x03FE`) от их начала; `None` — не они.
+fn object_data_len(data: &[u8]) -> Option<usize> {
+    let count = *data.get(6)? as usize;
+    let mut i = 7;
+    for _ in 0..count {
+        let n = u16::from_le_bytes([*data.get(i + 2)?, *data.get(i + 3)?]) as usize;
+        i += 4 + n;
+    }
+    (i <= data.len()).then_some(i)
+}
+
+/// Гиперссылка из данных объекта (блок `0x03FE`); `None` — ссылки нет.
+pub fn parse_hyper(data: &[u8]) -> Option<Hyper> {
+    let count = *data.get(6)? as usize;
+    let mut at = 7;
+    let mut item = None;
+    for _ in 0..count {
+        let id = u16::from_le_bytes([*data.get(at)?, *data.get(at + 1)?]);
+        let n = u16::from_le_bytes([*data.get(at + 2)?, *data.get(at + 3)?]) as usize;
+        if id == 0x0a {
+            item = Some(data.get(at + 4..at + 4 + n)?);
+        }
+        at += 4 + n;
+    }
+    let data = item?;
+    let u16_at = |i: usize| data.get(i..i + 2).map(|b| u16::from_le_bytes([b[0], b[1]]));
+    let end = data.len();
+    let mut h = Hyper::default();
+    let mut i = 0;
+    while i + 2 <= end {
+        let id = u16_at(i)?;
+        i += 2;
+        if id == 4 {
+            h.mode = u16_at(i)? as i32;
+            i += 2;
+            continue;
+        }
+        let n = u16_at(i)? as usize;
+        let text = super::cp1251::decode(data.get(i + 2..i + 2 + n)?);
+        i += 2 + n;
+        match id {
+            1 => h.target = text,
+            2 => h.window = text,
+            3 => h.object = text,
+            5 => h.effect = text,
+            _ => return Some(h),
+        }
+    }
+    Some(h)
+}
+
+/// Тело блока гиперссылки (без тега и длины блока).
+pub fn write_hyper(h: &Hyper) -> Vec<u8> {
+    let mut fields = Vec::new();
+    for (id, text) in [(1u16, &h.target), (2, &h.window), (3, &h.object), (5, &h.effect)] {
+        if id != 1 && text.is_empty() {
+            continue;
+        }
+        let bytes = super::cp1251::encode(text);
+        fields.extend_from_slice(&id.to_le_bytes());
+        fields.extend_from_slice(&(bytes.len() as u16).to_le_bytes());
+        fields.extend_from_slice(&bytes);
+    }
+    if h.mode != 0 {
+        fields.extend_from_slice(&4u16.to_le_bytes());
+        fields.extend_from_slice(&(h.mode as u16).to_le_bytes());
+    }
+    let mut out = HYPER_HEAD.to_vec();
+    out.extend_from_slice(&0x0au16.to_le_bytes());
+    out.extend_from_slice(&(fields.len() as u16).to_le_bytes());
+    out.extend_from_slice(&fields);
+    out
 }
 
 #[derive(Debug, Clone)]
@@ -213,7 +313,37 @@ pub fn parse(data: &[u8], path: &str) -> Result<Picture> {
         }
         break;
     }
+    if !ctx.sized {
+        read_object_data_v2(&r.data[r.pos.min(r.data.len())..], &mut pic);
+    }
     Ok(pic)
+}
+
+/// 2.x: после инструментов — `u32, u16` и список данных объектов, из
+/// которого берутся гиперссылки. Непонятное просто пропускается.
+fn read_object_data_v2(tail: &[u8], pic: &mut Picture) {
+    let u16_at = |i: usize| tail.get(i..i + 2).map(|b| u16::from_le_bytes([b[0], b[1]]));
+    let mut i = 6;
+    while let Some(kind) = u16_at(i) {
+        let handle = match kind {
+            1 => u16_at(i + 2),
+            2 => Some(0),
+            _ => None,
+        };
+        let Some(handle) = handle else { break };
+        i += if kind == 1 { 4 } else { 2 };
+        if u16_at(i) != Some(HYPER_TAG) {
+            break;
+        }
+        i += 2;
+        let Some(n) = object_data_len(&tail[i..]) else { break };
+        if kind == 1 {
+            if let Some(h) = parse_hyper(&tail[i..i + n]) {
+                pic.hypers.push((handle, h));
+            }
+        }
+        i += n;
+    }
 }
 
 fn read_chunk(r: &mut Reader, ctx: &Ctx, id: u16, pic: &mut Picture) -> Result<()> {
@@ -282,10 +412,23 @@ fn read_item(r: &mut Reader, ctx: &Ctx, id: u16, pic: &mut Picture) -> Result<()
             },
         };
         if let Some(end) = end {
-            if r.pos + 6 <= end && r.peek_u16(r.pos) == Some(0xCD) {
-                r.u16()?;
+            // блоки расширения: 0xCD — имя, 0x03FE — гиперссылка
+            while r.pos + 6 <= end {
+                let tag = r.u16()?;
                 let n = r.u32()? as usize;
-                name = super::cp1251::decode(&r.bytes(n.saturating_sub(6))?);
+                if n < 6 || r.pos + n - 6 > end {
+                    break;
+                }
+                let data = r.bytes(n - 6)?;
+                match tag {
+                    0xCD => name = super::cp1251::decode(&data),
+                    HYPER_TAG => {
+                        if let Some(h) = parse_hyper(&data) {
+                            pic.hypers.push((handle, h));
+                        }
+                    }
+                    _ => {}
+                }
             }
             r.pos = end;
         }
@@ -579,6 +722,12 @@ pub fn write(pic: &Picture) -> Vec<u8> {
                     w.u32(bytes.len() as u32 + 6);
                     w.bytes(&bytes);
                 }
+                if let Some((_, h)) = pic.hypers.iter().find(|(handle, _)| *handle == o.handle) {
+                    let bytes = write_hyper(h);
+                    w.u16(HYPER_TAG);
+                    w.u32(bytes.len() as u32 + 6);
+                    w.bytes(&bytes);
+                }
             });
         }
     });
@@ -738,6 +887,40 @@ impl Picture {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn hyperlink_blocks_of_the_corpus_round_trip() {
+        // блоки из примера «hyper»: переход к странице и системная команда
+        let page = hex("010005000200010a000c000100080077696e646f775f32");
+        let cmd = hex("010005000200010a00130001000b00434d5f505245565041474504000400");
+        let h = parse_hyper(&page).unwrap();
+        assert_eq!((h.mode, h.target.as_str()), (0, "window_2"));
+        assert_eq!(write_hyper(&h), page);
+        let h = parse_hyper(&cmd).unwrap();
+        assert_eq!((h.mode, h.target.as_str()), (4, "CM_PREVPAGE"));
+        assert_eq!(write_hyper(&h), cmd);
+        let full = Hyper { mode: 0, target: "стр.vdr".into(), window: "Окно".into(), object: "Root".into(), effect: "".into() };
+        assert_eq!(parse_hyper(&write_hyper(&full)).unwrap(), full);
+        // данные объекта без гиперссылки (элемент 0x0d — переменные объекта)
+        let vars = hex("010005000200010d0004006162630a");
+        assert_eq!(parse_hyper(&vars), None);
+        assert_eq!(object_data_len(&vars), Some(vars.len()));
+    }
+
+    #[test]
+    fn reads_hyperlinks_of_an_old_picture() {
+        // «hyper»: рисунок 2.02 корневого имиджа — кнопки меню ведут на страницы
+        let Some(data) = fixture("PROJECTS/samples/hyper/Root5782.cls") else { return };
+        let cls = crate::formats::cls::parse(&data, "Root5782.cls").unwrap();
+        let pic = parse(cls.image.as_deref().unwrap(), "Root5782").unwrap();
+        let targets: Vec<&str> = pic.hypers.iter().map(|(_, h)| h.target.as_str()).collect();
+        assert!(targets.contains(&"window_2") && targets.contains(&"StratumClass_Products"), "{targets:?}");
+        assert_eq!(pic.hypers.iter().find(|(h, _)| *h == 93).unwrap().1.target, "window_2");
+    }
+
+    fn hex(s: &str) -> Vec<u8> {
+        (0..s.len()).step_by(2).map(|i| u8::from_str_radix(&s[i..i + 2], 16).unwrap()).collect()
+    }
 
     fn fixture(rel: &str) -> Option<Vec<u8>> {
         std::fs::read(format!("{}/../fixtures/{rel}", env!("CARGO_MANIFEST_DIR"))).ok()

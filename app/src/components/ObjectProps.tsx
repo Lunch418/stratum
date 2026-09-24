@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { api, type ObjectProps as Props } from '../api';
 import { useStore } from '../store';
+import { HyperFields } from './ObjectDialog';
 
 export function ObjectProps() {
   const picked = useStore(s => s.pickedObject);
@@ -85,6 +86,10 @@ export function ObjectProps() {
             {(o.class === 'CHECKBOX' || o.class === 'RADIOBUTTON') && <label className="check"><input type="checkbox" checked={!!o.checked} onChange={e => set('checked', e.target.checked ? 1 : 0)} />отмечен</label>}
           </div>
         )}
+        <details open={!!o.hyper}>
+          <summary className="muted small">Гипербаза{o.hyper ? ' · ' + (o.hyper.target || '—') : ''}</summary>
+          <HyperFields o={o} set={set} />
+        </details>
         {o.points && (
           <details>
             <summary className="muted small">Точки ({o.points.length})</summary>

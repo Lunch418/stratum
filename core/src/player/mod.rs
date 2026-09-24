@@ -569,11 +569,37 @@ fn apply_event(s: &mut Shared, ev: Event) {
                 if let Err(e) = s.sim.mouse(space, msg, sx, sy, keys) {
                     s.error = Some(e.message);
                 }
-                // гипербаза: щелчок по объекту со ссылкой «открыть окно»
+                // гипербаза: щелчок по объекту со ссылкой (или по члену группы со
+                // ссылкой) — «открыть окно» или системная команда CM_PREVPAGE
                 if msg == 514 {
-                    let jump = s.sim.effects.gfx.space(space).and_then(|sp| sp.object_at(sx, sy).and_then(|h| sp.objects.get(&h)).and_then(|o| o.hyper.clone()));
-                    if let Some((0, target, win)) = jump {
-                        s.sim.effects.gfx.hyper_jump(&win, &target);
+                    let jump = s.sim.effects.gfx.space(space).and_then(|sp| {
+                        let mut at = sp.object_at(sx, sy);
+                        while let Some(o) = at.and_then(|h| sp.objects.get(&h)) {
+                            if o.hyper.is_some() {
+                                return o.hyper.clone();
+                            }
+                            at = o.parent;
+                        }
+                        // кнопки гипербазы — часто группы растров внутри групп
+                        // (флаг 0x1000), в которые попадание не ловит: берём
+                        // объект со ссылкой по габариту, верхний по Z-порядку
+                        let z = |h: u32| sp.zorder.iter().position(|&q| sp.top_ancestor(q) == h).unwrap_or(0);
+                        sp.objects
+                            .values()
+                            .filter(|o| o.hyper.is_some() && o.visible && sx >= o.x && sx <= o.x + o.w && sy >= o.y && sy <= o.y + o.h)
+                            .max_by_key(|o| z(o.handle))
+                            .and_then(|o| o.hyper.clone())
+                    });
+                    match jump {
+                        Some(h) if h.mode == 0 => {
+                            // окно не указано — страница меняется в том же окне
+                            let win = if h.window.is_empty() { window.clone() } else { h.window };
+                            s.sim.effects.gfx.hyper_jump(&win, &h.target);
+                        }
+                        Some(h) if h.mode == 4 && h.target.eq_ignore_ascii_case("CM_PREVPAGE") => {
+                            s.sim.effects.gfx.hyper_back();
+                        }
+                        _ => {}
                     }
                 }
             }
