@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { api, type ProjectProperty, type Sheet } from '../api';
 import { classByName, useStore } from '../store';
 
-function Tabs<T extends string>({ tabs, value, onChange }: { tabs: [T, string][]; value: T; onChange: (t: T) => void }) {
+export function Tabs<T extends string>({ tabs, value, onChange }: { tabs: [T, string][]; value: T; onChange: (t: T) => void }) {
   return (
     <div className="tabs small-tabs dialog-tabs">
       {tabs.map(([id, title]) => <button key={id} type="button" className={value === id ? 'active' : ''} onClick={() => onChange(id)}>{title}</button>)}
@@ -14,7 +14,7 @@ function Tabs<T extends string>({ tabs, value, onChange }: { tabs: [T, string][]
   );
 }
 
-function Frame({ title, width, children, onClose, onSubmit, action = 'OK' }: { title: string; width?: number; children: React.ReactNode; onClose: () => void; onSubmit?: () => void; action?: string }) {
+export function Frame({ title, width, children, onClose, onSubmit, action = 'OK' }: { title: string; width?: number; children: React.ReactNode; onClose: () => void; onSubmit?: () => void; action?: string }) {
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>
       <form className="modal" style={width ? { width: `min(${width}px, 94vw)` } : undefined} onMouseDown={e => e.stopPropagation()}
@@ -30,13 +30,13 @@ function Frame({ title, width, children, onClose, onSubmit, action = 'OK' }: { t
   );
 }
 
-const Check = ({ label, value, onChange, disabled }: { label: string; value: boolean; onChange: (v: boolean) => void; disabled?: boolean }) => (
+export const Check = ({ label, value, onChange, disabled }: { label: string; value: boolean; onChange: (v: boolean) => void; disabled?: boolean }) => (
   <label className="check"><input type="checkbox" checked={value} disabled={disabled} onChange={e => onChange(e.target.checked)} />{label}</label>
 );
-const Radio = ({ label, on, onChange, disabled }: { label: string; on: boolean; onChange: () => void; disabled?: boolean }) => (
+export const Radio = ({ label, on, onChange, disabled }: { label: string; on: boolean; onChange: () => void; disabled?: boolean }) => (
   <label className="check"><input type="radio" checked={on} disabled={disabled} onChange={onChange} />{label}</label>
 );
-const Num = ({ label, value, onChange, step = 1 }: { label: string; value: number; onChange: (v: number) => void; step?: number }) => (
+export const Num = ({ label, value, onChange, step = 1 }: { label: string; value: number; onChange: (v: number) => void; step?: number }) => (
   <label className="prop"><span>{label}</span><input type="number" step={step} value={value} onChange={e => onChange(Number(e.target.value))} /></label>
 );
 

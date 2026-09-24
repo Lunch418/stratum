@@ -22,6 +22,7 @@ import { Icon } from './components/Icon';
 import { MenuBar } from './components/MenuBar';
 import { SheetDialog, ProjectOptionsDialog, EnvOptionsDialog, ClassPropsDialog, CalcOrderDialog, FilePickDialog, AboutDialog, DeleteClassesDialog, loadEnv } from './components/Options';
 import { buildMenus, commandsFromMenus } from './menus';
+import { PrintDialog } from './components/PrintDialog';
 
 export default function App() {
   const s = useStore();
@@ -95,7 +96,7 @@ export default function App() {
       else if (e.code === 'F3') { e.preventDefault(); setDialog('stateLoad'); }
       else if (e.altKey && ['Digit1', 'Digit2', 'Digit3', 'Digit4'].includes(e.code)) { e.preventDefault(); s.toggleLayer((['grid', 'images', 'links', 'graphics'] as const)[Number(e.code[5]) - 1]); }
       else if (e.key === 'Enter' && s.selectedClass && !dialog && (e.target as HTMLElement).tagName !== 'BUTTON') { e.preventDefault(); setDialog('classProps'); }
-      else if (e.key.toLowerCase() === 'p' && e.ctrlKey && !e.shiftKey) { e.preventDefault(); window.print(); }
+      else if (e.key.toLowerCase() === 'p' && e.ctrlKey && !e.shiftKey) { e.preventDefault(); if (s.project && !s.project.empty) setDialog('print'); }
       else if (e.key.toLowerCase() === 'o' && e.ctrlKey) { e.preventDefault(); setDialog('open'); }
       else if (e.key === 'e' && e.ctrlKey) { e.preventDefault(); s.setTab(s.tab === 'code' ? 'scheme' : 'code'); }
       else if (e.key === 's' && e.ctrlKey) { e.preventDefault(); save(); }
@@ -192,6 +193,7 @@ export default function App() {
       {dialog === 'classProps' && <ClassPropsDialog onClose={() => setDialog(null)} />}
       {dialog === 'calcOrder' && <CalcOrderDialog onClose={() => setDialog(null)} />}
       {dialog === 'about' && <AboutDialog onClose={() => setDialog(null)} />}
+      {dialog === 'print' && <PrintDialog onClose={() => setDialog(null)} />}
       {dialog === 'deleteClasses' && <DeleteClassesDialog onClose={() => setDialog(null)} />}
       {dialog === 'insertFile' && s.selectedClass && (
         <FilePickDialog title="Вставить из файла в рисунок имиджа" ext="vdr,bmp" onClose={() => setDialog(null)}

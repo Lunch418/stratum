@@ -150,12 +150,24 @@ label.check { display: flex; align-items: center; gap: 8px; cursor: pointer; tex
 .list .row.selected { background: var(--accent-soft); color: var(--accent-ink); }
 .about-name { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
 
-/* печать: только активная вкладка */
+/* печать: страница собирается в #print-root (диалог «Печать»), остальное скрыто */
+#print-root { display: none; }
 @media print {
-  .topbar, .left, .right, .bottom, .splitter, .statusbar, .tabs, .toast { display: none !important; }
-  .workspace { display: block !important; }
-  .center, .tab-body { position: static !important; height: auto !important; overflow: visible !important; }
+  body.printing > :not(#print-root) { display: none !important; }
+  body.printing #print-root { display: block; color: #000; background: #fff; }
+  body:not(.printing) .topbar, body:not(.printing) .left, body:not(.printing) .right, body:not(.printing) .bottom,
+  body:not(.printing) .splitter, body:not(.printing) .statusbar, body:not(.printing) .tabs, body:not(.printing) .toast { display: none !important; }
 }
+#print-root .print-header { display: flex; gap: 16px; align-items: baseline; font: 10pt var(--font-ui); border-bottom: 0.3mm solid #000; padding-bottom: 1.5mm; margin-bottom: 3mm; }
+#print-root .print-header span { color: #444; }
+#print-root .print-header span:last-child { margin-left: auto; }
+#print-root .print-drawing { width: auto; height: auto; background: none; overflow: visible; }
+#print-root .print-drawing svg { display: block; overflow: visible; }
+#print-root .print-code { font: 9pt/1.35 var(--font-mono); white-space: pre-wrap; margin: 0; }
+#print-root .print-code .ln { color: #888; margin-right: 3ch; user-select: none; }
+#print-root.mono-print svg { filter: grayscale(1) contrast(1.2); }
+#print-root .scheme .pad-label { stroke: #fff; }
+#print-root .scheme .port, #print-root .scheme .hit { display: none; }
 .topbar .sep { width: 1px; height: 24px; background: var(--border); margin: 0 4px; }
 .menu-host { position: relative; }
 .context.menu { position: absolute; top: 100%; left: 0; margin-top: 4px; }
