@@ -389,19 +389,21 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
         }
 
         // ── системные ────────────────────────────────────────────────────
+        // местные дата и время
         "getdate" => {
-            let (y, m, d) = today();
+            let (y, m, d, ..) = super::clock::split(super::clock::local_now());
             fx.outputs.push((0, num(y as f64)));
             fx.outputs.push((1, num(m as f64)));
             fx.outputs.push((2, num(d as f64)));
             num(1.0)
         }
         "gettime" => {
-            let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0) % 86400;
-            fx.outputs.push((0, num((secs / 3600) as f64)));
-            fx.outputs.push((1, num(((secs / 60) % 60) as f64)));
-            fx.outputs.push((2, num((secs % 60) as f64)));
-            fx.outputs.push((3, num(0.0)));
+            let (.., hh, mm, ss) = super::clock::split(super::clock::local_now());
+            let hundredths = super::clock::hundredths();
+            fx.outputs.push((0, num(hh as f64)));
+            fx.outputs.push((1, num(mm as f64)));
+            fx.outputs.push((2, num(ss as f64)));
+            fx.outputs.push((3, num(hundredths as f64)));
             num(1.0)
         }
         "getkeyboardlayout" => num(1049.0),
@@ -506,21 +508,6 @@ fn is_ogre(n: &str) -> bool {
 }
 
 /// Год, месяц, день по системным часам (григорианский календарь).
-fn today() -> (i64, i64, i64) {
-    let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0);
-    let days = secs / 86400;
-    let z = days + 719468;
-    let era = z.div_euclid(146097);
-    let doe = z - era * 146097;
-    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
-    let y = yoe + era * 400;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let d = doy - (153 * mp + 2) / 5 + 1;
-    let m = if mp < 10 { mp + 3 } else { mp - 9 };
-    (if m <= 2 { y + 1 } else { y }, m, d)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -326,7 +326,8 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
             }
             num(0.0)
         }
-        "gettickcount" => num(0.0),
+        // миллисекунды с загрузки системы, как в Windows
+        "gettickcount" => num(super::clock::tick_count()),
         // inc(x [, step]) / dec(x [, step]) меняют переменную-аргумент
         "inc" | "dec" => {
             let step = if args.len() > 1 { f(args, 1) } else { 1.0 };
