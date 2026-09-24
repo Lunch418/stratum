@@ -3,7 +3,7 @@
 //! Сигнатуры — из `docs/lang/functions.md`. Возвращаемые значения как в
 //! оригинале: дескриптор или 0 при ошибке, 1/0 для успеха.
 
-use super::{Brush, Dib, Font, Gfx, Handle, Object, Pen, Shape, Space, TextPart};
+use super::{Brush, Dib, Font, Gfx, Handle, Object, Pen, Shape, Space, TextPart, WINDOW_FRAME, WORKSPACE_ON_SCREEN};
 use crate::runtime::value::Value;
 
 fn f(args: &[Value], i: usize) -> f64 {
@@ -93,9 +93,25 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
             let mode = f(args, 1);
             ok(window_space_mut(gfx, &s(args, 0)).map(|sp| sp.visible = mode != 0.0).is_some())
         }
-        "setwindoworg" | "setwindowpos" | "setwindowtitle" | "setwindowprop" | "bringwindowtotop"
+        "setwindoworg" => {
+            let org = (f(args, 1), f(args, 2));
+            ok(window_space_mut(gfx, &s(args, 0)).map(|sp| sp.org = org).is_some())
+        }
+        // SetWindowPos(окно, x, y, ширина, высота): размеры — всего окна
+        "setwindowpos" => {
+            let (org, size) = ((f(args, 1), f(args, 2)), (f(args, 3), f(args, 4)));
+            ok(window_space_mut(gfx, &s(args, 0)).map(|sp| {
+                sp.org = org;
+                sp.client = ((size.0 - WINDOW_FRAME.0).max(0.0), (size.1 - WINDOW_FRAME.1).max(0.0));
+            }).is_some())
+        }
+        "setwindowtitle" | "setwindowprop" | "bringwindowtotop"
         | "setwindowtransparent" | "setwindowtransparentcolor" => ok(window_space(gfx, &s(args, 0)).is_some()),
-        "getwindoworgx" | "getwindoworgy" | "getwindowwidth" | "getwindowheight" => num(0.0),
+        // положение — в экранных координатах, размер — с рамкой и заголовком
+        "getwindoworgx" => num(window_space(gfx, &s(args, 0)).map(|sp| sp.org.0 + WORKSPACE_ON_SCREEN.0).unwrap_or(0.0)),
+        "getwindoworgy" => num(window_space(gfx, &s(args, 0)).map(|sp| sp.org.1 + WORKSPACE_ON_SCREEN.1).unwrap_or(0.0)),
+        "getwindowwidth" => num(window_space(gfx, &s(args, 0)).map(|sp| sp.client.0 + WINDOW_FRAME.0).unwrap_or(0.0)),
+        "getwindowheight" => num(window_space(gfx, &s(args, 0)).map(|sp| sp.client.1 + WINDOW_FRAME.1).unwrap_or(0.0)),
         // GetWindowProp(name, prop): "hwnd" и прочие свойства ОС нам недоступны
         // GetWindowProp(окно, "Classname" | "Filename") — из чего открыто окно
         "getwindowprop" => Value::Str(window_space(gfx, &s(args, 0)).map(|sp| match s(args, 1).to_ascii_lowercase().as_str() {
@@ -812,11 +828,12 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
         }
 
         // ── экран и рабочая область ───────────────────────────────────────
-        "getscreenwidth" => num(1440.0),
-        "getscreenheight" => num(900.0),
-        "getworkareax" | "getworkareay" => num(0.0),
-        "getworkareawidth" => num(1440.0),
-        "getworkareaheight" => num(860.0),
+        // значения эталонного окружения, в котором сняты размеры окон
+        // (tools/verify/windows.txt)
+        "getscreenwidth" | "getworkareawidth" => num(1920.0),
+        "getscreenheight" | "getworkareaheight" => num(1080.0),
+        "getworkareax" => num(0.0),
+        "getworkareay" => num(32.0),
         "getprojectdirectory" => Value::Str(gfx.project_dir.display().to_string()),
 
         // ── принимаем без действия: градиенты, движок, строка состояния, звук ──

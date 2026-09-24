@@ -7,6 +7,14 @@
 выполняется ядром (`stratum run`) и оригиналом (`SC200032.EXE проект /run`),
 ответы сравниваются.
 
+Строка `! оператор` выполняется один раз на первом такте, а пробы — через
+N тактов после него (`% Wait = N`): так проверяется то, что оригинал делает
+не сразу (окна получают размеры сообщением WM_SIZE уже после открытия).
+
+Строка `@ папка Имя` добавляет в проект готовый имидж из родного проекта
+(`stratum convert`) вместе с рисунками — для проб окон и графики. Папка
+берётся от корня репозитория или абсолютная.
+
 Префикс `s:` у выражения — результат уже строка (без String()).
 Строка `> оператор` вставляется в текст как есть (объявления, присваивания)
 перед следующими пробами — так проверяется семантика, а не только функции.
@@ -36,12 +44,23 @@ def probes(path):
         line = line.strip()
         if not line or line.startswith('#'):
             continue
+        if line.startswith('!'):
+            SETUP.append(line[1:].strip())
+            continue
         if line.startswith('%'):
             key, value = [p.strip() for p in line[1:].split('=', 1)]
+            if key == 'Wait':
+                global WAIT
+                WAIT = int(value)
+                continue
             PROPERTIES.append({'key': key, 'int': int(value)})
             continue
         if line.startswith('>'):
             out.append((None, line[1:].strip()))
+            continue
+        if line.startswith('@'):
+            folder, name = line[1:].split()
+            EXTRA_CLASSES.append((ROOT / folder, name))
             continue
         name, expr = [p.strip() for p in line.split('|', 1)]
         out.append((name, expr))
@@ -49,8 +68,9 @@ def probes(path):
 
 
 def model_text(items, out_path):
-    lines = [
-        'if (done == 0)',
+    lines = ['if (tick == 0)'] + [' ' + st for st in SETUP] + ['endif', 'tick := tick + 1'] if SETUP or WAIT else []
+    lines += [
+        f'if (done == 0 && tick > {WAIT})' if SETUP or WAIT else 'if (done == 0)',
         f' h := CreateStream("FILE", "{out_path}", "CREATE")',
     ]
     for name, expr in items:
@@ -64,7 +84,7 @@ def model_text(items, out_path):
 
 
 VAR = lambda n, t: {'name': n, 'type': t, 'default': '', 'description': '', 'flags': 0}
-PROBE_VARS = [VAR('h', 'HANDLE'), VAR('r', 'FLOAT'), VAR('done', 'FLOAT')]
+PROBE_VARS = [VAR('h', 'HANDLE'), VAR('r', 'FLOAT'), VAR('done', 'FLOAT'), VAR('tick', 'FLOAT')]
 
 
 def write_class(dir, name, vars, text, children=()):
@@ -75,14 +95,40 @@ def write_class(dir, name, vars, text, children=()):
 
 # Свойства проекта для проб: строка `% MathMode = 3` в файле проб
 PROPERTIES = []
+# Готовые имиджи из родных проектов: строка `@ папка Имя`
+EXTRA_CLASSES = []
+# Операторы первого такта (`! оператор`) и задержка проб в тактах (`% Wait = N`)
+SETUP = []
+WAIT = 0
 
 
 def native_project(dir, text, compiler=False):
     (dir / 'classes').mkdir(parents=True, exist_ok=True)
     classes = [{'name': 'Main', 'file': 'Main'}] + ([{'name': 'Probe', 'file': 'Probe'}] if compiler else [])
+    for folder, name in EXTRA_CLASSES:
+        if not (folder / 'project.json').exists():
+            native = dir.parent / f'import-{folder.name}'
+            if not native.exists():
+                subprocess.run([str(CORE), 'convert', str(folder), str(native)], capture_output=True, check=True)
+            folder = native
+        # имидж вместе с детьми его схемы из той же папки (библиотечных
+        # детей оригинал найдёт в своих библиотеках)
+        todo, seen = [name], set()
+        while todo:
+            n = todo.pop()
+            meta = folder / 'classes' / f'{n}.strat.json'
+            if n in seen or not meta.exists():
+                continue
+            seen.add(n)
+            for f in (folder / 'classes').glob(f'{n}.*'):
+                shutil.copy(f, dir / 'classes' / f.name)
+            classes.append({'name': n, 'file': n})
+            todo += [c['class'] for c in json.loads(meta.read_text(encoding='utf-8'))['children']]
     (dir / 'project.json').write_text(json.dumps({'format': 'stratum-modern/1', 'root': 'Main', 'properties': PROPERTIES, 'variables': [], 'libraries': [], 'classes': classes}), encoding='utf-8')
     if not compiler:
-        write_class(dir, 'Main', PROBE_VARS, text)
+        # имидж, которого нет в дереве, оригинал не загружает — ставим
+        # импортированные имиджи на схему главного
+        write_class(dir, 'Main', PROBE_VARS, text, children=[n for _, n in EXTRA_CLASSES])
         return
     # Main передаёт текст пробы компилятору оригинала; Probe его исполняет
     driver = '\n'.join([
@@ -112,7 +158,7 @@ def run_core(items, work):
     native_project(proj, model_text(items, r'C:\verify\out.txt'))
     # диск C: модели ядро отображает в папку проекта — папка должна быть
     (proj / 'verify').mkdir(exist_ok=True)
-    subprocess.run([str(CORE), 'run', str(proj), '--ticks', '2'], capture_output=True, text=True)
+    subprocess.run([str(CORE), 'run', str(proj), '--ticks', str(WAIT + 2)], capture_output=True, text=True)
     # диск C: модели ядро отображает в папку проекта
     return parse(proj / 'verify' / 'out.txt')
 

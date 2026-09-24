@@ -53,7 +53,7 @@ pub fn open(c: &cls::Class, kind: Kind) -> Space {
         for o in sp.objects.values_mut() {
             o.scheme_element = false;
         }
-        if sp.client == (640.0, 480.0) {
+        if sp.client == crate::gfx::DEFAULT_CLIENT {
             sp.client = (32.0, 32.0);
         }
     }

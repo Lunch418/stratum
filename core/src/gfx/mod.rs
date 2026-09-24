@@ -184,6 +184,8 @@ pub struct Space {
     pub origin: (f64, f64),
     pub scale: (f64, f64),
     pub client: (f64, f64),
+    /// Левый верхний угол окна в рабочей области главного окна.
+    pub org: (f64, f64),
     pub visible: bool,
     /// Из чего открыто окно: имидж (`OpenSchemeWindow`) или файл `.vdr`
     /// (`LoadSpaceWindow`) — для `GetWindowProp`.
@@ -200,13 +202,28 @@ pub struct Space {
     next: Handle,
 }
 
+/// Окна модели в оригинале — дочерние MDI-окна. Без заданного размера
+/// окно получает размер MDI по умолчанию и встаёт каскадом; числа сняты с
+/// оригинала в эталонном окружении (Wine, экран 1920×1080), см.
+/// tools/verify/windows.txt.
+pub const DEFAULT_CLIENT: (f64, f64) = (625.0, 611.0);
+/// Рамка и заголовок: окно больше клиентской области на столько.
+pub const WINDOW_FRAME: (f64, f64) = (8.0, 34.0);
+/// Шаг каскада (заголовок + рамка) и число ступеней до возврата в угол.
+pub const CASCADE_STEP: f64 = 29.0;
+pub const CASCADE_STEPS: usize = 11;
+/// Где рабочая область главного окна лежит на экране: GetWindowOrgX/Y
+/// отвечают в экранных координатах, SetWindowOrg принимает координаты
+/// рабочей области.
+pub const WORKSPACE_ON_SCREEN: (f64, f64) = (85.0, 121.0);
+
 impl Space {
     pub fn new(handle: Handle, window: &str) -> Self {
         Space {
             handle,
             window: window.to_string(),
             scale: (1.0, 1.0),
-            client: (640.0, 480.0),
+            client: DEFAULT_CLIENT,
             visible: true,
             layers: u32::MAX,
             next: 1,
@@ -824,7 +841,11 @@ impl Gfx {
         }
         let h = self.next_space;
         self.next_space += 1;
-        self.spaces.insert(h, Space::new(h, name));
+        let mut space = Space::new(h, name);
+        // каскад MDI: номер ступени — число уже открытых окон
+        let step = (self.windows.len() % CASCADE_STEPS) as f64 * CASCADE_STEP;
+        space.org = (step, step);
+        self.spaces.insert(h, space);
         self.windows.insert(name.to_lowercase(), h);
         self.window_order.push(name.to_string());
         h
@@ -891,18 +912,13 @@ impl Gfx {
         }
     }
 
-    /// Окно без явного размера клиентской области подгоняется под объекты.
+    /// Окно, для которого рисунок размера не задаёт (в файле заглушка
+    /// 100×100), получает размер MDI-окна по умолчанию, как в оригинале.
     pub fn fit_client(&mut self, space: Handle) {
         let Some(sp) = self.spaces.get_mut(&space) else { return };
-        if sp.client != (100.0, 100.0) && sp.client != (0.0, 0.0) {
-            return;
+        if sp.client == (100.0, 100.0) || sp.client == (0.0, 0.0) {
+            sp.client = DEFAULT_CLIENT;
         }
-        let (mut x1, mut y1) = (0.0f64, 0.0f64);
-        for o in sp.objects.values().filter(|o| !o.scheme_element) {
-            x1 = x1.max(o.x + o.w);
-            y1 = y1.max(o.y + o.h);
-        }
-        sp.client = ((x1 + 8.0).max(200.0), (y1 + 8.0).max(150.0));
     }
 
     pub fn load_picture_file(&self, name: &str) -> Option<Picture> {

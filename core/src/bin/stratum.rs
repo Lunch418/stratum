@@ -695,9 +695,11 @@ fn cmd_instrument(args: &[String]) -> Result<(), String> {
 fn cmd_sttdiff(args: &[String]) -> Result<(), String> {
     let mut paths = Vec::new();
     let mut tol = 1e-9f64;
+    let mut all = false;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
+            "--all" => all = true,
             "--tol" => {
                 i += 1;
                 tol = args.get(i).and_then(|v| v.parse().ok()).ok_or("--tol: нужно число")?;
@@ -712,13 +714,25 @@ fn cmd_sttdiff(args: &[String]) -> Result<(), String> {
         formats::project::parse_state(&d, &p.display().to_string()).map_err(|e| e.to_string())
     };
     let (orig, ours) = (read(a)?, read(b)?);
-    let key = |img: &formats::project::StateImage| (lang::fold(&img.class_name), img.handle);
+    // экземпляры одного имиджа с тем же handle встречаются в разных ветвях
+    // (у каждого шара свой Engine#3): сопоставляем k-е вхождение с k-м —
+    // оба снимка пишутся в одном обходе дерева
+    let keyed = |images: &[formats::project::StateImage]| -> Vec<((String, u16), usize)> {
+        let mut seen: std::collections::HashMap<(String, u16), usize> = std::collections::HashMap::new();
+        images.iter().map(|img| {
+            let k = (lang::fold(&img.class_name), img.handle);
+            let n = seen.entry(k.clone()).or_insert(0);
+            *n += 1;
+            (k, *n)
+        }).collect()
+    };
+    let (orig_keys, our_keys) = (keyed(&orig.images), keyed(&ours.images));
     let (mut same, mut differ, mut missing) = (0, 0, 0);
     // типы переменных: дескрипторы считаем отдельно — их нумерация своя
     let only_numbers = std::env::var_os("STT_SKIP").map(|v| v.to_string_lossy().to_string()).unwrap_or_default();
     let mut worst: Vec<(f64, String)> = Vec::new();
-    for img in &orig.images {
-        let Some(other) = ours.images.iter().find(|o| key(o) == key(img)) else {
+    for (img, k) in orig.images.iter().zip(&orig_keys) {
+        let Some(other) = our_keys.iter().position(|o| o == k).map(|j| &ours.images[j]) else {
             missing += 1;
             continue;
         };
@@ -741,13 +755,14 @@ fn cmd_sttdiff(args: &[String]) -> Result<(), String> {
                     (Ok(x), Ok(y)) => (x - y).abs() / x.abs().max(y.abs()).max(1e-300),
                     _ => f64::INFINITY,
                 };
-                worst.push((d, format!("{}#{} {name}: оригинал {value}, ядро {v2}", img.class_name, img.handle)));
+                let nth = if k.1 > 1 { format!("/{}", k.1) } else { String::new() };
+                worst.push((d, format!("{}#{}{nth} {name}: оригинал {value}, ядро {v2}", img.class_name, img.handle)));
             }
         }
     }
     worst.sort_by(|x, y| y.0.partial_cmp(&x.0).unwrap_or(std::cmp::Ordering::Equal));
     println!("переменных совпало: {same}; расходится: {differ}; имиджей оригинала без пары в ядре: {missing}");
-    for (_, w) in worst.iter().take(15) {
+    for (_, w) in worst.iter().take(if all { usize::MAX } else { 15 }) {
         println!("  {w}");
     }
     if differ > 0 { Err("снимки расходятся".into()) } else { Ok(()) }

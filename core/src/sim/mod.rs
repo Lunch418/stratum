@@ -132,8 +132,8 @@ pub struct Simulation {
     /// `~x` читает текущие `cells`.
     old: Vec<Value>,
     types: Vec<ValueType>,
-    /// Порядок обхода экземпляров в такте.
-    order: Vec<usize>,
+    /// Дети каждого экземпляра в порядке вычисления (порядок схемы).
+    children: Vec<Vec<usize>>,
     /// Метод Ньютона для уравнений: предел итераций и допустимая невязка
     /// («Параметры проекта → Методы»).
     pub newton_iterations: usize,
@@ -210,7 +210,7 @@ impl Simulation {
             cells: Vec::new(),
             old: Vec::new(),
             types: Vec::new(),
-            order: Vec::new(),
+            children: Vec::new(),
             newton_iterations: 8,
             newton_tolerance: 1e-9,
             effects: Effects::default(),
@@ -258,8 +258,8 @@ impl Simulation {
         let root_index = sim.add_instance(project, root, &root.name, None, "", 0)?;
         sim.expand(project, root, root_index, &mut merges)?;
         sim.apply_links(&merges);
-        sim.order = (0..sim.instances.len()).collect();
-        sim.old = sim.cells.clone();
+        sim.children = sim.children_lists();
+        sim.reset_to_defaults();
         // служебные переменные со свойствами объекта на схеме (в оригинале
         // заполняются по «Стоп» и попадают в снимок; у нас — всегда)
         for i in 0..sim.instances.len() {
@@ -479,17 +479,36 @@ impl Simulation {
     }
 
     /// Переменные всех экземпляров — в значения по умолчанию из описаний имиджей.
+    ///
+    /// Связанные переменные делят ячейку, а значения по умолчанию у них бывают
+    /// разные. Оригинал раздаёт их в обходе «сначала дети по порядку схемы,
+    /// потом сам имидж»; последнее непустое значение побеждает, пустое ничего
+    /// не затирает (сверено в Wine, tools/verify_links.py).
     pub fn reset_to_defaults(&mut self) {
-        for i in 0..self.instances.len() {
+        for c in 0..self.cells.len() {
+            self.cells[c] = self.types[c].default_value();
+        }
+        let kids = self.children_lists();
+        let mut order = Vec::with_capacity(self.instances.len());
+        let mut stack: Vec<(usize, bool)> = (0..self.instances.len()).filter(|&i| self.instances[i].parent.is_none()).map(|i| (i, false)).collect();
+        while let Some((i, done)) = stack.pop() {
+            if done {
+                order.push(i);
+                continue;
+            }
+            stack.push((i, true));
+            stack.extend(kids[i].iter().rev().map(|&k| (k, false)));
+        }
+        for i in order {
             let class = self.instances[i].class;
             let Some(meta) = self.class_meta.get(class).cloned() else { continue };
-            for v in &meta.vars {
+            for v in meta.vars.iter().filter(|v| !v.default.trim().is_empty()) {
                 if let Some(&c) = self.instances[i].vars.get(&v.name.to_lowercase()) {
                     self.cells[c] = Value::parse_default(&v.default, self.types[c]);
-                    self.old[c] = self.cells[c].clone();
                 }
             }
         }
+        self.old = self.cells.clone();
     }
 
     /// Стартовые значения из `_preload.stt`.
@@ -525,17 +544,23 @@ impl Simulation {
         self.effects.dialog_request = None;
         self.effects.math_errors.clear();
         self.solve_equations()?;
-        let order = self.order.clone();
-        let mut disabled_roots: Vec<usize> = Vec::new();
-        for index in order {
+        // обход оригинала: сначала дети по порядку схемы, потом сам имидж
+        // (лист, родитель, …, корень последним — сверено в Wine). Отключённый
+        // имидж пропускается вместе с подсхемой в момент входа в него.
+        let roots: Vec<usize> = (0..self.instances.len()).filter(|&i| self.instances[i].parent.is_none()).collect();
+        let mut stack: Vec<(usize, bool)> = roots.into_iter().rev().map(|i| (i, false)).collect();
+        while let Some((index, entered)) = stack.pop() {
             if self.stopped {
                 break;
             }
-            if self.is_disabled(index) {
-                disabled_roots.push(index);
-                continue;
-            }
-            if disabled_roots.iter().any(|&d| self.descends_from(index, d)) {
+            if !entered {
+                if self.is_disabled(index) {
+                    continue;
+                }
+                stack.push((index, true));
+                if let Some(kids) = self.children.get(index) {
+                    stack.extend(kids.iter().rev().map(|&k| (k, false)));
+                }
                 continue;
             }
             let started = std::time::Instant::now();
@@ -568,6 +593,17 @@ impl Simulation {
         let enable = vars.get("_enable").map(|&c| self.cells[c].as_float());
         let disable = vars.get("_disable").map(|&c| self.cells[c].as_float());
         enable == Some(0.0) || disable.is_some_and(|d| d != 0.0)
+    }
+
+    /// Дети каждого экземпляра в порядке схемы: экземпляры создаются в нём.
+    fn children_lists(&self) -> Vec<Vec<usize>> {
+        let mut kids: Vec<Vec<usize>> = vec![Vec::new(); self.instances.len()];
+        for (i, inst) in self.instances.iter().enumerate() {
+            if let Some(p) = inst.parent {
+                kids[p].push(i);
+            }
+        }
+        kids
     }
 
     fn descends_from(&self, mut index: usize, ancestor: usize) -> bool {

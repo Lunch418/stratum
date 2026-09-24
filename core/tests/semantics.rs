@@ -64,3 +64,56 @@ fn math_errors_give_the_originals_values() {
         assert!(!sim.effects.math_errors.is_empty() || expr == "(-2)^3", "{expr}: ошибка должна регистрироваться");
     }
 }
+
+fn class(name: &str, vars: Vec<Variable>, text: &str, children: &[(&str, &str, u16)], links: &[(u16, u16, &str, &str)]) -> Class {
+    use stratum_core::formats::cls::{Child, Link};
+    Class {
+        name: name.into(),
+        version: 0x3003,
+        vars,
+        text: text.into(),
+        children: children.iter().map(|&(c, n, h)| Child { class_name: c.into(), handle: h, name: n.into(), x: 0.0, y: 0.0, flags: 0 }).collect(),
+        links: links.iter().map(|&(s, t, a, b)| Link { source: s, target: t, handle: 100 + s, flags: 0, vars: vec![(a.into(), b.into())], style: Default::default() }).collect(),
+        ..Default::default()
+    }
+}
+
+fn build(classes: Vec<Class>) -> Simulation {
+    let n = classes.len();
+    let project = LoadedProject { project: Project { root: "Main".into(), ..Default::default() }, classes, own_classes: n, ..Default::default() };
+    Simulation::build(&project).unwrap()
+}
+
+/// Оригинал считает сначала детей по порядку схемы, потом сам имидж:
+/// журнал «LKLKM» (сверено в Wine).
+#[test]
+fn children_are_calculated_before_their_parent() {
+    let leaf = class("Leaf", vec![], "SetVar(\"..\\..\", \"log\", GetVarS(\"..\\..\", \"log\") + \"L\")", &[], &[]);
+    let kid = class("Kid", vec![], "SetVar(\"..\", \"log\", GetVarS(\"..\", \"log\") + \"K\")", &[("Leaf", "L1", 1)], &[]);
+    let main = class("Main", vec![var("log", "STRING")], "log := ~log + \"M\"", &[("Kid", "K1", 1), ("Kid", "K2", 2)], &[]);
+    let mut sim = build(vec![main, kid, leaf]);
+    sim.step().unwrap();
+    assert_eq!(value(&sim, "log"), "LKLKM");
+}
+
+/// Связанные переменные с разными значениями по умолчанию: побеждает
+/// последнее непустое в обходе «дети, потом родитель»; направление связи
+/// не важно (сверено в Wine, tools/verify_links.py).
+#[test]
+fn linked_defaults_follow_the_originals_order() {
+    let v = |name: &str, d: &str| class(name, vec![Variable { default: d.into(), ..var("x", "FLOAT") }], "", &[], &[]);
+    let main = class(
+        "Main",
+        vec![Variable { default: "7".into(), ..var("p", "FLOAT") }],
+        "",
+        &[("V1", "A", 1), ("V2", "B", 2), ("V2", "H", 3), ("V1", "I", 4), ("V1", "N", 5), ("V0", "O", 6), ("V2", "P", 7)],
+        &[(1, 2, "x", "x"), (3, 4, "x", "x"), (5, 6, "x", "x"), (7, 0, "x", "p")],
+    );
+    let sim = build(vec![main, v("V0", ""), v("V1", "1"), v("V2", "2")]);
+    let x = |child: usize| sim.value(child, "x").unwrap().to_string();
+    // экземпляры: 0 — Main, дальше дети по порядку схемы
+    assert_eq!((x(1), x(2)), ("2".into(), "2".into()));
+    assert_eq!((x(3), x(4)), ("1".into(), "1".into()));
+    assert_eq!((x(5), x(6)), ("1".into(), "1".into()));
+    assert_eq!((x(7), value(&sim, "p")), ("7".into(), "7".into()));
+}
