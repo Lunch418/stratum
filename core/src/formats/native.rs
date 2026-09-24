@@ -423,16 +423,34 @@ pub fn export_stratum2000(dir: &Path, project: &LoadedProject) -> std::io::Resul
 /// старыми именами функций, которые текущий компилятор не знает). Новые
 /// переменные из текста дописываются в таблицу: оригинал адресует их по
 /// индексам. Имидж, который не компилируется, пишется без байт-кода.
-pub fn compile_classes(project: &LoadedProject) -> Vec<Class> {
-    use crate::lang::compile::{compile, image_function, Env, ImageFunction, Ty};
-    let functions: std::collections::HashMap<String, ImageFunction> = project
+/// Имиджи-функции проекта и библиотек по имени (в нижнем регистре).
+pub fn image_functions(project: &LoadedProject) -> std::collections::HashMap<String, crate::lang::compile::ImageFunction> {
+    project
         .classes
         .iter()
         .filter_map(|c| {
             let m = crate::lang::parse(&c.text).ok()?;
-            m.is_function.then(|| (crate::lang::fold(&c.name), image_function(c, &m)))
+            m.is_function.then(|| (crate::lang::fold(&c.name), crate::lang::compile::image_function(c, &m)))
         })
-        .collect();
+        .collect()
+}
+
+/// Проверка текста компилятором в правилах Stratum 2000: неизвестные
+/// функции, неподходящие аргументы, недопустимые операции. Ошибка значит,
+/// что оригинал этот текст не примет.
+pub fn check_text(project: &LoadedProject, cls: &Class, model: &crate::lang::Model) -> Result<(), crate::lang::compile::CompileError> {
+    use crate::lang::compile::{compile, Env, Ty};
+    let functions = image_functions(project);
+    let constant = |n: &str| crate::runtime::constants::lookup(n);
+    let function = |n: &str| functions.get(&crate::lang::fold(n)).cloned();
+    let env = Env { constant: &constant, function: &function, fold_minus: true, placeholders: false };
+    let known: Vec<(String, Ty)> = cls.vars.iter().map(|v| (v.name.clone(), Ty::from_name(&v.var_type))).collect();
+    compile(model, &known, &env).map(|_| ())
+}
+
+pub fn compile_classes(project: &LoadedProject) -> Vec<Class> {
+    use crate::lang::compile::{compile, Env, Ty};
+    let functions = image_functions(project);
     let constant = |n: &str| crate::runtime::constants::lookup(n);
     let function = |n: &str| functions.get(&crate::lang::fold(n)).cloned();
     let env = Env { constant: &constant, function: &function, fold_minus: true, placeholders: false };

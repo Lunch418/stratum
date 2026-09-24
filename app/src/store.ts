@@ -22,6 +22,7 @@ interface State {
   toast: string | null;
   theme: 'light' | 'dark';
   load: () => Promise<void>;
+  checkProject: () => Promise<void>;
   refreshInstances: () => Promise<void>;
   select: (klass: string | null, instance?: number | null) => void;
   enterScheme: (klass: string) => void;
@@ -83,6 +84,14 @@ export const useStore = create<State>((set, get) => ({
     const project = await api.project();
     set({ project, schemePath: [project.root], selectedClass: project.root, unsaved: project.unsaved });
     await get().refreshInstances();
+    get().checkProject();
+  },
+  /// сводка проверки компилятором Stratum 2000 — в «Сообщения»
+  checkProject: async () => {
+    try {
+      const list = await api.check();
+      for (const e of list) get().say({ level: e.stored ? 'info' : 'error', where: `${e.class}, строка ${e.line}`, text: e.stored ? `текущий компилятор Stratum 2000 не принимает текст (${e.message}); оригинал исполняет сохранённый байт-код` : `Stratum 2000 не примет текст: ${e.message}` });
+    } catch { /* ядро без /api/check */ }
   },
   refreshInstances: async () => set({ instances: await api.instances() }),
   select: (klass, instance = null) => set({ selectedClass: klass, selectedInstance: instance }),
@@ -115,6 +124,7 @@ export const useStore = create<State>((set, get) => ({
     const project = await api.project();
     set({ project, schemePath: [project.root], selectedClass: project.root, selectedInstance: null, unsaved: false, messages: [] });
     await get().refreshInstances();
+    get().checkProject();
     get().showToast('Проект открыт');
   },
   pickedObject: null,

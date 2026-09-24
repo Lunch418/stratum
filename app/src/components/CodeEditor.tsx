@@ -154,10 +154,17 @@ export function CodeEditor() {
     const monaco = monacoRef.current, editor = editorRef.current;
     if (monaco && editor) {
       const model = editor.getModel();
-      if (model) monaco.editor.setModelMarkers(model, 'stratum', r.ok || !r.error ? [] : [{
-        severity: 8, message: r.error.message, startLineNumber: r.error.line, startColumn: r.error.column, endLineNumber: r.error.line, endColumn: r.error.column + 1,
-      }]);
+      const markers = [];
+      if (!r.ok && r.error) markers.push({ severity: 8, message: r.error.message, startLineNumber: r.error.line, startColumn: r.error.column, endLineNumber: r.error.line, endColumn: r.error.column + 1 });
+      // ошибка компилятора в правилах Stratum 2000: ядро текст выполнит,
+      // но оригинал его не примет — предупреждение на всю строку
+      if (r.ok && r.compileError && model) {
+        const line = Math.max(1, r.compileError.line);
+        markers.push({ severity: 4, message: `Stratum 2000 не примет этот текст: ${r.compileError.message}`, startLineNumber: line, startColumn: 1, endLineNumber: line, endColumn: model.getLineMaxColumn(line) });
+      }
+      if (model) monaco.editor.setModelMarkers(model, 'stratum', markers);
     }
+    if (r.ok && r.compileError) say({ level: 'error', where: `${klass.name}, строка ${r.compileError.line}`, text: `Stratum 2000 не примет текст: ${r.compileError.message}` });
     if (r.ok) { showToast(r.live ? 'Применено на ходу' : 'Текст принят'); say({ level: 'info', where: klass.name, text: r.live ? 'текст применён в работающей модели' : 'текст принят' }); }
     else if (r.error) say({ level: 'error', where: `${klass.name}, строка ${r.error.line}`, text: r.error.message });
   }

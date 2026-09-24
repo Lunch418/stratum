@@ -215,10 +215,16 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
             s.project.classes[i].text = body.to_string();
             match lang::parse(body) {
                 Ok(m) => {
+                    // проверка компилятором в правилах Stratum 2000
+                    let check = crate::formats::native::check_text(&s.project, &s.project.classes[i], &m);
                     // на ходу: работающая модель получает новый текст без сброса
                     let live = s.sim.hot_swap_text(&name, m.clone());
                     s.models.insert(name.to_lowercase(), m);
-                    json(format!("{{\"ok\":true,\"live\":{live}}}"))
+                    let compile_error = match check {
+                        Ok(()) => "null".to_string(),
+                        Err(e) => format!("{{\"line\":{},\"message\":{}}}", e.line, json_string(&e.message)),
+                    };
+                    json(format!("{{\"ok\":true,\"live\":{live},\"compileError\":{compile_error}}}"))
                 }
                 Err(e) => json(format!("{{\"ok\":false,\"error\":{}}}", parse_error_json(&e))),
             }
@@ -698,6 +704,20 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
                 cls.icon = None;
             }
             json("{\"ok\":true}".into())
+        }
+        // проверка всех собственных имиджей компилятором в правилах Stratum 2000
+        ("GET", ["check"]) => {
+            let s = shared.lock().unwrap();
+            let mut items = Vec::new();
+            for c in &s.project.classes[..s.project.own_classes] {
+                let Ok(m) = lang::parse(&c.text) else { continue };
+                if let Err(e) = crate::formats::native::check_text(&s.project, c, &m) {
+                    // имидж с сохранённым байт-кодом оригинал исполнит и так
+                    let stored = c.bytecode.is_some() && c.bytecode_text.as_deref() == Some(c.text.as_str());
+                    items.push(format!("{{\"class\":{},\"line\":{},\"message\":{},\"stored\":{stored}}}", json_string(&c.name), e.line, json_string(&e.message)));
+                }
+            }
+            json(format!("[{}]", items.join(",")))
         }
         ("POST", ["link", "remove"]) => {
             let get = |k: &str| super::param(query, k).map(super::url_decode);
