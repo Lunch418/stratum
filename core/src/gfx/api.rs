@@ -1065,7 +1065,18 @@ pub fn insert_objects(sp: &mut Space, pic: &super::Picture) -> (Vec<Handle>, Vec
 /// («Солнечная система»: текст NumberView получает номера 16, 21, 26, а
 /// GetObject2dByName(HSpace, _HObject, "text") находит его внутри значка).
 fn embed_children(gfx: &mut Gfx, sp: Handle, class: &str) {
-    let children = gfx.class_children.get(&crate::lang::fold(class)).cloned().unwrap_or_default();
+    let mut children = gfx.class_children.get(&crate::lang::fold(class)).cloned().unwrap_or_default();
+    // рисунки раздаются по имиджам: сначала все экземпляры имиджа, который
+    // встретился в схеме первым, потом следующего (сверено в Wine: DIFF,
+    // tools/verify/diffgroups.txt)
+    let mut first: Vec<String> = Vec::new();
+    for (_, c) in &children {
+        let c = crate::lang::fold(c);
+        if !first.contains(&c) {
+            first.push(c);
+        }
+    }
+    children.sort_by_key(|(_, c)| first.iter().position(|f| *f == crate::lang::fold(c)));
     for (handle, child_class) in children {
         let group = handle as Handle;
         let Some(pic) = gfx.scheme_pictures.get(&crate::lang::fold(&child_class)).cloned() else { continue };
@@ -1086,6 +1097,24 @@ fn embed_children(gfx: &mut Gfx, sp: Handle, class: &str) {
             Some(w)
         };
         let (top, zorder) = insert_objects(space, &pic);
+        // габарит ломаных рисунка пересчитывается по точкам: в файле он
+        // с запасом в единицу (сверено в Wine: BALLS, круг 31 → 30)
+        for h in &zorder {
+            if let Some(o) = space.objects.get_mut(h) {
+                if let Shape::Polyline { points, .. } = &o.shape {
+                    if let Some(&(x0, y0)) = points.first() {
+                        let (mut a, mut b, mut c, mut d) = (x0, y0, x0, y0);
+                        for &(x, y) in points {
+                            a = a.min(x);
+                            b = b.min(y);
+                            c = c.max(x);
+                            d = d.max(y);
+                        }
+                        (o.x, o.y, o.w, o.h) = (a, b, c - a, d - b);
+                    }
+                }
+            }
+        }
         // простые объекты рисунка — поверх всего, что уже есть в окне
         space.zorder.extend(zorder);
         let holder = wrapper.unwrap_or(group);
@@ -1112,6 +1141,16 @@ fn embed_children(gfx: &mut Gfx, sp: Handle, class: &str) {
         };
         if let Some((x, y)) = icon_at {
             space.move_object(placed, x, y);
+        }
+        // значок под рисунком сжимается до 1×1: габарит группы — это рисунок
+        // (сверено в Wine: DIFF и BALLS, tools/verify/diffhit.txt)
+        if let Some(Shape::Group { children }) = space.objects.get(&group).map(|o| o.shape.clone()) {
+            for c in children {
+                if let Some(o) = space.objects.get_mut(&c) {
+                    o.w = 1.0;
+                    o.h = 1.0;
+                }
+            }
         }
         if let Some(Object { shape: Shape::Group { children }, scheme_element, .. }) = space.objects.get_mut(&group) {
             children.push(placed);

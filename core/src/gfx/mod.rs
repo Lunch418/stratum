@@ -774,7 +774,9 @@ impl Space {
                 (near || (*brush != 0 && inside_polygon((x, y), points))).then_some(h)
             }
             _ => {
-                let pad = 2.0;
+                // растр ловит точку ровно в своём прямоугольнике, края
+                // включительно (сверено в Wine: DIFF, tools/verify/diffhit.txt)
+                let pad = if matches!(obj.shape, Shape::Bitmap { .. }) { 0.0 } else { 2.0 };
                 (x >= obj.x - pad && x <= obj.x + obj.w + pad && y >= obj.y - pad && y <= obj.y + obj.h + pad)
                     .then_some(h)
             }
@@ -1142,4 +1144,27 @@ pub(crate) fn lowest_free<T>(table: &BTreeMap<Handle, T>) -> Handle {
         }
     }
     h
+}
+
+#[cfg(test)]
+mod hit_tests {
+    use super::*;
+
+    /// Эталоны — ответы `GetObjectFromPoint2d` оригинала
+    /// (tools/verify/hittest.txt, tools/verify/diffhit.txt).
+    #[test]
+    fn hit_test_follows_the_original() {
+        let mut sp = Space::new(1, "W");
+        sp.objects.insert(1, Object::new(1, 192.0, 128.0, 7.0, 7.0, Shape::Bitmap { dib: 1, src: (0.0, 0.0, 7.0, 7.0), masked: false }));
+        sp.objects.insert(2, Object::new(2, 100.0, 100.0, 100.0, 0.0, Shape::Polyline { pen: 1, brush: 0, points: vec![(100.0, 100.0), (200.0, 100.0)] }));
+        sp.zorder = vec![1, 2];
+        // растр — ровно свой прямоугольник, края включительно
+        assert_eq!(sp.object_at(192.0, 131.0), Some(1));
+        assert_eq!(sp.object_at(199.0, 135.0), Some(1));
+        assert_eq!(sp.object_at(191.5, 131.0), None);
+        assert_eq!(sp.object_at(195.0, 135.5), None);
+        // отрезок — в пределах 2 единиц
+        assert_eq!(sp.object_at(150.0, 102.0), Some(2));
+        assert_eq!(sp.object_at(150.0, 103.0), None);
+    }
 }
