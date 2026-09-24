@@ -1,0 +1,13 @@
+# семантика: регистр имён, фазы x/~x, приоритеты
+> FLOAT Скорость, a, b, c
+> Скорость := 5
+cyr_case     | ~скорость + 1
+> a := 10
+old_phase    | a
+new_phase    | ~a
+cmp_chain    | 1 != 1 + 1 != 2
+and_or       | 1 || 0 && 0
+neg_pow      | -2^2
+mul_div      | 2 * (3 - 1) / 4
+str_cmp      | "abc" < "abd"
+str_num      | s:"n=" + 5

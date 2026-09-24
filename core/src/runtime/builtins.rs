@@ -135,13 +135,15 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
         "max" => num(f(args, 0).max(f(args, 1))),
         "min" => num(f(args, 0).min(f(args, 1))),
         "average" => num((f(args, 0) + f(args, 1)) / 2.0),
-        "trunc" => num(f(args, 0).trunc()),
-        // round(x, n) — округление до n знаков; без второго аргумента до целого
+        // у оригинала trunc — округление вниз: trunc(-2.7) = -3 (сверено в Wine)
+        "trunc" => num(f(args, 0).floor()),
+        // round(x, n): ровная половина округляется вниз — round(2.5, 0) = 2,
+        // round(-2.5, 0) = -3 (сверено в Wine)
         "round" => {
             let x = f(args, 0);
             let digits = if args.len() > 1 { f(args, 1) } else { 0.0 };
             let k = 10f64.powf(digits);
-            num((x * k).round() / k)
+            num((x * k - 0.5).ceil() / k)
         }
         "roundt" => num(f(args, 0).round()),
         "rad" => num(f(args, 0).to_radians()),
@@ -182,7 +184,10 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
         "float" => num(f(args, 0)),
         "integer" => num(f(args, 0).trunc()),
         "handle" => Value::Handle(f(args, 0)),
-        "string" => Value::Str(s(args, 0)),
+        "string" => Value::Str(match args.first() {
+            Some(Value::Float(x)) => super::value::format_g(*x),
+            _ => s(args, 0),
+        }),
         "chr" => Value::Str(
             char::from_u32(f(args, 0) as u32).map(String::from).unwrap_or_default(),
         ),

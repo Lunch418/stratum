@@ -301,7 +301,8 @@ fn binary(op: BinOp, a: Value, b: Value) -> Value {
     use BinOp::*;
     let strings = matches!(a, Value::Str(_)) || matches!(b, Value::Str(_));
     match op {
-        Add if strings => Value::Str(a.as_string() + &b.as_string()),
+        // число в строке — как String(x) в оригинале (%g)
+        Add if strings => Value::Str(model_string(&a) + &model_string(&b)),
         Add => Value::Float(a.as_float() + b.as_float()),
         Sub => Value::Float(a.as_float() - b.as_float()),
         Mul => Value::Float(a.as_float() * b.as_float()),
@@ -344,5 +345,12 @@ fn binary(op: BinOp, a: Value, b: Value) -> Value {
         OrLogic => Value::Float(if a.is_true() || b.is_true() { 1.0 } else { 0.0 }),
         Shl => Value::Float((((a.as_float() as i64) << (b.as_float() as i64 & 63)) as f64).trunc()),
         Shr => Value::Float((((a.as_float() as i64) >> (b.as_float() as i64 & 63)) as f64).trunc()),
+    }
+}
+
+fn model_string(v: &Value) -> String {
+    match v {
+        Value::Float(x) => crate::runtime::value::format_g(*x),
+        other => other.as_string(),
     }
 }

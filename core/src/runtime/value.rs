@@ -129,6 +129,36 @@ impl fmt::Display for Value {
 }
 
 /// Печать числа так, как это делает оригинал: без хвостовых нулей.
+/// Число в строку так, как это делает сама модель в оригинале
+/// (`String(x)`, «строка + число»): формат `%g`, 6 значащих цифр —
+/// `1.41421`, `1e+20`, `1.23457e+11`, `1e-07`. Сверено с Stratum 2000
+/// через Wine (tools/verify/math.txt). Для инспектора и `.stt` остаётся
+/// полная точность [`format_number`].
+pub fn format_g(v: f64) -> String {
+    if v == 0.0 {
+        return "0".into();
+    }
+    if !v.is_finite() {
+        return if v.is_nan() { "nan".into() } else if v > 0.0 { "inf".into() } else { "-inf".into() };
+    }
+    // показатель после округления до 6 значащих цифр
+    let sci = format!("{:.5e}", v);
+    let (mantissa, exp) = sci.split_once('e').unwrap_or((&sci, "0"));
+    let exp: i32 = exp.parse().unwrap_or(0);
+    let trim = |s: String| -> String {
+        if s.contains('.') {
+            s.trim_end_matches('0').trim_end_matches('.').to_string()
+        } else {
+            s
+        }
+    };
+    if !(-4..6).contains(&exp) {
+        format!("{}e{}{:02}", trim(mantissa.to_string()), if exp < 0 { '-' } else { '+' }, exp.abs())
+    } else {
+        trim(format!("{:.*}", (5 - exp).max(0) as usize, v))
+    }
+}
+
 pub fn format_number(v: f64) -> String {
     if v == v.trunc() && v.abs() < 1e15 {
         format!("{}", v as i64)
@@ -141,6 +171,15 @@ pub fn format_number(v: f64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn string_conversion_matches_the_original() {
+        // эталоны получены от Stratum 2000 (tools/verify/math.txt)
+        for (v, s) in [(2f64.sqrt(), "1.41421"), (1e20, "1e+20"), (123456789012.0, "1.23457e+11"), (1e-7, "1e-07"), (3.1415926536, "3.14159"),
+            (-1.020682e-11, "-1.02068e-11"), (0.1, "0.1"), (-0.5, "-0.5"), (1024.0, "1024"), (3.5, "3.5"), (1.0 / 3.0, "0.333333")] {
+            assert_eq!(format_g(v), s, "{v}");
+        }
+    }
 
     #[test]
     fn numbers_print_without_trailing_zeros() {
