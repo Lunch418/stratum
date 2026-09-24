@@ -1240,6 +1240,28 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
             }
         }
         // состояние модели: файл .stt, стартовое состояние проекта, по умолчанию
+        // «Записать активное окно в VDR» (win=окно модели) и «Экспортировать…»
+        // рисунка имиджа (class, kind=image|scheme|icon): файл .vdr по пути path
+        ("POST", ["vdr", "save"]) => {
+            let get = |k: &str| super::param(query, k).map(super::url_decode).filter(|v| !v.is_empty());
+            let Some(path) = get("path") else { return error("400 Bad Request", "нужен путь path") };
+            let s = shared.lock().unwrap();
+            let data = if let Some(win) = get("win") {
+                let gfx = &s.sim.effects.gfx;
+                let Some(sp) = gfx.window_space(&win).and_then(|h| gfx.space(h)) else { return error("404 Not Found", "нет такого окна") };
+                vdr::write(&sp.to_picture())
+            } else if let Some(class) = get("class") {
+                let Some(c) = s.project.class(&class) else { return error("404 Not Found", "нет такого имиджа") };
+                let kind = super::editor::Kind::parse(&get("kind").unwrap_or_default());
+                vdr::write(&super::editor::open(c, kind).to_picture())
+            } else {
+                return error("400 Bad Request", "нужно окно win или имидж class");
+            };
+            match std::fs::write(&path, &data) {
+                Ok(()) => json(format!("{{\"ok\":true,\"bytes\":{}}}", data.len())),
+                Err(e) => error("500 Internal Server Error", &e.to_string()),
+            }
+        }
         ("POST", ["state", action]) => {
             let path = super::param(query, "path").map(super::url_decode).unwrap_or_default();
             // class=Имя — только экземпляры этого имиджа («переменные имиджа»)

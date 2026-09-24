@@ -46,6 +46,8 @@ export function buildMenus(ctx: MenuContext): Menu[] {
       { label: 'Сохранить всё', hint: 'Ctrl+S', run: ctx.save, disabled: noProject },
       { label: 'Сохранить проект как…', run: () => ctx.open('saveAs'), disabled: noProject },
       { label: 'Экспорт в Stratum 2000…', run: () => ctx.open('export'), disabled: noProject },
+      { label: 'Экспорт рисунка имиджа в VDR…', run: () => ctx.open('exportVdr'), disabled: !cls },
+      { label: 'Записать активное окно в VDR…', run: () => { s.setTab('model'); setTimeout(() => window.dispatchEvent(new CustomEvent('model-save-vdr')), 50); }, disabled: noProject },
       { label: 'Закрыть проект', run: () => api.newProject().then(() => s.load()), disabled: noProject },
       { sep: true },
       { label: 'Печать…', hint: 'Ctrl+P', run: () => ctx.open('print'), disabled: noProject },

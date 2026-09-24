@@ -24,8 +24,22 @@ export function handleSounds(sounds: { cmd: string; file: string; loop: boolean 
 
 export function ModelView() {
   const frame = useStore(s => s.frame);
+  const project = useStore(s => s.project);
+  const showToast = useStore(s => s.showToast);
+  const say = useStore(s => s.say);
+  const setDialog = useStore(s => s.setDialog);
   const last = useRef<Map<number, string>>(new Map());
   const host = useRef<HTMLDivElement>(null);
+  // активное окно — последнее, по которому щёлкнули (для «Записать в VDR»)
+  const [active, setActive] = useState<string | null>(null);
+  const [saveVdr, setSaveVdr] = useState(false);
+  const activeName = frame?.windows.some(w => w.name === active) ? active : frame?.windows[0]?.name ?? null;
+  // «Файл → Записать активное окно в VDR…»
+  useEffect(() => {
+    const open = () => { if (useStore.getState().frame?.windows.length) setSaveVdr(true); else useStore.getState().showToast('Нет открытых окон модели'); };
+    window.addEventListener('model-save-vdr', open);
+    return () => window.removeEventListener('model-save-vdr', open);
+  }, []);
 
   useEffect(() => {
     const root = host.current;
@@ -36,7 +50,7 @@ export function ModelView() {
         div = document.createElement('div');
         div.className = 'win'; div.dataset.win = String(w.id);
         div.innerHTML = `<div class="title"></div><div class="body"><div class="controls"></div></div>`;
-        attach(div, w.name);
+        attach(div, w.name, () => setActive(w.name));
         root.appendChild(div);
       }
       div.querySelector('.title')!.textContent = w.name;
@@ -45,6 +59,7 @@ export function ModelView() {
       div.classList.toggle('min', w.size === 'min');
       div.classList.toggle('dialog', w.style === 'dialog');
       div.classList.toggle('popup', w.style === 'popup');
+      div.classList.toggle('active', frame.windows.length > 1 && w.name === activeName);
       const body = div.querySelector<HTMLDivElement>('.body')!;
       if (last.current.get(w.id) !== w.svg) {
         body.querySelector('svg')?.remove();
@@ -54,21 +69,36 @@ export function ModelView() {
       syncControls(body.querySelector<HTMLDivElement>('.controls')!, w.name, w.controls ?? []);
     }
     for (const div of [...root.children]) if (!frame.windows.some(w => String(w.id) === (div as HTMLElement).dataset.win)) div.remove();
-  }, [frame]);
+  }, [frame, activeName]);
 
   if (!frame?.windows.length) return <div className="model"><div className="muted" style={{ color: '#eee' }}>Модель не открыла окон — нажмите Пуск или Шаг.</div>{frame?.dialog && <ModelDialogBox d={frame.dialog} />}</div>;
   const unsupported = frame.unsupported ?? [];
-  return <>
+  return <div className="model-view">
     {unsupported.length > 0 && <div className="unsupported" role="status"
       title={unsupported.map(u => `${u.name} — ${u.count} раз`).join('\n')}>
       Модель вызывает функции, которых здесь нет: {unsupported.slice(0, 3).map(u => u.name).join(', ')}{unsupported.length > 3 ? ` и ещё ${unsupported.length - 3}` : ''}. Результат может отличаться от Stratum 2000.
     </div>}
-    {frame.canHyperBack && <button className="small hyper-back" onClick={() => api.event('type=hyperback')} title="Гипербаза: предыдущая страница">‹ Назад</button>}
+    <div className="model-toolbar">
+      <button className="small" disabled={!frame.canHyperBack} onClick={() => api.event('type=hyperback')} title="Гипербаза: предыдущая страница">‹ Назад</button>
+      <span className="spacer" />
+      {frame.windows.length > 1 && <select className="small" value={activeName ?? ''} onChange={e => setActive(e.target.value)} title="Активное окно">
+        {frame.windows.map(w => <option key={w.id} value={w.name}>{w.name}</option>)}
+      </select>}
+      <button className="small" onClick={() => setSaveVdr(true)} title="Записать активное окно в VDR: рисунок окна как файл .vdr">Записать в VDR…</button>
+      <button className="small" onClick={() => setDialog('print')} title="Печать окна модели (Ctrl+P)">Печать…</button>
+    </div>
+    {saveVdr && activeName && <FilePickDialog title={`Записать окно «${activeName}» в VDR`} ext="vdr" onClose={() => setSaveVdr(false)}
+      save={(project?.dir || '.').replace(/[\\/]+$/, '') + '/' + activeName.replace(/[<>:"/\\|?*]/g, '_') + '.vdr'}
+      onPick={async p => {
+        setSaveVdr(false);
+        const r = await fetch(`/api/vdr/save?win=${encodeURIComponent(activeName)}&path=${encodeURIComponent(p)}`, { method: 'POST' });
+        if (r.ok) showToast('Окно записано в ' + p); else say({ level: 'error', where: 'VDR', text: (await r.json()).error ?? 'ошибка записи' });
+      }} />}
     <div className="model" ref={host} tabIndex={0} title="Alt+щелчок — свойства объекта в инспекторе"
       onKeyDown={e => { e.preventDefault(); api.event(`type=key&msg=256&vk=${e.keyCode}`); }}
       onKeyUp={e => api.event(`type=key&msg=257&vk=${e.keyCode}`)} />
     {frame.dialog && <ModelDialogBox d={frame.dialog} />}
-  </>;
+  </div>;
 }
 
 // MessageBox / InputBox модели: такт откачен ядром и повторится с ответом.
@@ -199,7 +229,7 @@ function updateControl(el: HTMLElement, kind: string, c: Control) {
   }
 }
 
-function attach(div: HTMLDivElement, name: string) {
+function attach(div: HTMLDivElement, name: string, onActivate: () => void) {
   const body = div.querySelector<HTMLDivElement>('.body')!;
   const send = (msg: number, e: MouseEvent) => {
     const svg = body.querySelector('svg');
@@ -212,6 +242,7 @@ function attach(div: HTMLDivElement, name: string) {
   };
   body.onmousemove = e => send(512, e);
   body.onmousedown = e => {
+    onActivate();
     (div.closest('.model') as HTMLElement)?.focus();
     // Alt+щелчок — выбрать объект для инспектора, не отдавая событие модели
     if (e.altKey && e.button === 0) {

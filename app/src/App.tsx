@@ -194,6 +194,15 @@ export default function App() {
       {dialog === 'calcOrder' && <CalcOrderDialog onClose={() => setDialog(null)} />}
       {dialog === 'about' && <AboutDialog onClose={() => setDialog(null)} />}
       {dialog === 'print' && <PrintDialog onClose={() => setDialog(null)} />}
+      {dialog === 'exportVdr' && s.project && s.selectedClass && (
+        <FilePickDialog title={`Экспорт рисунка имиджа ${s.selectedClass} в VDR`} ext="vdr" onClose={() => setDialog(null)}
+          save={(s.project.dir || '.').replace(/[\\/]+$/, '') + `/${s.selectedClass.replace(/[<>:"/\\|?*]/g, '_')}.vdr`}
+          onPick={async p => {
+            const cls = s.selectedClass!; setDialog(null);
+            const r = await fetch(`/api/vdr/save?class=${encodeURIComponent(cls)}&kind=${s.tab === 'icon' ? 'icon' : 'image'}&path=${encodeURIComponent(p)}`, { method: 'POST' });
+            if (r.ok) s.showToast('Рисунок записан в ' + p); else s.say({ level: 'error', where: 'VDR', text: (await r.json()).error ?? 'ошибка записи' });
+          }} />
+      )}
       {dialog === 'deleteClasses' && <DeleteClassesDialog onClose={() => setDialog(null)} />}
       {dialog === 'insertFile' && s.selectedClass && (
         <FilePickDialog title="Вставить из файла в рисунок имиджа" ext="vdr,bmp" onClose={() => setDialog(null)}

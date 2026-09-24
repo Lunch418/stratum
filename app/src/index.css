@@ -378,7 +378,10 @@ button.attention { border-color: var(--state-pause); }
 .icon-grid .icon-cell { width: 32px; height: 32px; border: 1px solid transparent; border-radius: 4px; cursor: pointer; background-color: #fff; background-repeat: no-repeat; }
 .icon-grid .icon-cell:hover { border-color: var(--accent); }
 
-.hyper-back { position: absolute; z-index: 5; margin: 8px; }
+.model-view { display: flex; flex-direction: column; height: 100%; }
+.model-view > .model { flex: 1; min-height: 0; height: auto; }
+.model-toolbar { display: flex; gap: 6px; align-items: center; padding: 4px 8px; border-bottom: 1px solid var(--border); background: var(--bg-surface); }
+.model .win.active { outline: 2px solid var(--accent); outline-offset: 1px; }
 .unsupported { position: absolute; z-index: 5; right: 8px; bottom: 8px; max-width: 420px; padding: 6px 10px; border-radius: 6px;
   font-size: 12px; line-height: 1.4; background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--state-pause);
   border-left-width: 4px; box-shadow: var(--shadow-pop); }
