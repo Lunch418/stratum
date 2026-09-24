@@ -95,18 +95,99 @@ cd ../core && ./target/release/stratum play ../fixtures/user/solar_system
 
 Стек по ТЗ: React 19 + TypeScript + Vite, Zustand, Monaco.
 
-Десктопное окно (Tauri 2, нужны `libwebkit2gtk-4.1-dev` и `libgtk-3-dev`):
+## Установка и запуск
+
+Десктопная программа `stratum-modern` — одна программа: ядро и IDE вшиты
+в неё, отдельно ставить Rust, Node или папку `app/dist` не нужно. При запуске
+она поднимает ядро на свободном порту `127.0.0.1` и открывает IDE в своём
+окне (Tauri 2).
+
+### Готовые установщики
+
+Собираются в GitHub Actions (workflow `release`): при запуске вручную —
+артефактами запуска, по метке `v*` — ещё и черновиком релиза.
+
+| Система | Файл | Установка |
+| --- | --- | --- |
+| Debian, Ubuntu | `Stratum Modern_…_amd64.deb` | `sudo apt install ./Stratum*.deb` |
+| Другие Linux | `Stratum Modern_…_amd64.AppImage` | `chmod +x Stratum*.AppImage` и запустить |
+| Windows 10/11 | `…_x64_en-US.msi` или `…_x64-setup.exe` | запустить установщик |
+| macOS 10.15+ (Intel и Apple Silicon) | `…_universal.dmg` | перетащить в «Программы» |
+
+Установщики не подписаны: Windows SmartScreen предложит «Подробнее →
+Выполнить в любом случае», macOS при первом запуске — открыть программу
+через контекстное меню «Открыть». На Windows нужен WebView2 (в Windows 11 уже
+есть, установщик докачает его сам).
 
 ```sh
-cd app && npm run build
-cd src-tauri && cargo build --release
-./target/release/stratum-modern                      # диалог «Открыть проект»
-./target/release/stratum-modern ../../fixtures/user/solar_system
+stratum-modern                                  # пустая IDE, диалог «Открыть проект»
+stratum-modern ~/stratum/solar_system           # сразу открыть проект
 ```
 
-Оболочка поднимает ядро на свободном порту и открывает IDE в своём окне;
-установщик `.deb` собирается командой `npx tauri build --bundles deb`
-(появляется в `app/src-tauri/target/release/bundle/deb/`).
+Библиотека и примеры оригинала в пакет не входят. Библиотечные имиджи
+(`LGSpace`, `NumberView`…) ищутся в `$STRATUM_LIBRARY` (несколько папок через
+`:`), затем в `fixtures/library` рядом с текущей папкой и в
+`~/.wine32/drive_c/Program Files/Stratum`.
+
+### Сборка из исходников
+
+Нужны Rust (stable), Node.js 22 и npm; на Linux ещё
+`libwebkit2gtk-4.1-dev`, `libgtk-3-dev`, `librsvg2-dev` (Debian/Ubuntu), на
+Windows — Microsoft C++ Build Tools, на macOS — Xcode Command Line Tools.
+
+```sh
+cd app
+npm ci
+npx tauri build                 # Linux: .deb и .AppImage
+npx tauri build --bundles msi   # Windows
+npx tauri build --bundles dmg   # macOS
+```
+
+Установщики появляются в `app/src-tauri/target/release/bundle/<тип>/`, сама
+программа — `app/src-tauri/target/release/stratum-modern`. `tauri build`
+сначала собирает IDE (`npm run build`) и вшивает её в программу.
+
+Проверить собранный `.deb`, ничего не ставя в систему:
+
+```sh
+dpkg-deb -x "app/src-tauri/target/release/bundle/deb/Stratum Modern_0.1.0_amd64.deb" /tmp/stratum-deb
+tools/smoke_desktop.sh /tmp/stratum-deb/usr/bin/stratum-modern   # без экрана — через xvfb-run
+```
+
+Скрипт запускает программу, берёт из её вывода ссылку и проверяет, что по
+ней отдаётся IDE, а API без токена закрыт.
+
+### Токен сессии локального сервера
+
+Ядро (и `stratum play`, и десктопная программа) слушает только `127.0.0.1`,
+но открытые в браузере чужие страницы тоже могут слать туда запросы. Поэтому
+при каждом запуске создаётся случайный токен сессии (128 бит), и ядро
+печатает ссылку с ним:
+
+```
+IDE: http://127.0.0.1:8765/?token=3f9c…  (Ctrl+C — выход)
+```
+
+- IDE открывается только по этой ссылке; сервер запоминает токен в cookie
+  `HttpOnly; SameSite=Strict`, и дальше страница ходит с ним сама. Без токена
+  API (`/frame`, `/event`, `/api/…`) отвечает 401;
+- заголовок `Host` должен быть `127.0.0.1:порт` или `localhost:порт` (защита
+  от DNS rebinding), `Origin`, если есть, — только свой; иначе 403;
+- всё, что меняет состояние, принимается только методом POST.
+
+Десктопная программа сама открывает окно по ссылке с токеном; на Linux и
+macOS, запущенная из терминала, она печатает ту же ссылку, и её можно открыть
+в обычном браузере. Для своих скриптов
+токен передаётся заголовком `X-Stratum-Token` или параметром `?token=`.
+Токен живёт до выхода из программы. Проверки — `core/src/player/guard.rs`,
+тест на живом сервере — `core/tests/player_guard.rs`.
+
+## Сверка поведения с оригиналом
+
+Что сверено с настоящим Stratum 2000, а что проверено ядром само на себе, и
+как повторить сверку (байт-код корпуса, траектории переменных через Wine) —
+[`docs/verification.md`](docs/verification.md). Тесты ядра без корпуса
+оригинала: `cd core && STRATUM_SKIP_CORPUS=1 cargo test` (так они идут в CI).
 
 ## Сборка данных
 
