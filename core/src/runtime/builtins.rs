@@ -183,8 +183,10 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
         // rnd(x) = x·rand()/32767, где rand() — генератор Borland C:
         // seed = seed·22695477 + 1, результат (seed >> 16) & 0x7FFF. Зерно 1,
         // и среда оригинала при запуске один раз уже вызывает rand(): первые
-        // значения 130, 10982, 1090… (сверено в Wine, tools/verify/random.txt)
-        "rnd" => num(f(args, 0) * borland_rand(fx) as f64 / 32767.0),
+        // значения 130, 10982, 1090… (сверено в Wine, tools/verify/random.txt).
+        // Делит оригинал умножением на 1/32767: (x·r)·(1/32767) в младших
+        // битах отличается от x·r/32767 (tools/verify/rndformula.txt)
+        "rnd" => num(f(args, 0) * borland_rand(fx) as f64 * (1.0 / 32767.0)),
         // randomize(x) — srand(x)
         "randomize" => {
             fx.rng = (f(args, 0) as i64 as u32) as u64 | RNG_SEEDED;

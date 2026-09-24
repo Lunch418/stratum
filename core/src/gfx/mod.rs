@@ -765,18 +765,26 @@ impl Space {
                 }
                 None
             }
-            // ломаная ловит точку в пределах 2 единиц от отрезков, а внутри —
-            // только с заливкой; габарит не в счёт (сверено в Wine,
-            // tools/verify/hittest.txt)
+            // ломаная ловит точку, если отрезок проходит ближе 3 единиц по
+            // каждой оси (квадрат ±3 вокруг точки, толщина пера не в счёт), а
+            // внутри — только с заливкой; габарит не в счёт (сверено в Wine,
+            // tools/verify/hittest.txt, linehit.txt)
             Shape::Polyline { brush, points, .. } if !points.is_empty() => {
-                let near = points.windows(2).any(|s| segment_distance((x, y), s[0], s[1]) <= 2.0)
-                    || (points.len() == 1 && segment_distance((x, y), points[0], points[0]) <= 2.0);
+                let near = points.windows(2).any(|s| segment_distance((x, y), s[0], s[1]) < 3.0)
+                    || (points.len() == 1 && segment_distance((x, y), points[0], points[0]) < 3.0);
                 (near || (*brush != 0 && inside_polygon((x, y), points))).then_some(h)
             }
+            // растр ловит точку в своём прямоугольнике (края включительно) и
+            // ещё в квадратиках у углов: по каждой оси от floor(угла) − 0,5
+            // до ceil(угла) + 0,5 (сверено в Wine: DIFF, tools/verify/diffhit.txt)
+            Shape::Bitmap { .. } => {
+                let inside = x >= obj.x && x <= obj.x + obj.w && y >= obj.y && y <= obj.y + obj.h;
+                let near = |p: f64, c: f64| p >= c.floor() - 0.5 && p <= c.ceil() + 0.5;
+                let corner = (near(x, obj.x) || near(x, obj.x + obj.w)) && (near(y, obj.y) || near(y, obj.y + obj.h));
+                (inside || corner).then_some(h)
+            }
             _ => {
-                // растр ловит точку ровно в своём прямоугольнике, края
-                // включительно (сверено в Wine: DIFF, tools/verify/diffhit.txt)
-                let pad = if matches!(obj.shape, Shape::Bitmap { .. }) { 0.0 } else { 2.0 };
+                let pad = 2.0;
                 (x >= obj.x - pad && x <= obj.x + obj.w + pad && y >= obj.y - pad && y <= obj.y + obj.h + pad)
                     .then_some(h)
             }
@@ -792,13 +800,24 @@ impl Space {
     }
 }
 
-/// Расстояние от точки до отрезка.
+/// Расстояние от точки до отрезка по большей из осей (Чебышёва).
 fn segment_distance(p: (f64, f64), a: (f64, f64), b: (f64, f64)) -> f64 {
     let (dx, dy) = (b.0 - a.0, b.1 - a.1);
-    let len2 = dx * dx + dy * dy;
-    let t = if len2 > 0.0 { (((p.0 - a.0) * dx + (p.1 - a.1) * dy) / len2).clamp(0.0, 1.0) } else { 0.0 };
-    let (cx, cy) = (a.0 + t * dx, a.1 + t * dy);
-    ((p.0 - cx).powi(2) + (p.1 - cy).powi(2)).sqrt()
+    let (ex, ey) = (p.0 - a.0, p.1 - a.1);
+    // max(|ex − t·dx|, |ey − t·dy|) выпукла по t: минимум в концах, в нулях
+    // слагаемых или там, где они равны по модулю
+    let mut ts = vec![0.0, 1.0];
+    for (num, den) in [(ex, dx), (ey, dy), (ex - ey, dx - dy), (ex + ey, dx + dy)] {
+        if den != 0.0 {
+            ts.push(num / den);
+        }
+    }
+    ts.into_iter()
+        .map(|t: f64| {
+            let t = t.clamp(0.0, 1.0);
+            (ex - t * dx).abs().max((ey - t * dy).abs())
+        })
+        .fold(f64::INFINITY, f64::min)
 }
 
 /// Точка внутри многоугольника (правило чёт-нечет, как заливка GDI ALTERNATE).
@@ -1162,9 +1181,21 @@ mod hit_tests {
         assert_eq!(sp.object_at(192.0, 131.0), Some(1));
         assert_eq!(sp.object_at(199.0, 135.0), Some(1));
         assert_eq!(sp.object_at(191.5, 131.0), None);
+        // и в квадратиках у углов
+        assert_eq!(sp.object_at(191.5, 127.5), Some(1));
+        assert_eq!(sp.object_at(191.0, 128.0), None);
+        assert_eq!(sp.object_at(199.5, 135.5), Some(1));
+        sp.objects.get_mut(&1).unwrap().x = 345.105;
+        sp.objects.get_mut(&1).unwrap().y = 87.398;
+        assert_eq!(sp.object_at(352.718, 93.7316), Some(1));
+        assert_eq!(sp.object_at(352.2, 90.0), None);
+        sp.objects.get_mut(&1).unwrap().x = 192.0;
+        sp.objects.get_mut(&1).unwrap().y = 128.0;
         assert_eq!(sp.object_at(195.0, 135.5), None);
-        // отрезок — в пределах 2 единиц
+        // отрезок — ближе 3 единиц по каждой оси
         assert_eq!(sp.object_at(150.0, 102.0), Some(2));
+        assert_eq!(sp.object_at(150.0, 102.99), Some(2));
         assert_eq!(sp.object_at(150.0, 103.0), None);
+        assert_eq!(sp.object_at(202.5, 102.5), Some(2));
     }
 }
