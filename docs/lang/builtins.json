@@ -6737,6 +6737,515 @@
   "section": "FUNCTIONS"
  },
  {
+  "name": "AddControlText2d",
+  "source": "Graph2d.tpl",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "STRING",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 1105,
+  "section": "FUNCTIONS"
+ },
+ {
+  "name": "AddControlText2d",
+  "source": "Graph2d.tpl",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "STRING",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 1106,
+  "section": "FUNCTIONS"
+ },
+ {
+  "name": "SetControlFont2d",
+  "source": "Graph2d.tpl",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "HANDLE",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 1101,
+  "section": "FUNCTIONS"
+ },
+ {
+  "name": "SetControlTextColor2d",
+  "source": "Graph2d.tpl",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "COLORREF",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 1102,
+  "section": "FUNCTIONS"
+ },
+ {
+  "name": "GetControlText2ds",
+  "source": "Graph2d.tpl",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "HANDLE",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 713,
+  "section": "FUNCTIONS"
+ },
+ {
+  "name": "SetControlText2ds",
+  "source": "Graph2d.tpl",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "HANDLE",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 714,
+  "section": "FUNCTIONS"
+ },
+ {
+  "name": "CheckDlgButton2d",
+  "source": "Graph2d.tpl",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 393,
+  "section": "FUNCTIONS"
+ },
+ {
+  "name": "IsDlgButtonChecked2d",
+  "source": "Graph2d.tpl",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "HANDLE",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 394,
+  "section": "FUNCTIONS"
+ },
+ {
+  "name": "EnableControl2d",
+  "source": "Graph2d.tpl",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 395,
+  "section": "FUNCTIONS"
+ },
+ {
+  "name": "SetControlFocus2d",
+  "source": "Graph2d.tpl",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "HANDLE",
+    "byref": false
+   }
+  ],
+  "ret": null,
+  "opcode": 1119,
+  "section": "FUNCTIONS"
+ },
+ {
+  "name": "SetControlStyle2d",
+  "source": "Graph2d.tpl",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 460,
+  "section": "FUNCTIONS"
+ },
+ {
+  "name": "GetControlStyle2d",
+  "source": "Graph2d.tpl",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "HANDLE",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 461,
+  "section": "FUNCTIONS"
+ },
+ {
+  "name": "LBAddString",
+  "source": "Graph2d.tpl",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "STRING",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 462,
+  "section": "FUNCTIONS"
+ },
+ {
+  "name": "LBInsertString",
+  "source": "Graph2d.tpl",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "STRING",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 463,
+  "section": "FUNCTIONS"
+ },
+ {
+  "name": "LBGetString",
+  "source": "Graph2d.tpl",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   }
+  ],
+  "ret": "STRING",
+  "opcode": 464,
+  "section": "FUNCTIONS"
+ },
+ {
+  "name": "LBClearList",
+  "source": "Graph2d.tpl",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "HANDLE",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 465,
+  "section": "FUNCTIONS"
+ },
+ {
+  "name": "LBDeleteString",
+  "source": "Graph2d.tpl",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 466,
+  "section": "FUNCTIONS"
+ },
+ {
+  "name": "LBGetCount",
+  "source": "Graph2d.tpl",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "HANDLE",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 467,
+  "section": "FUNCTIONS"
+ },
+ {
+  "name": "LBGetSelIndex",
+  "source": "Graph2d.tpl",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "HANDLE",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 468,
+  "section": "FUNCTIONS"
+ },
+ {
+  "name": "LBGetSelIndexs",
+  "source": "Graph2d.tpl",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "HANDLE",
+    "byref": false
+   }
+  ],
+  "ret": "HANDLE",
+  "opcode": 1114,
+  "section": "FUNCTIONS"
+ },
+ {
+  "name": "LBSetSelIndex",
+  "source": "Graph2d.tpl",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 469,
+  "section": "FUNCTIONS"
+ },
+ {
+  "name": "LBGetCaretIndex",
+  "source": "Graph2d.tpl",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "HANDLE",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 470,
+  "section": "FUNCTIONS"
+ },
+ {
+  "name": "LBSetCaretIndex",
+  "source": "Graph2d.tpl",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 471,
+  "section": "FUNCTIONS"
+ },
+ {
+  "name": "LBFindString",
+  "source": "Graph2d.tpl",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "STRING",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 472,
+  "section": "FUNCTIONS"
+ },
+ {
+  "name": "LBFindStringExact",
+  "source": "Graph2d.tpl",
+  "args": [
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "HANDLE",
+    "byref": false
+   },
+   {
+    "type": "STRING",
+    "byref": false
+   },
+   {
+    "type": "FLOAT",
+    "byref": false
+   }
+  ],
+  "ret": "FLOAT",
+  "opcode": 473,
+  "section": "FUNCTIONS"
+ },
+ {
   "name": "AddGroupItem2d",
   "source": "Graph2d.tpl",
   "args": [

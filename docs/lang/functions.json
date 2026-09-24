@@ -13624,6 +13624,974 @@
   "source": "tpl+help"
  },
  {
+  "name": "AddControlText2d",
+  "overloads": [
+   {
+    "signature": "FLOAT AddControlText2d(HANDLE, HANDLE, STRING)",
+    "args": [
+     {
+      "type": "HANDLE",
+      "byref": false
+     },
+     {
+      "type": "HANDLE",
+      "byref": false
+     },
+     {
+      "type": "STRING",
+      "byref": false
+     }
+    ],
+    "ret": "FLOAT",
+    "opcode": 1105,
+    "table": "Graph2d.tpl"
+   },
+   {
+    "signature": "FLOAT AddControlText2d(HANDLE, HANDLE, STRING, FLOAT)",
+    "args": [
+     {
+      "type": "HANDLE",
+      "byref": false
+     },
+     {
+      "type": "HANDLE",
+      "byref": false
+     },
+     {
+      "type": "STRING",
+      "byref": false
+     },
+     {
+      "type": "FLOAT",
+      "byref": false
+     }
+    ],
+    "ret": "FLOAT",
+    "opcode": 1106,
+    "table": "Graph2d.tpl"
+   }
+  ],
+  "group": "",
+  "description": "",
+  "params": [],
+  "returns": "",
+  "example": "",
+  "help_topic": null,
+  "source": "tpl"
+ },
+ {
+  "name": "SetControlFont2d",
+  "overloads": [
+   {
+    "signature": "FLOAT SetControlFont2d(HANDLE, HANDLE, HANDLE)",
+    "args": [
+     {
+      "type": "HANDLE",
+      "byref": false
+     },
+     {
+      "type": "HANDLE",
+      "byref": false
+     },
+     {
+      "type": "HANDLE",
+      "byref": false
+     }
+    ],
+    "ret": "FLOAT",
+    "opcode": 1101,
+    "table": "Graph2d.tpl"
+   }
+  ],
+  "group": "Функции работы с интерфейсными элементами",
+  "description": "Функция устанавливает шрифт текста в интерфейсный элемент.",
+  "params": [
+   {
+    "name": "HSpace",
+    "desc": "Дескриптор пространства."
+   },
+   {
+    "name": "HObject",
+    "desc": "Дескриптор объекта."
+   },
+   {
+    "name": "HFont",
+    "desc": "Дескриптор шрифта."
+   }
+  ],
+  "returns": "Возвращаемое значение является ненулевым, если функция выполнена успешно, в противном случае возвращается 0.",
+  "example": "hControl:= [CreateControlObject2d](CreateControlObject2d.md) (HSpace,\"EDIT\",\"проверка\",WS_VISIBLE|WS_CHILD| ES_CENTER,0,70,80,20,0)\nhFont := [CreateFont2dpt](CreateFont2dpt.md) (HSpace,FontName, FontSize, FontStyle)\n\nr:=SetControlFont2d(HSpace,~hControl,~hFont)\n\nсм. [Интерфейсные элементы](Control_objects.md)\nсм. [Графика 2D](Graphics2d.md)",
+  "help_topic": "SetControlFont2d",
+  "source": "tpl+help"
+ },
+ {
+  "name": "SetControlTextColor2d",
+  "overloads": [
+   {
+    "signature": "FLOAT SetControlTextColor2d(HANDLE, HANDLE, COLORREF)",
+    "args": [
+     {
+      "type": "HANDLE",
+      "byref": false
+     },
+     {
+      "type": "HANDLE",
+      "byref": false
+     },
+     {
+      "type": "COLORREF",
+      "byref": false
+     }
+    ],
+    "ret": "FLOAT",
+    "opcode": 1102,
+    "table": "Graph2d.tpl"
+   }
+  ],
+  "group": "",
+  "description": "",
+  "params": [],
+  "returns": "",
+  "example": "",
+  "help_topic": null,
+  "source": "tpl"
+ },
+ {
+  "name": "GetControlText2ds",
+  "overloads": [
+   {
+    "signature": "FLOAT GetControlText2ds(HANDLE, HANDLE, HANDLE)",
+    "args": [
+     {
+      "type": "HANDLE",
+      "byref": false
+     },
+     {
+      "type": "HANDLE",
+      "byref": false
+     },
+     {
+      "type": "HANDLE",
+      "byref": false
+     }
+    ],
+    "ret": "FLOAT",
+    "opcode": 713,
+    "table": "Graph2d.tpl"
+   }
+  ],
+  "group": "",
+  "description": "",
+  "params": [],
+  "returns": "",
+  "example": "",
+  "help_topic": null,
+  "source": "tpl"
+ },
+ {
+  "name": "SetControlText2ds",
+  "overloads": [
+   {
+    "signature": "FLOAT SetControlText2ds(HANDLE, HANDLE, HANDLE)",
+    "args": [
+     {
+      "type": "HANDLE",
+      "byref": false
+     },
+     {
+      "type": "HANDLE",
+      "byref": false
+     },
+     {
+      "type": "HANDLE",
+      "byref": false
+     }
+    ],
+    "ret": "FLOAT",
+    "opcode": 714,
+    "table": "Graph2d.tpl"
+   }
+  ],
+  "group": "",
+  "description": "",
+  "params": [],
+  "returns": "",
+  "example": "",
+  "help_topic": null,
+  "source": "tpl"
+ },
+ {
+  "name": "CheckDlgButton2d",
+  "overloads": [
+   {
+    "signature": "FLOAT CheckDlgButton2d(HANDLE, HANDLE, FLOAT)",
+    "args": [
+     {
+      "type": "HANDLE",
+      "byref": false
+     },
+     {
+      "type": "HANDLE",
+      "byref": false
+     },
+     {
+      "type": "FLOAT",
+      "byref": false
+     }
+    ],
+    "ret": "FLOAT",
+    "opcode": 393,
+    "table": "Graph2d.tpl"
+   }
+  ],
+  "group": "Функции работы с интерфейсными элементами",
+  "description": "Функция устанавливает кнопки CHECKBUTTON, RADIOBUTTON, 3STATEBUTTON в одно из состояний -\"включено\", \"выключено\" (и \"неопределенное\" для 3STATEBUTTON)",
+  "params": [
+   {
+    "name": "HSpace",
+    "desc": "Дескриптор пространства."
+   },
+   {
+    "name": "HObject",
+    "desc": "Дескриптор объекта."
+   },
+   {
+    "name": "State",
+    "desc": "Требуемое состояние: 0 - выключено, 1 - включено, 2 - неактивировано (только для 3STATEBUTTON)"
+   }
+  ],
+  "returns": "Является ненулевым, если функция выполнена успешно, в противном случае возвращается 0.",
+  "example": "if(~state)\n  r := CheckDlgButton2d(HSpace,HObject,~state)\n endif\n\nсм. [Интерфейсные элементы](Control_objects.md)",
+  "help_topic": "CheckDlgButton2d",
+  "source": "tpl+help"
+ },
+ {
+  "name": "IsDlgButtonChecked2d",
+  "overloads": [
+   {
+    "signature": "FLOAT IsDlgButtonChecked2d(HANDLE, HANDLE)",
+    "args": [
+     {
+      "type": "HANDLE",
+      "byref": false
+     },
+     {
+      "type": "HANDLE",
+      "byref": false
+     }
+    ],
+    "ret": "FLOAT",
+    "opcode": 394,
+    "table": "Graph2d.tpl"
+   }
+  ],
+  "group": "Функции работы с интерфейсными элементами",
+  "description": "Функция проверяет текущее состояние кнопок типа CHECKBUTTON, RADIOBUTTON, 3STATEBUTTON.",
+  "params": [
+   {
+    "name": "HSpace",
+    "desc": "Дескриптор пространства."
+   },
+   {
+    "name": "HObject",
+    "desc": "Дескриптор объекта."
+   }
+  ],
+  "returns": "Возвращаемое значение это состояние объекта:\n0 - \"выключено\"\n1- \"включено\"\n2 - \"неопределено\" (только для 3STATEBUTTON)",
+  "example": "k := IsDlgButtonChecked2d (HSpace,HObject)\n\nсм. [Интерфейсные элементы](Control_objects.md)",
+  "help_topic": "IsDlgButtonChecked2d",
+  "source": "tpl+help"
+ },
+ {
+  "name": "EnableControl2d",
+  "overloads": [
+   {
+    "signature": "FLOAT EnableControl2d(HANDLE, HANDLE, FLOAT)",
+    "args": [
+     {
+      "type": "HANDLE",
+      "byref": false
+     },
+     {
+      "type": "HANDLE",
+      "byref": false
+     },
+     {
+      "type": "FLOAT",
+      "byref": false
+     }
+    ],
+    "ret": "FLOAT",
+    "opcode": 395,
+    "table": "Graph2d.tpl"
+   }
+  ],
+  "group": "Функции работы с интерфейсными элементами",
+  "description": "Функция устанавливает состояние интерфейсного элемента - \"активирован\", \"неактивирован\".",
+  "params": [
+   {
+    "name": "HSpace",
+    "desc": "Дескриптор пространства."
+   },
+   {
+    "name": "HObject",
+    "desc": "Дескриптор объекта."
+   },
+   {
+    "name": "State",
+    "desc": "Состояние, 0 - \"неактивировано\", 1 - \"неактивирован\"."
+   }
+  ],
+  "returns": "Возвращаемое значение является ненулевым, если функция выполнена успешно, в противном случае возвращается 0.",
+  "example": "HObject := [CreateControlObject2d](CreateControlObject2d.md) (~HSpace,\"BUTTON\",\"проверка\",WS_VISIBLE|WS_CHILD|BS_AUTOCHECKBOX,0,70,80,20,0)\nr := EnableControl2d(~HSpace,~HObject,0)\n\nсм. [Функции работы с интерфейсными элементами](Control_object_functions.md)\nсм. [Интерфейсные элементы](Control_objects.md)",
+  "help_topic": "EnableControl2d",
+  "source": "tpl+help"
+ },
+ {
+  "name": "SetControlFocus2d",
+  "overloads": [
+   {
+    "signature": "SetControlFocus2d(HANDLE, HANDLE)",
+    "args": [
+     {
+      "type": "HANDLE",
+      "byref": false
+     },
+     {
+      "type": "HANDLE",
+      "byref": false
+     }
+    ],
+    "ret": null,
+    "opcode": 1119,
+    "table": "Graph2d.tpl"
+   }
+  ],
+  "group": "Функции работы с интерфейсными элементами",
+  "description": "Функция устанавливает фокус ввода в интерфейсный элемент.",
+  "params": [
+   {
+    "name": "HSpace",
+    "desc": "Дескриптор пространства."
+   },
+   {
+    "name": "HObject",
+    "desc": "Дескриптор объекта. Если значение нулевое (#0), то фокус передается окну HSpace."
+   }
+  ],
+  "returns": "",
+  "example": "HObject := [CreateControlObject2d](CreateControlObject2d.md) (~HSpace,\"BUTTON\",\"проверка\",WS_VISIBLE|WS_CHILD|BS_AUTOCHECKBOX,0,70,80,20,0)\nSetControlFocus2d(~HSpace,~HObject)\n…\nSetControlFocus2d(~HSpace,№0)//Передали фокус окну\n\nсм. [Функции работы с интерфейсными элементами](Control_object_functions.md)\nсм. [Интерфейсные элементы](Control_objects.md)",
+  "help_topic": "SetControlFocus2d",
+  "source": "tpl+help"
+ },
+ {
+  "name": "SetControlStyle2d",
+  "overloads": [
+   {
+    "signature": "FLOAT SetControlStyle2d(HANDLE, HANDLE, FLOAT)",
+    "args": [
+     {
+      "type": "HANDLE",
+      "byref": false
+     },
+     {
+      "type": "HANDLE",
+      "byref": false
+     },
+     {
+      "type": "FLOAT",
+      "byref": false
+     }
+    ],
+    "ret": "FLOAT",
+    "opcode": 460,
+    "table": "Graph2d.tpl"
+   }
+  ],
+  "group": "Функции работы с интерфейсными элементами",
+  "description": "Функция устанавливает объекту Windows новый стиль.",
+  "params": [
+   {
+    "name": "HSpace",
+    "desc": "Дескриптор пространства."
+   },
+   {
+    "name": "HObject",
+    "desc": "Дескриптор объекта."
+   },
+   {
+    "name": "Style",
+    "desc": "Новый стиль (см. [стили Windows объектов](Windows_Style.md))"
+   }
+  ],
+  "returns": "Возвращаемое значение является ненулевым, если функция выполнена успешно, в противном случае возвращается 0.",
+  "example": "k:=SetControlStyle2d(HSpace,HObject,WS_VISIBLE+BS_CHECKBUTTON+WS_CHILD)\n\nсм. [Интерфейсные элементы](Control_objects.md)\nсм. [Графика 2D](Graphics2d.md)",
+  "help_topic": "SetControlStyle2d",
+  "source": "tpl+help"
+ },
+ {
+  "name": "GetControlStyle2d",
+  "overloads": [
+   {
+    "signature": "FLOAT GetControlStyle2d(HANDLE, HANDLE)",
+    "args": [
+     {
+      "type": "HANDLE",
+      "byref": false
+     },
+     {
+      "type": "HANDLE",
+      "byref": false
+     }
+    ],
+    "ret": "FLOAT",
+    "opcode": 461,
+    "table": "Graph2d.tpl"
+   }
+  ],
+  "group": "Функции работы с интерфейсными элементами",
+  "description": "Функция позволяет получить текущий стиль указанного [интерфейсного элемента](Control_objects.md).",
+  "params": [
+   {
+    "name": "HSpace",
+    "desc": "Дескриптор пространства."
+   },
+   {
+    "name": "HObject",
+    "desc": "Дескриптор объекта."
+   }
+  ],
+  "returns": "Возвращаемое значение является ненулевым, если функция выполнена успешно, в противном случае возвращается 0.",
+  "example": "Style := GetControlStyle2d (HSpace,~HObject)\n\nсм. [Интерфейсные элементы](Control_objects.md)",
+  "help_topic": "GetControlStyle2d",
+  "source": "tpl+help"
+ },
+ {
+  "name": "LBAddString",
+  "overloads": [
+   {
+    "signature": "FLOAT LBAddString(HANDLE, HANDLE, STRING)",
+    "args": [
+     {
+      "type": "HANDLE",
+      "byref": false
+     },
+     {
+      "type": "HANDLE",
+      "byref": false
+     },
+     {
+      "type": "STRING",
+      "byref": false
+     }
+    ],
+    "ret": "FLOAT",
+    "opcode": 462,
+    "table": "Graph2d.tpl"
+   }
+  ],
+  "group": "Функции работы с интерфейсными элементами",
+  "description": "Функция добавляет строку в конец списка (только для LISTBOX и COMBOBOX).",
+  "params": [
+   {
+    "name": "HSpace",
+    "desc": "Дескриптор пространства."
+   },
+   {
+    "name": "HObject",
+    "desc": "Дескриптор объекта."
+   },
+   {
+    "name": "Text",
+    "desc": "Строка."
+   }
+  ],
+  "returns": "Является ненулевым, если функция выполнена успешно, в противном случае возвращается 0.",
+  "example": "HObject := [CreateControlObject2d](CreateControlObject2d.md) (~HSpace,\"COMBOBOX\",\"combo\",WS_VISIBLE|WS_CHILD|CBS_SORT|CBS_DROPDOWN,0,100,80,100,0)\nr := LBAddString (~HSpace,~HObject,\"Text1\")\nr := LBAddString (~HSpace,~HObject,\"Text2\")\nr := LBAddString (~HSpace,~HObject,\"Text3\")\n\nсм. [Интерфейсные элементы](Control_objects.md)",
+  "help_topic": "LBAddString",
+  "source": "tpl+help"
+ },
+ {
+  "name": "LBInsertString",
+  "overloads": [
+   {
+    "signature": "FLOAT LBInsertString(HANDLE, HANDLE, STRING, FLOAT)",
+    "args": [
+     {
+      "type": "HANDLE",
+      "byref": false
+     },
+     {
+      "type": "HANDLE",
+      "byref": false
+     },
+     {
+      "type": "STRING",
+      "byref": false
+     },
+     {
+      "type": "FLOAT",
+      "byref": false
+     }
+    ],
+    "ret": "FLOAT",
+    "opcode": 463,
+    "table": "Graph2d.tpl"
+   }
+  ],
+  "group": "",
+  "description": "",
+  "params": [],
+  "returns": "",
+  "example": "",
+  "help_topic": null,
+  "source": "tpl"
+ },
+ {
+  "name": "LBGetString",
+  "overloads": [
+   {
+    "signature": "STRING LBGetString(HANDLE, HANDLE, FLOAT)",
+    "args": [
+     {
+      "type": "HANDLE",
+      "byref": false
+     },
+     {
+      "type": "HANDLE",
+      "byref": false
+     },
+     {
+      "type": "FLOAT",
+      "byref": false
+     }
+    ],
+    "ret": "STRING",
+    "opcode": 464,
+    "table": "Graph2d.tpl"
+   }
+  ],
+  "group": "Функции работы с интерфейсными элементами",
+  "description": "Функция возвращает строку с указанным номером из списка (только для LISTBOX и COMBOBOX).",
+  "params": [
+   {
+    "name": "HSpace",
+    "desc": "Дескриптор пространства."
+   },
+   {
+    "name": "HObject",
+    "desc": "Дескриптор объекта."
+   },
+   {
+    "name": "Number",
+    "desc": "Номер строки."
+   }
+  ],
+  "returns": "Возвращаемое значение строка, если номер неверный - пустая строка.",
+  "example": "txt2 := LBGetString (HSpace, HObject, 2)\n\nсм. [Интерфейсные элементы](Control_objects.md)",
+  "help_topic": "LBGetString",
+  "source": "tpl+help"
+ },
+ {
+  "name": "LBClearList",
+  "overloads": [
+   {
+    "signature": "FLOAT LBClearList(HANDLE, HANDLE)",
+    "args": [
+     {
+      "type": "HANDLE",
+      "byref": false
+     },
+     {
+      "type": "HANDLE",
+      "byref": false
+     }
+    ],
+    "ret": "FLOAT",
+    "opcode": 465,
+    "table": "Graph2d.tpl"
+   }
+  ],
+  "group": "Функции работы с интерфейсными элементами",
+  "description": "Функция удаляет все строки из списка (только для LISTBOX и COMBOBOX).",
+  "params": [
+   {
+    "name": "HSpace",
+    "desc": "Дескриптор пространства."
+   },
+   {
+    "name": "HObject",
+    "desc": "Дескриптор объекта."
+   }
+  ],
+  "returns": "Является ненулевым, если функция выполнена успешно, в противном случае возвращается 0.",
+  "example": "r := LBClearList(HSpace, HObject)\n\nсм. [Интерфейсные элементы](Control_objects.md)",
+  "help_topic": "LBClearList",
+  "source": "tpl+help"
+ },
+ {
+  "name": "LBDeleteString",
+  "overloads": [
+   {
+    "signature": "FLOAT LBDeleteString(HANDLE, HANDLE, FLOAT)",
+    "args": [
+     {
+      "type": "HANDLE",
+      "byref": false
+     },
+     {
+      "type": "HANDLE",
+      "byref": false
+     },
+     {
+      "type": "FLOAT",
+      "byref": false
+     }
+    ],
+    "ret": "FLOAT",
+    "opcode": 466,
+    "table": "Graph2d.tpl"
+   }
+  ],
+  "group": "Функции работы с интерфейсными элементами",
+  "description": "Функция удаляет строку из списка с заданным номером (только для LISTBOX и COMBOBOX).",
+  "params": [
+   {
+    "name": "HSpace",
+    "desc": "Дескриптор пространства."
+   },
+   {
+    "name": "HObject",
+    "desc": "Дескриптор объекта."
+   },
+   {
+    "name": "Number",
+    "desc": "Номер строки."
+   }
+  ],
+  "returns": "Возвращаемое значение является ненулевым, если функция выполнена успешно, в противном случае возвращается 0.",
+  "example": "r := LBDeleteString (HSpace, HObject, 13)\n\nсм. [Интерфейсные элементы](Control_objects.md)",
+  "help_topic": "LBDeleteString",
+  "source": "tpl+help"
+ },
+ {
+  "name": "LBGetCount",
+  "overloads": [
+   {
+    "signature": "FLOAT LBGetCount(HANDLE, HANDLE)",
+    "args": [
+     {
+      "type": "HANDLE",
+      "byref": false
+     },
+     {
+      "type": "HANDLE",
+      "byref": false
+     }
+    ],
+    "ret": "FLOAT",
+    "opcode": 467,
+    "table": "Graph2d.tpl"
+   }
+  ],
+  "group": "",
+  "description": "",
+  "params": [],
+  "returns": "",
+  "example": "",
+  "help_topic": null,
+  "source": "tpl"
+ },
+ {
+  "name": "LBGetSelIndex",
+  "overloads": [
+   {
+    "signature": "FLOAT LBGetSelIndex(HANDLE, HANDLE)",
+    "args": [
+     {
+      "type": "HANDLE",
+      "byref": false
+     },
+     {
+      "type": "HANDLE",
+      "byref": false
+     }
+    ],
+    "ret": "FLOAT",
+    "opcode": 468,
+    "table": "Graph2d.tpl"
+   }
+  ],
+  "group": "",
+  "description": "",
+  "params": [],
+  "returns": "",
+  "example": "",
+  "help_topic": null,
+  "source": "tpl"
+ },
+ {
+  "name": "LBGetSelIndexs",
+  "overloads": [
+   {
+    "signature": "HANDLE LBGetSelIndexs(HANDLE, HANDLE)",
+    "args": [
+     {
+      "type": "HANDLE",
+      "byref": false
+     },
+     {
+      "type": "HANDLE",
+      "byref": false
+     }
+    ],
+    "ret": "HANDLE",
+    "opcode": 1114,
+    "table": "Graph2d.tpl"
+   }
+  ],
+  "group": "",
+  "description": "",
+  "params": [],
+  "returns": "",
+  "example": "",
+  "help_topic": null,
+  "source": "tpl"
+ },
+ {
+  "name": "LBSetSelIndex",
+  "overloads": [
+   {
+    "signature": "FLOAT LBSetSelIndex(HANDLE, HANDLE, FLOAT)",
+    "args": [
+     {
+      "type": "HANDLE",
+      "byref": false
+     },
+     {
+      "type": "HANDLE",
+      "byref": false
+     },
+     {
+      "type": "FLOAT",
+      "byref": false
+     }
+    ],
+    "ret": "FLOAT",
+    "opcode": 469,
+    "table": "Graph2d.tpl"
+   }
+  ],
+  "group": "Функции работы с интерфейсными элементами",
+  "description": "Функция выделяет (рамкой) строку в списке с указанным номером (только для LISTBOX и COMBOBOX).",
+  "params": [
+   {
+    "name": "HSpace",
+    "desc": "Дескриптор пространства."
+   },
+   {
+    "name": "HObject",
+    "desc": "Дескриптор объекта."
+   },
+   {
+    "name": "Number",
+    "desc": "Номер строки."
+   }
+  ],
+  "returns": "Возвращаемое значение является ненулевым, если функция выполнена успешно, в противном случае возвращается 0.",
+  "example": "r := LBSetSelIndex (HSpace, HObject, Number)\n\nсм. [Интерфейсные элементы](Control_objects.md)",
+  "help_topic": "LBSetSelIndex",
+  "source": "tpl+help"
+ },
+ {
+  "name": "LBGetCaretIndex",
+  "overloads": [
+   {
+    "signature": "FLOAT LBGetCaretIndex(HANDLE, HANDLE)",
+    "args": [
+     {
+      "type": "HANDLE",
+      "byref": false
+     },
+     {
+      "type": "HANDLE",
+      "byref": false
+     }
+    ],
+    "ret": "FLOAT",
+    "opcode": 470,
+    "table": "Graph2d.tpl"
+   }
+  ],
+  "group": "Функции работы с интерфейсными элементами",
+  "description": "Функция возвращает номер строки в списке, выбранной пользователем (отмечается синим цветом) (только для LISTBOX и COMBOBOX).",
+  "params": [
+   {
+    "name": "HSpace",
+    "desc": "Дескриптор пространства."
+   },
+   {
+    "name": "HObject",
+    "desc": "Дескриптор объекта."
+   }
+  ],
+  "returns": "Номер выбранной строки, в противном случае возвращается 0.",
+  "example": "r := LBGetCaretIndex (HSpace, HObject)\n\nсм. [Интерфейсные элементы](Control_objects.md)",
+  "help_topic": "LBGetCaretIndex",
+  "source": "tpl+help"
+ },
+ {
+  "name": "LBSetCaretIndex",
+  "overloads": [
+   {
+    "signature": "FLOAT LBSetCaretIndex(HANDLE, HANDLE, FLOAT)",
+    "args": [
+     {
+      "type": "HANDLE",
+      "byref": false
+     },
+     {
+      "type": "HANDLE",
+      "byref": false
+     },
+     {
+      "type": "FLOAT",
+      "byref": false
+     }
+    ],
+    "ret": "FLOAT",
+    "opcode": 471,
+    "table": "Graph2d.tpl"
+   }
+  ],
+  "group": "Функции работы с интерфейсными элементами",
+  "description": "Функция выделяет (синим цветом) строку в списке с указанным номером (только для LISTBOX и COMBOBOX).",
+  "params": [
+   {
+    "name": "HSpace",
+    "desc": "Дескриптор пространства."
+   },
+   {
+    "name": "HObject",
+    "desc": "Дескриптор объекта."
+   },
+   {
+    "name": "Number",
+    "desc": "Номер строки"
+   }
+  ],
+  "returns": "Возвращаемое значение является ненулевым, если функция выполнена успешно, в противном случае возвращается 0.",
+  "example": "r := LBSetCaretIndex (HSpace, HObject, 1)\n\nсм. [Интерфейсные элементы](Control_objects.md)",
+  "help_topic": "LBSetCaretIndex",
+  "source": "tpl+help"
+ },
+ {
+  "name": "LBFindString",
+  "overloads": [
+   {
+    "signature": "FLOAT LBFindString(HANDLE, HANDLE, STRING, FLOAT)",
+    "args": [
+     {
+      "type": "HANDLE",
+      "byref": false
+     },
+     {
+      "type": "HANDLE",
+      "byref": false
+     },
+     {
+      "type": "STRING",
+      "byref": false
+     },
+     {
+      "type": "FLOAT",
+      "byref": false
+     }
+    ],
+    "ret": "FLOAT",
+    "opcode": 472,
+    "table": "Graph2d.tpl"
+   }
+  ],
+  "group": "Функции работы с интерфейсными элементами",
+  "description": "Функция ищет, начиная с заданного номера в списке строк, строку, содержащую указанный текст, и возвращает ее номер (только для LISTBOX и COMBOBOX).",
+  "params": [
+   {
+    "name": "HSpace",
+    "desc": "Дескриптор пространства."
+   },
+   {
+    "name": "HObject",
+    "desc": "Дескриптор объекта."
+   },
+   {
+    "name": "Text",
+    "desc": "Образец для поиска."
+   },
+   {
+    "name": "Number",
+    "desc": "Номер строки, с которой начинать поиск."
+   }
+  ],
+  "returns": "Номер строки, в которой найден образец, противном случае возвращается -1.",
+  "example": "n := LBFindString (HSpace, HObject, \"понедельник\", 1)\n\nсм. [Интерфейсные элементы](Control_objects.md)",
+  "help_topic": "LBFindString",
+  "source": "tpl+help"
+ },
+ {
+  "name": "LBFindStringExact",
+  "overloads": [
+   {
+    "signature": "FLOAT LBFindStringExact(HANDLE, HANDLE, STRING, FLOAT)",
+    "args": [
+     {
+      "type": "HANDLE",
+      "byref": false
+     },
+     {
+      "type": "HANDLE",
+      "byref": false
+     },
+     {
+      "type": "STRING",
+      "byref": false
+     },
+     {
+      "type": "FLOAT",
+      "byref": false
+     }
+    ],
+    "ret": "FLOAT",
+    "opcode": 473,
+    "table": "Graph2d.tpl"
+   }
+  ],
+  "group": "Функции работы с интерфейсными элементами",
+  "description": "Функция ищет, начиная с заданного номера в списке строк, строку содержащую заданный текст, и возвращает ее номер (только для LISTBOX и COMBOBOX).",
+  "params": [
+   {
+    "name": "HSpace",
+    "desc": "Дескриптор пространства."
+   },
+   {
+    "name": "HObject",
+    "desc": "Дескриптор объекта."
+   },
+   {
+    "name": "Text",
+    "desc": "Образец для поиска."
+   },
+   {
+    "name": "Number",
+    "desc": "Номер строки, с которой начинать поиск."
+   }
+  ],
+  "returns": "Возвращаемое значение - номер строки, в которой найден образец, противном случае возвращается -1.",
+  "example": "n := LBFindString (HSpace, HObject, \"пон\", 1)\n\nсм. [Интерфейсные элементы](Control_objects.md)",
+  "help_topic": "LBFindStringExact",
+  "source": "tpl+help"
+ },
+ {
   "name": "AddGroupItem2d",
   "overloads": [
    {
@@ -36607,140 +37575,6 @@
   "source": "tpl+help"
  },
  {
-  "name": "CheckDlgButton2d",
-  "overloads": [
-   {
-    "signature": "FLOAT CheckDlgButton2d(HANDLE HSpace, HANDLE HObject, FLOAT State)",
-    "args": [
-     "HANDLE HSpace",
-     "HANDLE HObject",
-     "FLOAT State"
-    ],
-    "ret": "FLOAT",
-    "opcode": null,
-    "table": null
-   }
-  ],
-  "group": "Функции работы с интерфейсными элементами",
-  "description": "Функция устанавливает кнопки CHECKBUTTON, RADIOBUTTON, 3STATEBUTTON в одно из состояний -\"включено\", \"выключено\" (и \"неопределенное\" для 3STATEBUTTON)",
-  "params": [
-   {
-    "name": "HSpace",
-    "desc": "Дескриптор пространства."
-   },
-   {
-    "name": "HObject",
-    "desc": "Дескриптор объекта."
-   },
-   {
-    "name": "State",
-    "desc": "Требуемое состояние: 0 - выключено, 1 - включено, 2 - неактивировано (только для 3STATEBUTTON)"
-   }
-  ],
-  "returns": "Является ненулевым, если функция выполнена успешно, в противном случае возвращается 0.",
-  "example": "if(~state)\n  r := CheckDlgButton2d(HSpace,HObject,~state)\n endif\n\nсм. [Интерфейсные элементы](Control_objects.md)",
-  "help_topic": "CheckDlgButton2d",
-  "source": "help"
- },
- {
-  "name": "EnableControl2d",
-  "overloads": [
-   {
-    "signature": "FLOAT EnableControl2d (HANDLE HSpace, HANDLE HObject, FLOAT State)",
-    "args": [
-     "HANDLE HSpace",
-     "HANDLE HObject",
-     "FLOAT State"
-    ],
-    "ret": "FLOAT",
-    "opcode": null,
-    "table": null
-   }
-  ],
-  "group": "Функции работы с интерфейсными элементами",
-  "description": "Функция устанавливает состояние интерфейсного элемента - \"активирован\", \"неактивирован\".",
-  "params": [
-   {
-    "name": "HSpace",
-    "desc": "Дескриптор пространства."
-   },
-   {
-    "name": "HObject",
-    "desc": "Дескриптор объекта."
-   },
-   {
-    "name": "State",
-    "desc": "Состояние, 0 - \"неактивировано\", 1 - \"неактивирован\"."
-   }
-  ],
-  "returns": "Возвращаемое значение является ненулевым, если функция выполнена успешно, в противном случае возвращается 0.",
-  "example": "HObject := [CreateControlObject2d](CreateControlObject2d.md) (~HSpace,\"BUTTON\",\"проверка\",WS_VISIBLE|WS_CHILD|BS_AUTOCHECKBOX,0,70,80,20,0)\nr := EnableControl2d(~HSpace,~HObject,0)\n\nсм. [Функции работы с интерфейсными элементами](Control_object_functions.md)\nсм. [Интерфейсные элементы](Control_objects.md)",
-  "help_topic": "EnableControl2d",
-  "source": "help"
- },
- {
-  "name": "SetControlFocus2d",
-  "overloads": [
-   {
-    "signature": "SetControlFocus2d (HANDLE HSpace, HANDLE HObject)",
-    "args": [
-     "HANDLE HSpace",
-     "HANDLE HObject"
-    ],
-    "ret": null,
-    "opcode": null,
-    "table": null
-   }
-  ],
-  "group": "Функции работы с интерфейсными элементами",
-  "description": "Функция устанавливает фокус ввода в интерфейсный элемент.",
-  "params": [
-   {
-    "name": "HSpace",
-    "desc": "Дескриптор пространства."
-   },
-   {
-    "name": "HObject",
-    "desc": "Дескриптор объекта. Если значение нулевое (#0), то фокус передается окну HSpace."
-   }
-  ],
-  "returns": "",
-  "example": "HObject := [CreateControlObject2d](CreateControlObject2d.md) (~HSpace,\"BUTTON\",\"проверка\",WS_VISIBLE|WS_CHILD|BS_AUTOCHECKBOX,0,70,80,20,0)\nSetControlFocus2d(~HSpace,~HObject)\n…\nSetControlFocus2d(~HSpace,№0)//Передали фокус окну\n\nсм. [Функции работы с интерфейсными элементами](Control_object_functions.md)\nсм. [Интерфейсные элементы](Control_objects.md)",
-  "help_topic": "SetControlFocus2d",
-  "source": "help"
- },
- {
-  "name": "GetControlStyle2d",
-  "overloads": [
-   {
-    "signature": "FLOAT GetControlStyle2d (HANDLE HSpace, HANDLE HObject)",
-    "args": [
-     "HANDLE HSpace",
-     "HANDLE HObject"
-    ],
-    "ret": "FLOAT",
-    "opcode": null,
-    "table": null
-   }
-  ],
-  "group": "Функции работы с интерфейсными элементами",
-  "description": "Функция позволяет получить текущий стиль указанного [интерфейсного элемента](Control_objects.md).",
-  "params": [
-   {
-    "name": "HSpace",
-    "desc": "Дескриптор пространства."
-   },
-   {
-    "name": "HObject",
-    "desc": "Дескриптор объекта."
-   }
-  ],
-  "returns": "Возвращаемое значение является ненулевым, если функция выполнена успешно, в противном случае возвращается 0.",
-  "example": "Style := GetControlStyle2d (HSpace,~HObject)\n\nсм. [Интерфейсные элементы](Control_objects.md)",
-  "help_topic": "GetControlStyle2d",
-  "source": "help"
- },
- {
   "name": "GetLastMCIEerror",
   "overloads": [
    {
@@ -36852,361 +37686,6 @@
   "source": "help"
  },
  {
-  "name": "IsDlgButtonChecked2d",
-  "overloads": [
-   {
-    "signature": "FLOAT IsDlgButtonChecked2d (HANDLE HSpace, HANDLE HObject)",
-    "args": [
-     "HANDLE HSpace",
-     "HANDLE HObject"
-    ],
-    "ret": "FLOAT",
-    "opcode": null,
-    "table": null
-   }
-  ],
-  "group": "Функции работы с интерфейсными элементами",
-  "description": "Функция проверяет текущее состояние кнопок типа CHECKBUTTON, RADIOBUTTON, 3STATEBUTTON.",
-  "params": [
-   {
-    "name": "HSpace",
-    "desc": "Дескриптор пространства."
-   },
-   {
-    "name": "HObject",
-    "desc": "Дескриптор объекта."
-   }
-  ],
-  "returns": "Возвращаемое значение это состояние объекта:\n0 - \"выключено\"\n1- \"включено\"\n2 - \"неопределено\" (только для 3STATEBUTTON)",
-  "example": "k := IsDlgButtonChecked2d (HSpace,HObject)\n\nсм. [Интерфейсные элементы](Control_objects.md)",
-  "help_topic": "IsDlgButtonChecked2d",
-  "source": "help"
- },
- {
-  "name": "LBAddString",
-  "overloads": [
-   {
-    "signature": "FLOAT LBAddString (HANDLE HSpace, HANDLE HObject, STRING Text)",
-    "args": [
-     "HANDLE HSpace",
-     "HANDLE HObject",
-     "STRING Text"
-    ],
-    "ret": "FLOAT",
-    "opcode": null,
-    "table": null
-   }
-  ],
-  "group": "Функции работы с интерфейсными элементами",
-  "description": "Функция добавляет строку в конец списка (только для LISTBOX и COMBOBOX).",
-  "params": [
-   {
-    "name": "HSpace",
-    "desc": "Дескриптор пространства."
-   },
-   {
-    "name": "HObject",
-    "desc": "Дескриптор объекта."
-   },
-   {
-    "name": "Text",
-    "desc": "Строка."
-   }
-  ],
-  "returns": "Является ненулевым, если функция выполнена успешно, в противном случае возвращается 0.",
-  "example": "HObject := [CreateControlObject2d](CreateControlObject2d.md) (~HSpace,\"COMBOBOX\",\"combo\",WS_VISIBLE|WS_CHILD|CBS_SORT|CBS_DROPDOWN,0,100,80,100,0)\nr := LBAddString (~HSpace,~HObject,\"Text1\")\nr := LBAddString (~HSpace,~HObject,\"Text2\")\nr := LBAddString (~HSpace,~HObject,\"Text3\")\n\nсм. [Интерфейсные элементы](Control_objects.md)",
-  "help_topic": "LBAddString",
-  "source": "help"
- },
- {
-  "name": "LBClearList",
-  "overloads": [
-   {
-    "signature": "FLOAT LBClearList (HANDLE HSpace, HANDLE HObject)",
-    "args": [
-     "HANDLE HSpace",
-     "HANDLE HObject"
-    ],
-    "ret": "FLOAT",
-    "opcode": null,
-    "table": null
-   }
-  ],
-  "group": "Функции работы с интерфейсными элементами",
-  "description": "Функция удаляет все строки из списка (только для LISTBOX и COMBOBOX).",
-  "params": [
-   {
-    "name": "HSpace",
-    "desc": "Дескриптор пространства."
-   },
-   {
-    "name": "HObject",
-    "desc": "Дескриптор объекта."
-   }
-  ],
-  "returns": "Является ненулевым, если функция выполнена успешно, в противном случае возвращается 0.",
-  "example": "r := LBClearList(HSpace, HObject)\n\nсм. [Интерфейсные элементы](Control_objects.md)",
-  "help_topic": "LBClearList",
-  "source": "help"
- },
- {
-  "name": "LBDeleteString",
-  "overloads": [
-   {
-    "signature": "FLOAT LBDeleteString (HANDLE HSpace, HANDLE HObject, FLOAT Number)",
-    "args": [
-     "HANDLE HSpace",
-     "HANDLE HObject",
-     "FLOAT Number"
-    ],
-    "ret": "FLOAT",
-    "opcode": null,
-    "table": null
-   }
-  ],
-  "group": "Функции работы с интерфейсными элементами",
-  "description": "Функция удаляет строку из списка с заданным номером (только для LISTBOX и COMBOBOX).",
-  "params": [
-   {
-    "name": "HSpace",
-    "desc": "Дескриптор пространства."
-   },
-   {
-    "name": "HObject",
-    "desc": "Дескриптор объекта."
-   },
-   {
-    "name": "Number",
-    "desc": "Номер строки."
-   }
-  ],
-  "returns": "Возвращаемое значение является ненулевым, если функция выполнена успешно, в противном случае возвращается 0.",
-  "example": "r := LBDeleteString (HSpace, HObject, 13)\n\nсм. [Интерфейсные элементы](Control_objects.md)",
-  "help_topic": "LBDeleteString",
-  "source": "help"
- },
- {
-  "name": "LBFindString",
-  "overloads": [
-   {
-    "signature": "FLOAT LBFindString (HANDLE HSpace, HANDLE HObject, STRING Text, FLOAT Number)",
-    "args": [
-     "HANDLE HSpace",
-     "HANDLE HObject",
-     "STRING Text",
-     "FLOAT Number"
-    ],
-    "ret": "FLOAT",
-    "opcode": null,
-    "table": null
-   }
-  ],
-  "group": "Функции работы с интерфейсными элементами",
-  "description": "Функция ищет, начиная с заданного номера в списке строк, строку, содержащую указанный текст, и возвращает ее номер (только для LISTBOX и COMBOBOX).",
-  "params": [
-   {
-    "name": "HSpace",
-    "desc": "Дескриптор пространства."
-   },
-   {
-    "name": "HObject",
-    "desc": "Дескриптор объекта."
-   },
-   {
-    "name": "Text",
-    "desc": "Образец для поиска."
-   },
-   {
-    "name": "Number",
-    "desc": "Номер строки, с которой начинать поиск."
-   }
-  ],
-  "returns": "Номер строки, в которой найден образец, противном случае возвращается -1.",
-  "example": "n := LBFindString (HSpace, HObject, \"понедельник\", 1)\n\nсм. [Интерфейсные элементы](Control_objects.md)",
-  "help_topic": "LBFindString",
-  "source": "help"
- },
- {
-  "name": "LBFindStringExact",
-  "overloads": [
-   {
-    "signature": "FLOAT LBFindStringExact (HANDLE HSpace, HANDLE HObject, STRING Text, FLOAT Number)",
-    "args": [
-     "HANDLE HSpace",
-     "HANDLE HObject",
-     "STRING Text",
-     "FLOAT Number"
-    ],
-    "ret": "FLOAT",
-    "opcode": null,
-    "table": null
-   }
-  ],
-  "group": "Функции работы с интерфейсными элементами",
-  "description": "Функция ищет, начиная с заданного номера в списке строк, строку содержащую заданный текст, и возвращает ее номер (только для LISTBOX и COMBOBOX).",
-  "params": [
-   {
-    "name": "HSpace",
-    "desc": "Дескриптор пространства."
-   },
-   {
-    "name": "HObject",
-    "desc": "Дескриптор объекта."
-   },
-   {
-    "name": "Text",
-    "desc": "Образец для поиска."
-   },
-   {
-    "name": "Number",
-    "desc": "Номер строки, с которой начинать поиск."
-   }
-  ],
-  "returns": "Возвращаемое значение - номер строки, в которой найден образец, противном случае возвращается -1.",
-  "example": "n := LBFindString (HSpace, HObject, \"пон\", 1)\n\nсм. [Интерфейсные элементы](Control_objects.md)",
-  "help_topic": "LBFindStringExact",
-  "source": "help"
- },
- {
-  "name": "LBGetCaretIndex",
-  "overloads": [
-   {
-    "signature": "FLOAT LBGetCaretIndex (HANDLE HSpace, HANDLE HObject)",
-    "args": [
-     "HANDLE HSpace",
-     "HANDLE HObject"
-    ],
-    "ret": "FLOAT",
-    "opcode": null,
-    "table": null
-   }
-  ],
-  "group": "Функции работы с интерфейсными элементами",
-  "description": "Функция возвращает номер строки в списке, выбранной пользователем (отмечается синим цветом) (только для LISTBOX и COMBOBOX).",
-  "params": [
-   {
-    "name": "HSpace",
-    "desc": "Дескриптор пространства."
-   },
-   {
-    "name": "HObject",
-    "desc": "Дескриптор объекта."
-   }
-  ],
-  "returns": "Номер выбранной строки, в противном случае возвращается 0.",
-  "example": "r := LBGetCaretIndex (HSpace, HObject)\n\nсм. [Интерфейсные элементы](Control_objects.md)",
-  "help_topic": "LBGetCaretIndex",
-  "source": "help"
- },
- {
-  "name": "LBGetString",
-  "overloads": [
-   {
-    "signature": "STRING LBGetString (HANDLE HSpace, HANDLE HObject, FLOAT Number)",
-    "args": [
-     "HANDLE HSpace",
-     "HANDLE HObject",
-     "FLOAT Number"
-    ],
-    "ret": "STRING",
-    "opcode": null,
-    "table": null
-   }
-  ],
-  "group": "Функции работы с интерфейсными элементами",
-  "description": "Функция возвращает строку с указанным номером из списка (только для LISTBOX и COMBOBOX).",
-  "params": [
-   {
-    "name": "HSpace",
-    "desc": "Дескриптор пространства."
-   },
-   {
-    "name": "HObject",
-    "desc": "Дескриптор объекта."
-   },
-   {
-    "name": "Number",
-    "desc": "Номер строки."
-   }
-  ],
-  "returns": "Возвращаемое значение строка, если номер неверный - пустая строка.",
-  "example": "txt2 := LBGetString (HSpace, HObject, 2)\n\nсм. [Интерфейсные элементы](Control_objects.md)",
-  "help_topic": "LBGetString",
-  "source": "help"
- },
- {
-  "name": "LBSetCaretIndex",
-  "overloads": [
-   {
-    "signature": "FLOAT LBSetCaretIndex (HANDLE HSpace, HANDLE HObject, FLOAT Number)",
-    "args": [
-     "HANDLE HSpace",
-     "HANDLE HObject",
-     "FLOAT Number"
-    ],
-    "ret": "FLOAT",
-    "opcode": null,
-    "table": null
-   }
-  ],
-  "group": "Функции работы с интерфейсными элементами",
-  "description": "Функция выделяет (синим цветом) строку в списке с указанным номером (только для LISTBOX и COMBOBOX).",
-  "params": [
-   {
-    "name": "HSpace",
-    "desc": "Дескриптор пространства."
-   },
-   {
-    "name": "HObject",
-    "desc": "Дескриптор объекта."
-   },
-   {
-    "name": "Number",
-    "desc": "Номер строки"
-   }
-  ],
-  "returns": "Возвращаемое значение является ненулевым, если функция выполнена успешно, в противном случае возвращается 0.",
-  "example": "r := LBSetCaretIndex (HSpace, HObject, 1)\n\nсм. [Интерфейсные элементы](Control_objects.md)",
-  "help_topic": "LBSetCaretIndex",
-  "source": "help"
- },
- {
-  "name": "LBSetSelIndex",
-  "overloads": [
-   {
-    "signature": "FLOAT LBSetSelIndex (HANDLE HSpace, HANDLE HObject, FLOAT Number)",
-    "args": [
-     "HANDLE HSpace",
-     "HANDLE HObject",
-     "FLOAT Number"
-    ],
-    "ret": "FLOAT",
-    "opcode": null,
-    "table": null
-   }
-  ],
-  "group": "Функции работы с интерфейсными элементами",
-  "description": "Функция выделяет (рамкой) строку в списке с указанным номером (только для LISTBOX и COMBOBOX).",
-  "params": [
-   {
-    "name": "HSpace",
-    "desc": "Дескриптор пространства."
-   },
-   {
-    "name": "HObject",
-    "desc": "Дескриптор объекта."
-   },
-   {
-    "name": "Number",
-    "desc": "Номер строки."
-   }
-  ],
-  "returns": "Возвращаемое значение является ненулевым, если функция выполнена успешно, в противном случае возвращается 0.",
-  "example": "r := LBSetSelIndex (HSpace, HObject, Number)\n\nсм. [Интерфейсные элементы](Control_objects.md)",
-  "help_topic": "LBSetSelIndex",
-  "source": "help"
- },
- {
   "name": "RegisterNetObject",
   "overloads": [
    {
@@ -37287,78 +37766,6 @@
   "returns": "",
   "example": "",
   "help_topic": "SetCameraPoint3d",
-  "source": "help"
- },
- {
-  "name": "SetControlStyle2d",
-  "overloads": [
-   {
-    "signature": "FLOAT SetControlStyle2d (HANDLE HSpace, HANDLE HObject, FLOAT Style)",
-    "args": [
-     "HANDLE HSpace",
-     "HANDLE HObject",
-     "FLOAT Style"
-    ],
-    "ret": "FLOAT",
-    "opcode": null,
-    "table": null
-   }
-  ],
-  "group": "Функции работы с интерфейсными элементами",
-  "description": "Функция устанавливает объекту Windows новый стиль.",
-  "params": [
-   {
-    "name": "HSpace",
-    "desc": "Дескриптор пространства."
-   },
-   {
-    "name": "HObject",
-    "desc": "Дескриптор объекта."
-   },
-   {
-    "name": "Style",
-    "desc": "Новый стиль (см. [стили Windows объектов](Windows_Style.md))"
-   }
-  ],
-  "returns": "Возвращаемое значение является ненулевым, если функция выполнена успешно, в противном случае возвращается 0.",
-  "example": "k:=SetControlStyle2d(HSpace,HObject,WS_VISIBLE+BS_CHECKBUTTON+WS_CHILD)\n\nсм. [Интерфейсные элементы](Control_objects.md)\nсм. [Графика 2D](Graphics2d.md)",
-  "help_topic": "SetControlStyle2d",
-  "source": "help"
- },
- {
-  "name": "SetControlFont2d",
-  "overloads": [
-   {
-    "signature": "FLOAT SetControlFont2d(HANDLE HSpace, HANDLE HObject, , HANDLE HFont)",
-    "args": [
-     "HANDLE HSpace",
-     "HANDLE HObject",
-     "HANDLE HFont"
-    ],
-    "ret": "FLOAT",
-    "opcode": null,
-    "table": null
-   }
-  ],
-  "group": "Функции работы с интерфейсными элементами",
-  "description": "Функция устанавливает шрифт текста в интерфейсный элемент.",
-  "params": [
-   {
-    "name": "HSpace",
-    "desc": "Дескриптор пространства."
-   },
-   {
-    "name": "HObject",
-    "desc": "Дескриптор объекта."
-   },
-   {
-    "name": "HFont",
-    "desc": "Дескриптор шрифта."
-   }
-  ],
-  "returns": "Возвращаемое значение является ненулевым, если функция выполнена успешно, в противном случае возвращается 0.",
-  "example": "hControl:= [CreateControlObject2d](CreateControlObject2d.md) (HSpace,\"EDIT\",\"проверка\",WS_VISIBLE|WS_CHILD| ES_CENTER,0,70,80,20,0)\nhFont := [CreateFont2dpt](CreateFont2dpt.md) (HSpace,FontName, FontSize, FontStyle)\n\nr:=SetControlFont2d(HSpace,~hControl,~hFont)\n\nсм. [Интерфейсные элементы](Control_objects.md)\nсм. [Графика 2D](Graphics2d.md)",
-  "help_topic": "SetControlFont2d",
   "source": "help"
  },
  {

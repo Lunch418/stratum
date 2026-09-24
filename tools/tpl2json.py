@@ -28,8 +28,37 @@ SECTION_RE = re.compile(r"^\s*([A-Z_]+)\s*$")
 
 
 def strip_comments(text):
-    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
-    return "\n".join(line.split("//")[0] for line in text.splitlines())
+    """Убирает `//…` и `/*…*/` за один проход слева направо.
+
+    Порядок важен: в шаблонах есть строки вида `… out 395 //**`, и если
+    сначала искать `/*…*/`, «блок» откроется внутри строчного комментария и
+    съест всё до ближайшего `*/` (раньше так пропадало полсотни функций
+    Graph2d.tpl, например EnableControl2d и LBClearList)."""
+    out, i, n = [], 0, len(text)
+    in_str = False
+    while i < n:
+        c = text[i]
+        if in_str:
+            out.append(c)
+            if c == '"' or c == "\n":
+                in_str = False
+            i += 1
+        elif c == '"':
+            in_str = True
+            out.append(c)
+            i += 1
+        elif text.startswith("//", i):
+            j = text.find("\n", i)
+            i = n if j < 0 else j
+        elif text.startswith("/*", i):
+            j = text.find("*/", i + 2)
+            skipped = text[i:n if j < 0 else j + 2]
+            out.append("\n" * skipped.count("\n"))
+            i = n if j < 0 else j + 2
+        else:
+            out.append(c)
+            i += 1
+    return "".join(out)
 
 
 def parse_args(spec):

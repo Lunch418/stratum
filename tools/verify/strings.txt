@@ -1,0 +1,9 @@
+# строки: нумерация позиций и крайние случаи
+pos1          | Pos("Stratum Computer", "Computer", 1)
+pos3          | Pos("Computer Computer Computer Computer", "Computer", 3)
+pos_none      | Pos("abc", "x", 1)
+substr        | s:Substr("Stratum Computer 3.0", 8, 9)
+left          | s:Left("Stratum Computer", 7)
+right         | s:Right("Stratum Computer", 8)
+length        | Length("Stratum")
+upper_cyr     | s:Upper("скорость")

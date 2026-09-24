@@ -22,6 +22,7 @@ fn main() -> ExitCode {
         Some("render") => cmd_render(&args[1..]),
         Some("play") => cmd_play(&args[1..]),
         Some("convert") => cmd_convert(&args[1..]),
+        Some("bytecode") => cmd_bytecode(&args[1..]),
         Some("--help") | Some("-h") | None => {
             usage();
             Ok(())
@@ -467,6 +468,126 @@ fn collect(dir: &Path, out: &mut Vec<PathBuf>) -> std::io::Result<()> {
         } else if path.extension().is_some_and(|e| e.eq_ignore_ascii_case("cls")) {
             out.push(path);
         }
+    }
+    Ok(())
+}
+
+/// Сверка нашего компилятора с компилятором оригинала: каждый `.cls` в
+/// папке компилируется заново и сравнивается с его секцией 0x0d слово в
+/// слово. `--show N` — вывести первые N расхождений подробно.
+fn cmd_bytecode(args: &[String]) -> Result<(), String> {
+    use stratum_core::lang::compile::{compile, Env, ImageFunction, Ty};
+    let mut dir = None;
+    let mut show = 0usize;
+    let mut filter = String::new();
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--show" => {
+                i += 1;
+                show = args.get(i).and_then(|v| v.parse().ok()).unwrap_or(5);
+            }
+            "--only" => {
+                i += 1;
+                filter = args.get(i).cloned().unwrap_or_default();
+            }
+            other => dir = Some(PathBuf::from(other)),
+        }
+        i += 1;
+    }
+    let dir = dir.ok_or("нужна папка с .cls")?;
+    let mut files = Vec::new();
+    fn walk(d: &std::path::Path, out: &mut Vec<PathBuf>) {
+        let Ok(rd) = std::fs::read_dir(d) else { return };
+        for e in rd.flatten() {
+            let p = e.path();
+            if p.is_dir() {
+                walk(&p, out);
+            } else if p.extension().is_some_and(|x| x.eq_ignore_ascii_case("cls")) {
+                out.push(p);
+            }
+        }
+    }
+    walk(&dir, &mut files);
+    files.sort();
+    // имиджи-функции всех найденных .cls: параметры (флаг 0x200) и результат
+    let mut image_functions: std::collections::HashMap<String, ImageFunction> = Default::default();
+    for f in &files {
+        let Ok(data) = std::fs::read(f) else { continue };
+        let Ok(cls) = formats::cls::parse(&data, "") else { continue };
+        let Ok(model) = lang::parse(&cls.text) else { continue };
+        if model.is_function {
+            image_functions.entry(lang::fold(&cls.name)).or_insert_with(|| lang::compile::image_function(&cls, &model));
+        }
+    }
+    let (mut same, mut differ, mut failed, mut skipped, mut shown) = (0, 0, 0, 0, 0);
+    let mut reasons: std::collections::BTreeMap<String, usize> = Default::default();
+    let mut seen = std::collections::HashSet::new();
+    for f in &files {
+        let Ok(data) = std::fs::read(f) else { continue };
+        let Ok(cls) = formats::cls::parse(&data, &f.display().to_string()) else { continue };
+        let Some(bc) = &cls.bytecode else {
+            skipped += 1;
+            continue;
+        };
+        // одинаковые имиджи из разных примеров считаем один раз
+        if !seen.insert((cls.text.clone(), bc.clone())) {
+            continue;
+        }
+        if !filter.is_empty() && !f.display().to_string().contains(&filter) {
+            continue;
+        }
+        let original: Vec<u16> = bc.chunks(2).map(|c| u16::from_le_bytes([c[0], c[1]])).collect();
+        let known: Vec<(String, Ty)> = cls.vars.iter().map(|v| (v.name.clone(), Ty::from_name(&v.var_type))).collect();
+        let model = match lang::parse(&cls.text) {
+            Ok(m) => m,
+            Err(e) => {
+                failed += 1;
+                *reasons.entry(format!("разбор: {}", e.message)).or_default() += 1;
+                continue;
+            }
+        };
+        let constants = |n: &str| stratum_core::runtime::constants::lookup(n);
+        let functions = |n: &str| image_functions.get(&lang::fold(n)).cloned();
+        let env = |fold_minus| Env { constant: &constants, function: &functions, fold_minus };
+        // сворачивание `-число` в корпусе встречается в обоих вариантах
+        let result = compile(&model, &known, &env(true)).and_then(|a| {
+            if a.code == original {
+                Ok(a)
+            } else {
+                compile(&model, &known, &env(false)).map(|b| if b.code == original { b } else { a })
+            }
+        });
+        match result {
+            Ok(c) if c.code == original => same += 1,
+            Ok(c) => {
+                differ += 1;
+                let at = c.code.iter().zip(&original).position(|(a, b)| a != b).unwrap_or(c.code.len().min(original.len()));
+                *reasons.entry(format!("расхождение, оригинал: {:?}", &original[at.saturating_sub(0)..(at + 2).min(original.len())])).or_default() += 1;
+                if shown < show {
+                    shown += 1;
+                    println!("== {}\n{}\nпеременные: {:?}", f.display(), cls.text.trim(), known.iter().map(|(n, t)| format!("{n}:{}", t.name())).collect::<Vec<_>>());
+                    println!("ядро:     {:?}", c.code);
+                    println!("оригинал: {:?}", original);
+                    println!("первое расхождение в слове {at}\n");
+                }
+            }
+            Err(e) => {
+                failed += 1;
+                *reasons.entry(e.message.split(':').next().unwrap_or("").to_string() + ": " + e.message.split(':').nth(1).unwrap_or("").trim()).or_default() += 1;
+                if shown < show && filter.len() > 0 {
+                    shown += 1;
+                    println!("== {} — ошибка: {} (строка {})", f.display(), e.message, e.line);
+                }
+            }
+        }
+    }
+    let total = same + differ + failed;
+    println!("совпало слово в слово: {same} из {total}; расходится: {differ}; не скомпилировано: {failed}; без байт-кода: {skipped}");
+    let mut top: Vec<_> = reasons.into_iter().collect();
+    top.sort_by(|a, b| b.1.cmp(&a.1));
+    for (r, n) in top.iter().take(25) {
+        println!("  {n:4}  {r}");
     }
     Ok(())
 }

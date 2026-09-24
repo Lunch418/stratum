@@ -2,7 +2,7 @@
 
 Сведено из таблиц компилятора (`template/*.tpl`: типы аргументов и опкоды) и декомпилированной справки `SC3.HLP` (описания).
 
-Всего имён: 960. Из них в обоих источниках: 824, только в таблицах: 111, только в справке: 25.
+Всего имён: 968. Из них в обоих источниках: 840, только в таблицах: 119, только в справке: 9.
 
 ## Функции работы с Ogre 3D (299)
 
@@ -463,10 +463,11 @@
 | [ShowObject2d](../help/topics/ShowObject2d.md) | `ShowObject2d(HANDLE, HANDLE)` | 383 | Функция устанавливает видимость графического объекта. Обратное действие производит функция [HideObject2d](HideObject2d.md). |
 | [SwapObject2d](../help/topics/SwapObject2d.md) | `FLOAT SwapObject2d(HANDLE, HANDLE, HANDLE)` | 356 | Функция меняет два графических объекта местами в Z списке. |
 
-## Без группы (только в таблицах компилятора) (118)
+## Без группы (только в таблицах компилятора) (126)
 
 | Функция | Сигнатуры | Опкод | Описание |
 |---|---|---|---|
+| AddControlText2d | `FLOAT AddControlText2d(HANDLE, HANDLE, STRING)`<br>`FLOAT AddControlText2d(HANDLE, HANDLE, STRING, FLOAT)` | 1105, 1106 |  |
 | AnalyseWord | `STRING AnalyseWord(STRING)` | 895 |  |
 | ApplyTexture3d | `FLOAT ApplyTexture3d(HANDLE, HANDLE, HANDLE, HANDLE, [FLOAT])` | 728 |  |
 | BillboardSet_CreateBillboard | `HANDLE BillboardSet_CreateBillboard(HANDLE, FLOAT, FLOAT, FLOAT)` | 1079 |  |
@@ -502,6 +503,7 @@
 | [Float](../help/topics/Operator_sub.md) | `FLOAT Float(STRING)`<br>`FLOAT float(INTEGER)`<br>`FLOAT FLOAT(HANDLE)`<br>`FLOAT FLOAT(COLORREF)` | 143, 17, 17, 17 | Оператор вычисляет разницу между двумя числами. |
 | FrameGetPos2d | `FLOAT FrameGetPos2d(HANDLE, HANDLE)` | 455 |  |
 | GetActualWidth2d | `FLOAT GetActualWidth2d(HANDLE, HANDLE)` | 242 |  |
+| GetControlText2ds | `FLOAT GetControlText2ds(HANDLE, HANDLE, HANDLE)` | 713 |  |
 | GetControlTextLength2d | `FLOAT GetControlTextLength2d(HANDLE, HANDLE)` | 1103 |  |
 | GetElement | `FLOAT GetElement(FLOAT, [FLOAT])` | 480 |  |
 | GethObject | `HANDLE GethObject()` | 223 |  |
@@ -524,6 +526,10 @@
 | jmp | `jmp()` | 51 |  |
 | jnz | `jnz(FLOAT)`<br>`jnz(HANDLE)` | 52, 110 |  |
 | jz | `jz(FLOAT)`<br>`jz(HANDLE)` | 53, 111 |  |
+| LBGetCount | `FLOAT LBGetCount(HANDLE, HANDLE)` | 467 |  |
+| LBGetSelIndex | `FLOAT LBGetSelIndex(HANDLE, HANDLE)` | 468 |  |
+| LBGetSelIndexs | `HANDLE LBGetSelIndexs(HANDLE, HANDLE)` | 1114 |  |
+| LBInsertString | `FLOAT LBInsertString(HANDLE, HANDLE, STRING, FLOAT)` | 463 |  |
 | LoadProject | `FLOAT LoadProject(STRING)` | 720 |  |
 | Lower | `STRING Lower(STRING)` | 130 |  |
 | Ltrim | `STRING Ltrim(STRING)` | 137 |  |
@@ -565,6 +571,8 @@
 | SendData | `FLOAT SendData(STRING, FLOAT)` | 1127 |  |
 | SendUserResult | `FLOAT SendUserResult(HANDLE)`<br>`FLOAT SendUserResult(HANDLE, HANDLE)` | 879, 886 |  |
 | SetActiveProject | `FLOAT SetActiveProject(STRING)` | 722 |  |
+| SetControlText2ds | `FLOAT SetControlText2ds(HANDLE, HANDLE, HANDLE)` | 714 |  |
+| SetControlTextColor2d | `FLOAT SetControlTextColor2d(HANDLE, HANDLE, COLORREF)` | 1102 |  |
 | SetDibPixel2d | `FLOAT SetDibPixel2d(HANDLE, HANDLE, FLOAT, FLOAT, COLORREF)` | 1125 |  |
 | SetElement | `FLOAT SetElement(FLOAT, [FLOAT])` | 481 |  |
 | SetHyperJump2d | `FLOAT SetHyperJump2d(HANDLE, HANDLE, FLOAT, [STRING])` | 755 |  |
@@ -921,25 +929,25 @@
 
 | Функция | Сигнатуры | Опкод | Описание |
 |---|---|---|---|
-| [CheckDlgButton2d](../help/topics/CheckDlgButton2d.md) | `FLOAT CheckDlgButton2d(HANDLE HSpace, HANDLE HObject, FLOAT State)` |  | Функция устанавливает кнопки CHECKBUTTON, RADIOBUTTON, 3STATEBUTTON в одно из состояний -"включено", "выключено" (и "неопределенное" для 3STATEBUTTON) |
+| [CheckDlgButton2d](../help/topics/CheckDlgButton2d.md) | `FLOAT CheckDlgButton2d(HANDLE, HANDLE, FLOAT)` | 393 | Функция устанавливает кнопки CHECKBUTTON, RADIOBUTTON, 3STATEBUTTON в одно из состояний -"включено", "выключено" (и "неопределенное" для 3STATEBUTTON) |
 | [CreateControlObject2d](../help/topics/CreateControlObject2d.md) | `CreateControlObject2d(HANDLE, STRING, STRING, FLOAT)` |  | Функция создает в указанном графическом пространстве интерфейсный Windows объект (см. [интерфейсные элементы](Control_objects.md)). |
 | [DbSetControlTable](../help/topics/DbSetControlTable.md) | `FLOAT DbSetControlTable(HANDLE, HANDLE, HANDLE, STRING)` | 581 |  |
-| [EnableControl2d](../help/topics/EnableControl2d.md) | `FLOAT EnableControl2d (HANDLE HSpace, HANDLE HObject, FLOAT State)` |  | Функция устанавливает состояние интерфейсного элемента - "активирован", "неактивирован". |
-| [GetControlStyle2d](../help/topics/GetControlStyle2d.md) | `FLOAT GetControlStyle2d (HANDLE HSpace, HANDLE HObject)` |  | Функция позволяет получить текущий стиль указанного [интерфейсного элемента](Control_objects.md). |
+| [EnableControl2d](../help/topics/EnableControl2d.md) | `FLOAT EnableControl2d(HANDLE, HANDLE, FLOAT)` | 395 | Функция устанавливает состояние интерфейсного элемента - "активирован", "неактивирован". |
+| [GetControlStyle2d](../help/topics/GetControlStyle2d.md) | `FLOAT GetControlStyle2d(HANDLE, HANDLE)` | 461 | Функция позволяет получить текущий стиль указанного [интерфейсного элемента](Control_objects.md). |
 | [GetControlText2d](../help/topics/GetControlText2d.md) | `STRING GetControlText2d(HANDLE, HANDLE)`<br>`STRING GetControlText2d(HANDLE, HANDLE, FLOAT, FLOAT)` | 391, 1104 | Функция возвращает текст или его часть, содержащийся в указанном [интерфейсном элементе](Control_objects.md) (только для EDIT, BUTTON, COMBOBOX). |
-| [IsDlgButtonChecked2d](../help/topics/IsDlgButtonChecked2d.md) | `FLOAT IsDlgButtonChecked2d (HANDLE HSpace, HANDLE HObject)` |  | Функция проверяет текущее состояние кнопок типа CHECKBUTTON, RADIOBUTTON, 3STATEBUTTON. |
-| [LBAddString](../help/topics/LBAddString.md) | `FLOAT LBAddString (HANDLE HSpace, HANDLE HObject, STRING Text)` |  | Функция добавляет строку в конец списка (только для LISTBOX и COMBOBOX). |
-| [LBClearList](../help/topics/LBClearList.md) | `FLOAT LBClearList (HANDLE HSpace, HANDLE HObject)` |  | Функция удаляет все строки из списка (только для LISTBOX и COMBOBOX). |
-| [LBDeleteString](../help/topics/LBDeleteString.md) | `FLOAT LBDeleteString (HANDLE HSpace, HANDLE HObject, FLOAT Number)` |  | Функция удаляет строку из списка с заданным номером (только для LISTBOX и COMBOBOX). |
-| [LBFindString](../help/topics/LBFindString.md) | `FLOAT LBFindString (HANDLE HSpace, HANDLE HObject, STRING Text, FLOAT Number)` |  | Функция ищет, начиная с заданного номера в списке строк, строку, содержащую указанный текст, и возвращает ее номер (только для LISTBOX и COMBOBOX). |
-| [LBFindStringExact](../help/topics/LBFindStringExact.md) | `FLOAT LBFindStringExact (HANDLE HSpace, HANDLE HObject, STRING Text, FLOAT Number)` |  | Функция ищет, начиная с заданного номера в списке строк, строку содержащую заданный текст, и возвращает ее номер (только для LISTBOX и COMBOBOX). |
-| [LBGetCaretIndex](../help/topics/LBGetCaretIndex.md) | `FLOAT LBGetCaretIndex (HANDLE HSpace, HANDLE HObject)` |  | Функция возвращает номер строки в списке, выбранной пользователем (отмечается синим цветом) (только для LISTBOX и COMBOBOX). |
-| [LBGetString](../help/topics/LBGetString.md) | `STRING LBGetString (HANDLE HSpace, HANDLE HObject, FLOAT Number)` |  | Функция возвращает строку с указанным номером из списка (только для LISTBOX и COMBOBOX). |
-| [LBSetCaretIndex](../help/topics/LBSetCaretIndex.md) | `FLOAT LBSetCaretIndex (HANDLE HSpace, HANDLE HObject, FLOAT Number)` |  | Функция выделяет (синим цветом) строку в списке с указанным номером (только для LISTBOX и COMBOBOX). |
-| [LBSetSelIndex](../help/topics/LBSetSelIndex.md) | `FLOAT LBSetSelIndex (HANDLE HSpace, HANDLE HObject, FLOAT Number)` |  | Функция выделяет (рамкой) строку в списке с указанным номером (только для LISTBOX и COMBOBOX). |
-| [SetControlFocus2d](../help/topics/SetControlFocus2d.md) | `SetControlFocus2d (HANDLE HSpace, HANDLE HObject)` |  | Функция устанавливает фокус ввода в интерфейсный элемент. |
-| [SetControlFont2d](../help/topics/SetControlFont2d.md) | `FLOAT SetControlFont2d(HANDLE HSpace, HANDLE HObject, , HANDLE HFont)` |  | Функция устанавливает шрифт текста в интерфейсный элемент. |
-| [SetControlStyle2d](../help/topics/SetControlStyle2d.md) | `FLOAT SetControlStyle2d (HANDLE HSpace, HANDLE HObject, FLOAT Style)` |  | Функция устанавливает объекту Windows новый стиль. |
+| [IsDlgButtonChecked2d](../help/topics/IsDlgButtonChecked2d.md) | `FLOAT IsDlgButtonChecked2d(HANDLE, HANDLE)` | 394 | Функция проверяет текущее состояние кнопок типа CHECKBUTTON, RADIOBUTTON, 3STATEBUTTON. |
+| [LBAddString](../help/topics/LBAddString.md) | `FLOAT LBAddString(HANDLE, HANDLE, STRING)` | 462 | Функция добавляет строку в конец списка (только для LISTBOX и COMBOBOX). |
+| [LBClearList](../help/topics/LBClearList.md) | `FLOAT LBClearList(HANDLE, HANDLE)` | 465 | Функция удаляет все строки из списка (только для LISTBOX и COMBOBOX). |
+| [LBDeleteString](../help/topics/LBDeleteString.md) | `FLOAT LBDeleteString(HANDLE, HANDLE, FLOAT)` | 466 | Функция удаляет строку из списка с заданным номером (только для LISTBOX и COMBOBOX). |
+| [LBFindString](../help/topics/LBFindString.md) | `FLOAT LBFindString(HANDLE, HANDLE, STRING, FLOAT)` | 472 | Функция ищет, начиная с заданного номера в списке строк, строку, содержащую указанный текст, и возвращает ее номер (только для LISTBOX и COMBOBOX). |
+| [LBFindStringExact](../help/topics/LBFindStringExact.md) | `FLOAT LBFindStringExact(HANDLE, HANDLE, STRING, FLOAT)` | 473 | Функция ищет, начиная с заданного номера в списке строк, строку содержащую заданный текст, и возвращает ее номер (только для LISTBOX и COMBOBOX). |
+| [LBGetCaretIndex](../help/topics/LBGetCaretIndex.md) | `FLOAT LBGetCaretIndex(HANDLE, HANDLE)` | 470 | Функция возвращает номер строки в списке, выбранной пользователем (отмечается синим цветом) (только для LISTBOX и COMBOBOX). |
+| [LBGetString](../help/topics/LBGetString.md) | `STRING LBGetString(HANDLE, HANDLE, FLOAT)` | 464 | Функция возвращает строку с указанным номером из списка (только для LISTBOX и COMBOBOX). |
+| [LBSetCaretIndex](../help/topics/LBSetCaretIndex.md) | `FLOAT LBSetCaretIndex(HANDLE, HANDLE, FLOAT)` | 471 | Функция выделяет (синим цветом) строку в списке с указанным номером (только для LISTBOX и COMBOBOX). |
+| [LBSetSelIndex](../help/topics/LBSetSelIndex.md) | `FLOAT LBSetSelIndex(HANDLE, HANDLE, FLOAT)` | 469 | Функция выделяет (рамкой) строку в списке с указанным номером (только для LISTBOX и COMBOBOX). |
+| [SetControlFocus2d](../help/topics/SetControlFocus2d.md) | `SetControlFocus2d(HANDLE, HANDLE)` | 1119 | Функция устанавливает фокус ввода в интерфейсный элемент. |
+| [SetControlFont2d](../help/topics/SetControlFont2d.md) | `FLOAT SetControlFont2d(HANDLE, HANDLE, HANDLE)` | 1101 | Функция устанавливает шрифт текста в интерфейсный элемент. |
+| [SetControlStyle2d](../help/topics/SetControlStyle2d.md) | `FLOAT SetControlStyle2d(HANDLE, HANDLE, FLOAT)` | 460 | Функция устанавливает объекту Windows новый стиль. |
 | [SetControlText2d](../help/topics/SetControlText2d.md) | `FLOAT SetControlText2d(HANDLE, HANDLE, STRING)` | 392 | Функция устанавливает новый текст в интерфейсный элемент. (только для EDIT, BUTTON, COMBOBOX). |
 
 ## Функции работы с файлами и папками (16)

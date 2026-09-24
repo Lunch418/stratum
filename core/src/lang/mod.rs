@@ -1,7 +1,9 @@
 //! Язык моделирования Stratum: лексер, парсер, дерево разбора.
 
 pub mod ast;
+pub mod compile;
 pub mod lexer;
+mod opcodes;
 pub mod parser;
 
 pub use ast::{BinOp, Expr, Model, Stmt, UnOp};

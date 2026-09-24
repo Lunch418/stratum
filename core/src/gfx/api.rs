@@ -732,8 +732,35 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
                 _ => None,
             }).unwrap_or(-1.0))
         }
-        "lbgetcaretindex" => num(object(gfx, args).map(|o| match &o.shape { Shape::Control { style, .. } => (*style >> 24) as f64, _ => 0.0 }).unwrap_or(0.0)),
-        "lbsetcaretindex" | "lbsetselindex" => ok(object(gfx, args).is_some()),
+        // выбранная строка списка хранится в старшем байте стиля контрола
+        "lbgetcaretindex" | "lbgetselindex" => num(object(gfx, args).map(|o| match &o.shape {
+            Shape::Control { style, text, .. } if !text.is_empty() => (*style >> 24) as f64,
+            _ => -1.0,
+        }).unwrap_or(-1.0)),
+        "lbsetcaretindex" | "lbsetselindex" => {
+            let i = f(args, 2).clamp(0.0, 255.0) as u32;
+            ok(object_mut(gfx, args).map(|o| if let Shape::Control { style, .. } = &mut o.shape { *style = (*style & 0x00ff_ffff) | (i << 24) }).is_some())
+        }
+        "lbgetcount" => num(object(gfx, args).map(|o| match &o.shape { Shape::Control { text, .. } => text.lines().count() as f64, _ => 0.0 }).unwrap_or(0.0)),
+        "lbinsertstring" => {
+            let (t, at) = (s(args, 2), f(args, 3));
+            num(object_mut(gfx, args).and_then(|o| match &mut o.shape {
+                Shape::Control { text, .. } => {
+                    let mut lines: Vec<String> = text.lines().map(str::to_string).collect();
+                    let i = if at < 0.0 { lines.len() } else { (at as usize).min(lines.len()) };
+                    lines.insert(i, t.clone());
+                    *text = lines.join("\n");
+                    Some(i as f64)
+                }
+                _ => None,
+            }).unwrap_or(-1.0))
+        }
+        "addcontroltext2d" => {
+            let t = s(args, 2);
+            ok(object_mut(gfx, args).map(|o| if let Shape::Control { text, .. } = &mut o.shape { text.push_str(&t) }).is_some())
+        }
+        // цвет текста контрола рисует страница; ядру достаточно принять вызов
+        "setcontroltextcolor2d" => ok(object(gfx, args).is_some()),
         "getcontroltextlength2d" => num(object(gfx, args).map(|o| match &o.shape { Shape::Control { text, .. } => text.chars().count() as f64, _ => 0.0 }).unwrap_or(0.0)),
         "setcontrolfocus2d" | "dbsetcontroltable" => ok(object(gfx, args).is_some()),
 

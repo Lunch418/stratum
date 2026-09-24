@@ -185,6 +185,38 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
         "getstratumdirectory" => text(std::env::current_dir().map(|p| p.display().to_string()).unwrap_or_default()),
         "gettempdirectory" => text(std::env::temp_dir().display().to_string()),
 
+        // ── текст контрола через поток (варианты …2ds) ────────────────────
+        "getcontroltext2ds" | "setcontroltext2ds" | "lbgetselindexs" => {
+            let (sp, obj) = (f(args, 0) as crate::gfx::Handle, f(args, 1) as crate::gfx::Handle);
+            let control = fx.gfx.space_mut(sp).and_then(|s| s.objects.get_mut(&obj));
+            let Some(crate::gfx::Object { shape: crate::gfx::Shape::Control { text, style, .. }, .. }) = control else { return Some(num(0.0)) };
+            match lower.as_str() {
+                "getcontroltext2ds" => {
+                    let bytes = crate::formats::cp1251::encode(text);
+                    match fx.streams.items.get_mut(&(f(args, 2) as u32)) {
+                        Some(st) => {
+                            st.data = bytes;
+                            st.pos = 0;
+                            num(1.0)
+                        }
+                        None => num(0.0),
+                    }
+                }
+                "setcontroltext2ds" => match fx.streams.items.get(&(f(args, 2) as u32)) {
+                    Some(st) => {
+                        *text = crate::formats::cp1251::decode(&st.data);
+                        num(1.0)
+                    }
+                    None => num(0.0),
+                },
+                // выбранные строки списка — поток с номерами через перевод строки
+                _ => {
+                    let sel = if text.is_empty() { String::new() } else { format!("{}\n", *style >> 24) };
+                    Value::Handle(fx.streams.open(Stream { data: sel.into_bytes(), writable: true, ..Default::default() }) as f64)
+                }
+            }
+        }
+
         // ── потоки ───────────────────────────────────────────────────────
         "createstream" => {
             let kind = s(args, 0).to_ascii_uppercase();
