@@ -775,11 +775,11 @@ impl Space {
                 (near || (*brush != 0 && inside_polygon((x, y), points))).then_some(h)
             }
             // растр ловит точку в своём прямоугольнике (края включительно) и
-            // ещё в квадратиках у углов: по каждой оси от floor(угла) − 0,5
-            // до ceil(угла) + 0,5 (сверено в Wine: DIFF, tools/verify/diffhit.txt)
+            // ещё в квадратиках у углов: ближе 1 по каждой оси (сверено в
+            // Wine: DIFF, tools/verify/diffhit.txt)
             Shape::Bitmap { .. } => {
                 let inside = x >= obj.x && x <= obj.x + obj.w && y >= obj.y && y <= obj.y + obj.h;
-                let near = |p: f64, c: f64| p >= c.floor() - 0.5 && p <= c.ceil() + 0.5;
+                let near = |p: f64, c: f64| (p - c).abs() < 1.0;
                 let corner = (near(x, obj.x) || near(x, obj.x + obj.w)) && (near(y, obj.y) || near(y, obj.y + obj.h));
                 (inside || corner).then_some(h)
             }
@@ -1189,6 +1189,9 @@ mod hit_tests {
         sp.objects.get_mut(&1).unwrap().y = 87.398;
         assert_eq!(sp.object_at(352.718, 93.7316), Some(1));
         assert_eq!(sp.object_at(352.2, 90.0), None);
+        sp.objects.get_mut(&1).unwrap().x = 303.04;
+        sp.objects.get_mut(&1).unwrap().y = 103.669;
+        assert_eq!(sp.object_at(302.491, 110.538), Some(1));
         sp.objects.get_mut(&1).unwrap().x = 192.0;
         sp.objects.get_mut(&1).unwrap().y = 128.0;
         assert_eq!(sp.object_at(195.0, 135.5), None);
