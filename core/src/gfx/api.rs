@@ -1093,17 +1093,33 @@ fn embed_children(gfx: &mut Gfx, sp: Handle, class: &str) {
             _ => continue,
         }
         // рисунок из одного объекта ложится в группу значка как есть; из
-        // нескольких — в обёртку, которая получает номер раньше объектов
-        // (сверено в Wine: «Солнечная система», tools/verify/zorder.txt)
+        // нескольких — в обёртку (сверено в Wine: «Солнечная система»,
+        // tools/verify/zorder.txt)
         let single = pic.objects.iter().filter(|o| !pic.objects.iter().any(|g| matches!(&g.kind, crate::formats::vdr::ObjectKind::Group { children } if children.contains(&o.handle)))).count() == 1;
-        let wrapper = if single {
-            None
-        } else {
-            let w = super::lowest_free(&space.objects);
-            space.objects.insert(w, Object::new(w, 0.0, 0.0, 0.0, 0.0, Shape::Group { children: Vec::new() }));
-            Some(w)
-        };
+        // обёртка — группа внутри рисунка с наименьшим свободным в нём номером;
+        // затем объекты рисунка вместе с ней получают номера окна по порядку
+        // своих номеров: у NumberView (объекты 2, 3) обёртка раньше объектов,
+        // у VSlider1 (объекты 1–13) — после (сверено в Wine: «Солнечная
+        // система», L1, tools/verify/embedorder.txt)
+        let mut pic = pic;
+        if !single {
+            use crate::formats::vdr::{Object as VObject, ObjectKind};
+            let used: std::collections::BTreeSet<u16> = pic.objects.iter().map(|o| o.handle).collect();
+            let w = (1..=u16::MAX).find(|h| !used.contains(h)).unwrap_or(u16::MAX);
+            let tops: Vec<u16> = pic.objects.iter().filter(|o| !pic.objects.iter().any(|g| matches!(&g.kind, ObjectKind::Group { children } if children.contains(&o.handle)))).map(|o| o.handle).collect();
+            pic.objects.push(VObject { handle: w, name: String::new(), flags: 0, kind: ObjectKind::Group { children: tops } });
+        }
         let (top, zorder) = insert_objects(space, &pic);
+        let (wrapper, top) = if single {
+            (None, top)
+        } else {
+            let w = top[0];
+            let inner = match space.objects.get(&w).map(|o| &o.shape) {
+                Some(Shape::Group { children }) => children.clone(),
+                _ => Vec::new(),
+            };
+            (Some(w), inner)
+        };
         // габарит ломаных рисунка пересчитывается по точкам: в файле он
         // с запасом в единицу (сверено в Wine: BALLS, круг 31 → 30)
         for h in &zorder {
