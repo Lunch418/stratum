@@ -117,3 +117,34 @@ fn cross_origin_post_is_rejected_even_with_token() {
     let r = request(port, "POST", "/event?type=key", &[("Origin", format!("http://127.0.0.1:{port}")), cookie]);
     assert_eq!(r.status, 200, "{}", r.text);
 }
+
+/// Запрос с объявленным телом, которое так и не приходит: ответ должен
+/// прийти сразу, без выделения памяти под тело и без ожидания.
+fn request_with_unsent_body(port: u16, method: &str, target: &str, headers: &[(&str, String)], length: usize) -> Reply {
+    let mut stream = TcpStream::connect(("127.0.0.1", port)).expect("нет соединения");
+    stream.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+    let mut req = format!("{method} {target} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\n");
+    for (k, v) in headers {
+        req.push_str(&format!("{k}: {v}\r\n"));
+    }
+    req.push_str(&format!("Content-Length: {length}\r\n\r\n"));
+    stream.write_all(req.as_bytes()).unwrap();
+    let mut raw = Vec::new();
+    let _ = stream.read_to_end(&mut raw);
+    let text = String::from_utf8_lossy(&raw).into_owned();
+    let status = text.split_whitespace().nth(1).and_then(|s| s.parse().ok()).unwrap_or(0);
+    Reply { status, text }
+}
+
+#[test]
+fn body_of_rejected_request_is_not_awaited() {
+    let (port, token) = start();
+    let big = 30 << 20;
+    // без токена: 401 сразу, тело не читается
+    assert_eq!(request_with_unsent_body(port, "POST", "/api/save", &[], big).status, 401);
+    // чужой Origin даже с токеном: 403 сразу
+    let r = request_with_unsent_body(port, "POST", "/api/save", &[("Origin", "http://evil.example".into()), token_header(&token)], big);
+    assert_eq!(r.status, 403, "{}", r.text);
+    // не-API без токена: тело тоже не ждётся
+    assert_eq!(request_with_unsent_body(port, "POST", "/", &[], big).status, 405);
+}

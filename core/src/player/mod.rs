@@ -464,12 +464,12 @@ pub fn serve_with(opts: Options, on_ready: impl FnOnce(u16, &str)) -> Result<(),
     std::thread::spawn(move || loop {
         let started = Instant::now();
         let fps = {
-            let mut s = worker.lock().unwrap();
+            let mut s = worker.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             while let Some(ev) = s.events.pop_front() {
-                apply_event(&mut s, ev);
+                guarded(&mut s, |s| apply_event(s, ev));
             }
             if s.running && !s.sim.stopped && s.error.is_none() {
-                s.advance();
+                guarded(&mut s, Shared::advance);
             }
             s.fps
         };
@@ -499,15 +499,48 @@ pub fn serve_with(opts: Options, on_ready: impl FnOnce(u16, &str)) -> Result<(),
             let _ = stream.write_all(b"HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
             continue;
         }
-        active.fetch_add(1, Ordering::SeqCst);
-        let (shared, server, active) = (Arc::clone(&shared), Arc::clone(&server), Arc::clone(&active));
+        let slot = Slot::take(&active);
+        let (shared, server) = (Arc::clone(&shared), Arc::clone(&server));
         std::thread::spawn(move || {
+            // место освобождается и при панике обработчика (Drop)
+            let _slot = slot;
             let _ = stream.set_read_timeout(Some(Duration::from_secs(30)));
-            let _ = handle(stream, &shared, &server);
-            active.fetch_sub(1, Ordering::SeqCst);
+            let handled = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| handle(stream, &shared, &server)));
+            if handled.is_err() {
+                // паника под замком отравила бы общее состояние навсегда:
+                // этот запрос потерян, остальные работают дальше
+                shared.clear_poison();
+            }
         });
     }
     Ok(())
+}
+
+/// Занятое соединение: счётчик уменьшается при любом выходе из потока.
+struct Slot(Arc<std::sync::atomic::AtomicUsize>);
+
+impl Slot {
+    fn take(active: &Arc<std::sync::atomic::AtomicUsize>) -> Slot {
+        active.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        Slot(Arc::clone(active))
+    }
+}
+
+impl Drop for Slot {
+    fn drop(&mut self) {
+        self.0.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
+/// Паника ядра на данных модели (испорченный файл, непредусмотренный
+/// случай) не должна отравлять общее состояние и останавливать сервер:
+/// модель останавливается с ошибкой, IDE продолжает работать.
+fn guarded(s: &mut Shared, f: impl FnOnce(&mut Shared)) {
+    if let Err(p) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(s))) {
+        let msg = p.downcast_ref::<&str>().map(|m| m.to_string()).or_else(|| p.downcast_ref::<String>().cloned()).unwrap_or_default();
+        s.running = false;
+        s.error = Some(format!("внутренняя ошибка ядра: {msg}"));
+    }
 }
 
 fn apply_event(s: &mut Shared, ev: Event) {
@@ -673,15 +706,6 @@ fn handle(mut stream: TcpStream, shared: &Arc<Mutex<Shared>>, server: &Server) -
         }
         guard::Headers::read(&line, &mut headers);
     }
-    if content_length > MAX_BODY {
-        return reply(&mut stream, "413 Payload Too Large", "text/plain", b"", None);
-    }
-    let mut body_bytes = vec![0; content_length];
-    if content_length > 0 {
-        reader.read_exact(&mut body_bytes)?;
-    }
-    let body_text = String::from_utf8_lossy(&body_bytes).into_owned();
-
     let (path, query) = match target.split_once('?') {
         Some((p, q)) => (p.to_string(), q.to_string()),
         None => (target.clone(), String::new()),
@@ -699,6 +723,17 @@ fn handle(mut stream: TcpStream, shared: &Arc<Mutex<Shared>>, server: &Server) -
     if is_api && !authorized {
         return reply(&mut stream, "401 Unauthorized", "application/json; charset=utf-8", "{\"error\":\"нет токена сессии: откройте IDE по ссылке из консоли\"}".as_bytes(), None);
     }
+    // тело читается только после проверок: иначе любая страница в браузере
+    // заставляла бы сервер выделять и ждать до MAX_BODY на каждое соединение
+    if content_length > MAX_BODY {
+        return reply(&mut stream, "413 Payload Too Large", "text/plain", b"", None);
+    }
+    let mut body_bytes = Vec::new();
+    if authorized && content_length > 0 {
+        body_bytes = vec![0; content_length];
+        reader.read_exact(&mut body_bytes)?;
+    }
+    let body_text = String::from_utf8_lossy(&body_bytes).into_owned();
 
     let (status, mime, body): (&str, &str, Vec<u8>) = match (method.as_str(), path.as_str()) {
         ("GET", "/frame") => ("200 OK", "application/json; charset=utf-8", frame_json(shared).into_bytes()),
@@ -784,7 +819,9 @@ fn reply(stream: &mut TcpStream, status: &str, mime: &str, body: &[u8], set_cook
 fn static_file(dir: Option<&std::path::Path>, path: &str) -> Option<(&'static str, Vec<u8>)> {
     let dir = dir?;
     let rel = path.trim_start_matches('/');
-    if rel.is_empty() || rel.contains("..") {
+    // «:» и «\» — диск и разделитель Windows: `dir.join("C:/…")` там дал бы
+    // абсолютный путь в обход папки
+    if rel.is_empty() || rel.contains("..") || rel.contains(':') || rel.contains('\\') || std::path::Path::new(rel).is_absolute() {
         return None;
     }
     let file = dir.join(rel);
@@ -814,7 +851,11 @@ pub(crate) fn url_decode(s: &str) -> String {
     while i < bytes.len() {
         match bytes[i] {
             b'%' if i + 2 < bytes.len() => {
-                if let Ok(v) = u8::from_str_radix(&s[i + 1..i + 3], 16) {
+                // по байтам: после «%» может стоять не ASCII, и срез строки
+                // по индексу i + 3 разрезал бы букву (паника)
+                let hex = |b: u8| (b as char).to_digit(16);
+                if let (Some(h), Some(l)) = (hex(bytes[i + 1]), hex(bytes[i + 2])) {
+                    let v = (h * 16 + l) as u8;
                     out.push(v);
                     i += 3;
                     continue;
@@ -995,4 +1036,85 @@ fn describe_error(sim: &Simulation, e: &crate::sim::interp::RuntimeError) -> Str
         out = format!("{out} (строка {})", e.line);
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn url_decode_survives_broken_escapes() {
+        assert_eq!(url_decode("a%20b+c"), "a b c");
+        assert_eq!(url_decode("%D0%96"), "Ж");
+        // «%» и сразу не-ASCII: раньше срез строки паниковал
+        assert_eq!(url_decode("%aЖ"), "%aЖ");
+        assert_eq!(url_decode("%Жa"), "%Жa");
+        assert_eq!(url_decode("%+1"), "% 1");
+        assert_eq!(url_decode("100%"), "100%");
+    }
+
+    #[test]
+    fn static_files_stay_inside_build_folder() {
+        let dir = std::env::temp_dir().join(format!("stratum-static-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("index.html"), "ok").unwrap();
+        assert!(static_file(Some(&dir), "/index.html").is_some());
+        for bad in ["/../etc/passwd", "/C:/Windows/win.ini", "/C:\\Windows\\win.ini", "//etc/passwd", "/\\\\server\\share\\x"] {
+            assert!(static_file(Some(&dir), bad).is_none(), "{bad}");
+        }
+        let _ = std::fs::remove_file(dir.join("index.html"));
+        let _ = std::fs::remove_dir(&dir);
+    }
+
+    #[test]
+    fn slot_is_released_when_handler_panics() {
+        let active = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let slot = Slot::take(&active);
+        assert_eq!(active.load(std::sync::atomic::Ordering::SeqCst), 1);
+        let _ = std::thread::spawn(move || {
+            let _slot = slot;
+            panic!("обработчик упал");
+        })
+        .join();
+        assert_eq!(active.load(std::sync::atomic::Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn panic_in_model_stops_it_without_poisoning() {
+        let project = empty_project();
+        let sim = Simulation::build(&project).unwrap();
+        let shared = Arc::new(Mutex::new(Shared {
+            libraries: Vec::new(),
+            empty: true,
+            sim,
+            past: VecDeque::new(),
+            breakpoints: Vec::new(),
+            next_breakpoint: 1,
+            halt: None,
+            dialog: None,
+            resume_after_dialog: false,
+            dialog_answers: Vec::new(),
+            hyper_events: Vec::new(),
+            traces: Vec::new(),
+            next_trace: 1,
+            running: true,
+            fps: 30,
+            math_mode: 0,
+            events: VecDeque::new(),
+            error: None,
+            project,
+            models: HashMap::new(),
+            dirty: false,
+            unsaved: false,
+            history: Vec::new(),
+            future: Vec::new(),
+        }));
+        {
+            let mut s = shared.lock().unwrap();
+            guarded(&mut s, |_| panic!("испорченный растр"));
+            assert!(!s.running);
+            assert!(s.error.as_deref().is_some_and(|e| e.contains("испорченный растр")));
+        }
+        assert!(!shared.is_poisoned());
+    }
 }
