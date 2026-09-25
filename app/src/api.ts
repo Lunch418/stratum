@@ -47,6 +47,10 @@ export interface ObjectProps {
   hyper?: { mode: number; target: string; window: string; object: string; effect: string };
   /// члены группы и исходный прямоугольник растра
   members?: number[]; src?: [number, number, number, number];
+  /// проекция 3D (CreateView3d): камера и материалы её 3D-пространства
+  view3d?: { space: number; objects: number;
+    camera: { handle: number; name: string; pos: number[]; target: number[]; up: number[]; focus: number; extent: number } | null;
+    materials: { handle: number; name: string; color: string }[] };
 }
 export interface ParseError { line: number; column: number; message: string }
 

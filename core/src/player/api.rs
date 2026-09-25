@@ -1209,7 +1209,21 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
                 }
             };
             let Some(o) = handle.and_then(|h| space.objects.get(&h)) else { return json("null".into()) };
-            json(object_json(space, o))
+            let mut out = object_json(space, o);
+            // проекция 3D: камера и материалы её пространства (закладки «Проекция 3D», «Материалы»)
+            if let crate::gfx::Shape::View3d { space: s3, camera } = &o.shape {
+                if let Some(sp3) = gfx.spaces3d.get(s3) {
+                    let v = |p: [f64; 3]| format!("[{},{},{}]", num(p[0]), num(p[1]), num(p[2]));
+                    let cam = sp3.cameras.get(camera).map(|c| format!(
+                        "{{\"handle\":{},\"name\":{},\"pos\":{},\"target\":{},\"up\":{},\"focus\":{},\"extent\":{}}}",
+                        c.handle, json_string(&c.name), v(c.pos), v(c.target), v(c.up), num(c.focus), num(c.extent)
+                    )).unwrap_or("null".into());
+                    let mats: Vec<String> = sp3.materials.iter().map(|(h, (n, c))| format!("{{\"handle\":{h},\"name\":{},\"color\":{}}}", json_string(n), json_string(&svg::color(*c)))).collect();
+                    out.pop();
+                    out.push_str(&format!(",\"view3d\":{{\"space\":{s3},\"objects\":{},\"camera\":{cam},\"materials\":[{}]}}}}", sp3.objects.len(), mats.join(",")));
+                }
+            }
+            json(out)
         }
         ("POST", ["object", "set"]) => {
             let get = |k: &str| super::param(query, k).map(super::url_decode);
@@ -1218,6 +1232,33 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
             };
             let mut s = shared.lock().unwrap();
             let gfx = &mut s.sim.effects.gfx;
+            // камера и материалы проекции 3D: camera.pos|target|up = «x,y,z», camera.focus|extent, material.<handle> = цвет
+            if field.starts_with("camera.") || field.starts_with("material.") {
+                let view = gfx.window_space(&win).and_then(|h| gfx.space(h)).and_then(|sp| sp.objects.get(&handle)).and_then(|o| match o.shape {
+                    crate::gfx::Shape::View3d { space, camera } => Some((space, camera)),
+                    _ => None,
+                });
+                let Some((s3, cam)) = view else { return error("400 Bad Request", "объект — не проекция 3D") };
+                let Some(sp3) = gfx.spaces3d.get_mut(&s3) else { return error("404 Not Found", "нет 3D-пространства") };
+                let xyz: Vec<f64> = value.split(',').filter_map(|p| p.trim().parse().ok()).collect();
+                let done = if let Some(m) = field.strip_prefix("material.") {
+                    let h = m.parse().unwrap_or(0);
+                    sp3.materials.get_mut(&h).map(|mat| mat.1 = parse_color(&value)).is_some()
+                } else if let Some(c) = sp3.cameras.get_mut(&cam) {
+                    let v3 = (xyz.len() == 3).then(|| [xyz[0], xyz[1], xyz[2]]);
+                    match (field.as_str(), v3) {
+                        ("camera.pos", Some(v)) => { c.pos = v; true }
+                        ("camera.target", Some(v)) => { c.target = v; true }
+                        ("camera.up", Some(v)) => { c.up = v; true }
+                        ("camera.focus", _) => value.parse().map(|f: f64| c.focus = f.max(0.0)).is_ok(),
+                        ("camera.extent", _) => value.parse().map(|f: f64| c.extent = f.max(0.0)).is_ok(),
+                        _ => false,
+                    }
+                } else {
+                    false
+                };
+                return json(format!("{{\"ok\":{done}}}"));
+            }
             let Some(space) = gfx.window_space(&win).and_then(|h| gfx.space_mut(h)) else { return error("404 Not Found", "нет такого окна") };
             let done = set_object_field(space, handle, &field, &value);
             json(format!("{{\"ok\":{done}}}"))

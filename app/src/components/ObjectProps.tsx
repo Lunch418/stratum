@@ -86,6 +86,31 @@ export function ObjectProps() {
             {(o.class === 'CHECKBOX' || o.class === 'RADIOBUTTON') && <label className="check"><input type="checkbox" checked={!!o.checked} onChange={e => set('checked', e.target.checked ? 1 : 0)} />отмечен</label>}
           </div>
         )}
+        {o.view3d && (
+          <details open>
+            <summary className="muted small">Проекция 3D · пространство #{o.view3d.space}, объектов {o.view3d.objects}</summary>
+            {o.view3d.camera ? <>
+              <div className="muted small">Камера #{o.view3d.camera.handle}{o.view3d.camera.name ? ' · ' + o.view3d.camera.name : ''}</div>
+              {(['pos', 'target', 'up'] as const).map(k => (
+                <label key={k} className="prop"><span>{{ pos: 'Положение', target: 'Цель', up: 'Верх' }[k]}</span>
+                  <input type="text" className="mono" defaultValue={o.view3d!.camera![k].join(', ')} key={k + o.view3d!.camera![k].join()}
+                    onBlur={e => e.target.value !== o.view3d!.camera![k].join(', ') && set('camera.' + k, e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} /></label>
+              ))}
+              <div className="prop-grid">
+                <label className="prop"><span>Фокус</span><input type="number" className="mono" defaultValue={o.view3d.camera.focus} key={'f' + o.view3d.camera.focus} onBlur={e => set('camera.focus', e.target.value)} title="0 — ортогональная проекция" /></label>
+                <label className="prop"><span>Кадр</span><input type="number" className="mono" defaultValue={o.view3d.camera.extent} key={'x' + o.view3d.camera.extent} onBlur={e => set('camera.extent', e.target.value)} title="Половина ширины кадра; 0 — по сцене" /></label>
+              </div>
+            </> : <div className="muted small">Камеры нет.</div>}
+          </details>
+        )}
+        {o.view3d && o.view3d.materials.length > 0 && (
+          <details>
+            <summary className="muted small">Материалы ({o.view3d.materials.length})</summary>
+            {o.view3d.materials.map(m => (
+              <label key={m.handle} className="prop"><span>{m.name || '#' + m.handle}</span><input type="color" value={m.color} onChange={e => set('material.' + m.handle, e.target.value)} /></label>
+            ))}
+          </details>
+        )}
         <details open={!!o.hyper}>
           <summary className="muted small">Гипербаза{o.hyper ? ' · ' + (o.hyper.target || '—') : ''}</summary>
           <HyperFields o={o} set={set} />
