@@ -436,8 +436,11 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
         // файловые диалоги: заголовок, путь/имя по умолчанию, фильтр расширений
         "fileloaddialog" | "filesavedialog" | "chosefolderdialog" | "choosefolderdialog" => {
             let kind = match lower.as_str() { "filesavedialog" => "save", "fileloaddialog" => "open", _ => "folder" };
+            // без пользователя — имя по умолчанию (третий аргумент), как «OK»
+            // в окне оригинала; пустое имя — «Отмена», пустая строка
+            // (сверено в Wine: VIDEO, FileDialog)
             let d = s(args, 1);
-            fx.ask(super::builtins::DialogRequest { kind, title: s(args, 0), text: s(args, 2), style: 0, default: d.clone() }, text(d))
+            fx.ask(super::builtins::DialogRequest { kind, title: s(args, 0), text: s(args, 2), style: 0, default: d }, text(s(args, 2)))
         }
         "chosecolordialog" => {
             let c = f(args, 1);

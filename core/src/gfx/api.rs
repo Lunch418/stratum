@@ -987,24 +987,35 @@ fn text_extent(sp: &Space, text: Handle) -> (f64, f64) {
 /// Вставляет содержимое рисунка в пространство как одну группу, возвращает
 /// её дескриптор (или единственный объект, если он один).
 pub fn insert_picture(sp: &mut Space, pic: &super::Picture, x: f64, y: f64, move_to: bool) -> Handle {
-    let (top, zorder) = insert_objects(sp, pic);
+    // рисунок из нескольких объектов получает обёртку по тому же правилу,
+    // что и рисунки детей в окне схемы (сверено в Wine: VIDEO, NumberView —
+    // группа 1, текст 2)
+    let pic = with_wrapper(pic);
+    let (top, zorder) = insert_objects(sp, &pic);
     sp.zorder.extend(zorder);
-    let root = if top.len() == 1 {
-        top[0]
-    } else {
-        let g = sp.add_object(Object::new(0, 0.0, 0.0, 0.0, 0.0, Shape::Group { children: top.clone() }));
-        for c in &top {
-            if let Some(o) = sp.objects.get_mut(c) {
-                o.parent = Some(g);
-            }
-        }
-        sp.update_group_bounds(g);
-        g
-    };
+    let Some(&root) = top.first() else { return 0 };
+    if matches!(sp.objects.get(&root).map(|o| &o.shape), Some(Shape::Group { .. })) {
+        sp.update_group_bounds(root);
+    }
     if move_to {
         sp.move_object(root, x, y);
     }
     root
+}
+
+/// Рисунок из нескольких объектов верхнего уровня получает обёртку — группу
+/// внутри рисунка с наименьшим свободным в нём номером; дальше объекты и
+/// она получают номера пространства по порядку своих номеров.
+fn with_wrapper(pic: &super::Picture) -> super::Picture {
+    use crate::formats::vdr::{Object as VObject, ObjectKind};
+    let tops: Vec<u16> = pic.objects.iter().filter(|o| !pic.objects.iter().any(|g| matches!(&g.kind, ObjectKind::Group { children } if children.contains(&o.handle)))).map(|o| o.handle).collect();
+    let mut pic = pic.clone();
+    if tops.len() > 1 {
+        let used: std::collections::BTreeSet<u16> = pic.objects.iter().map(|o| o.handle).collect();
+        let w = (1..=u16::MAX).find(|h| !used.contains(h)).unwrap_or(u16::MAX);
+        pic.objects.push(VObject { handle: w, name: String::new(), flags: 0, kind: ObjectKind::Group { children: tops } });
+    }
+    pic
 }
 
 /// Объекты и инструменты рисунка — в пространство с новыми дескрипторами
@@ -1145,15 +1156,11 @@ fn embed_children(gfx: &mut Gfx, sp: Handle, class: &str) {
         // своих номеров: у NumberView (объекты 2, 3) обёртка раньше объектов,
         // у VSlider1 (объекты 1–13) — после (сверено в Wine: «Солнечная
         // система», L1, tools/verify/embedorder.txt)
-        let mut pic = pic;
-        if !single {
-            use crate::formats::vdr::{Object as VObject, ObjectKind};
-            let used: std::collections::BTreeSet<u16> = pic.objects.iter().map(|o| o.handle).collect();
-            let w = (1..=u16::MAX).find(|h| !used.contains(h)).unwrap_or(u16::MAX);
-            let tops: Vec<u16> = pic.objects.iter().filter(|o| !pic.objects.iter().any(|g| matches!(&g.kind, ObjectKind::Group { children } if children.contains(&o.handle)))).map(|o| o.handle).collect();
-            pic.objects.push(VObject { handle: w, name: String::new(), flags: 0, kind: ObjectKind::Group { children: tops } });
-        }
+        let pic = with_wrapper(&pic);
         let (top, zorder) = insert_objects(space, &pic);
+        if top.is_empty() {
+            continue;
+        }
         let (wrapper, top) = if single {
             (None, top)
         } else {
