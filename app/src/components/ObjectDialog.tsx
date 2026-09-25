@@ -1,12 +1,41 @@
 // «Параметры двухмерного объекта» оригинала для объекта рисунка имиджа:
-// вкладки «Положение», «Линия», «Заливка», «Текст», «Гипербаза», «Точки».
+// вкладки «Положение», «Линия», «Заливка», «Текст», «BMP», «Группа»,
+// «Гипербаза», «Переменные», «Точки», «Информация».
 // Правки уходят сразу (каждая — шаг Undo), как в панели инспектора.
 import { useState } from 'react';
 import type { ObjectProps } from '../api';
 import { useStore } from '../store';
 import { Frame, Tabs } from './Options';
 
-type Tab = 'place' | 'pen' | 'brush' | 'text' | 'hyper' | 'points';
+type Tab = 'place' | 'pen' | 'brush' | 'text' | 'bmp' | 'group' | 'hyper' | 'vars' | 'points' | 'info';
+
+/// «Переменные» объекта: `a,b;x,y` — переменной a этого имиджа сопоставлена
+/// переменная (или псевдоним) x другого имиджа.
+function parseVars(text: string): Map<string, string> {
+  const [names, targets] = text.split(';');
+  const a = (names ?? '').split(',').map(s => s.trim()), b = (targets ?? '').split(',').map(s => s.trim());
+  return new Map(a.map((n, i): [string, string] => [n.toLowerCase(), b[i] ?? '']).filter(([n]) => n));
+}
+function VarsTab({ text, vars, onChange }: { text: string; vars: string[]; onChange: (t: string) => void }) {
+  const map = parseVars(text);
+  const [values, setValues] = useState<Record<string, string>>(() => Object.fromEntries(vars.map(v => [v, map.get(v.toLowerCase()) ?? ''])));
+  const commit = (next: Record<string, string>) => {
+    const pairs = Object.entries(next).filter(([, t]) => t.trim());
+    onChange(pairs.length ? pairs.map(p => p[0]).join(',') + ';' + pairs.map(p => p[1].trim()).join(',') : '');
+  };
+  return <>
+    <div className="muted small">Напротив переменных этого имиджа введите переменные (или псевдонимы) другого имиджа: связь, начатая и законченная на этом объекте, соединит их сама.</div>
+    {vars.length === 0 && <div className="muted">У имиджа нет переменных.</div>}
+    <table className="vars"><tbody>
+      {vars.map(v => (
+        <tr key={v}><td className="mono">{v}</td><td>
+          <input type="text" className="mono" value={values[v] ?? ''} onChange={e => setValues({ ...values, [v]: e.target.value })}
+            onBlur={() => commit(values)} onKeyDown={e => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
+        </td></tr>
+      ))}
+    </tbody></table>
+  </>;
+}
 export type SetField = (field: string, value: string | number) => void;
 
 const MODES: [number, string][] = [[0, 'Открыть окно'], [1, 'Запустить Windows-приложение'], [2, 'Загрузить новый проект'], [3, 'Ничего не делать'], [4, 'Выполнить системную команду']];
@@ -42,13 +71,26 @@ export function HyperFields({ o, set }: { o: ObjectProps; set: SetField }) {
   );
 }
 
-export function ObjectDialog({ o, set, resize, onClose }: { o: ObjectProps; set: SetField; resize: (p: Partial<Record<'x' | 'y' | 'w' | 'h', number>>) => void; onClose: () => void }) {
+export interface ObjectVars { text: string; classVars: string[]; onChange: (text: string) => void }
+
+export function ObjectDialog({ o, set, resize, onClose, vars, onOpen, all }: {
+  o: ObjectProps; set: SetField; resize: (p: Partial<Record<'x' | 'y' | 'w' | 'h', number>>) => void; onClose: () => void;
+  /// закладка «Переменные» (только для рисунка имиджа)
+  vars?: ObjectVars;
+  /// открыть свойства другого объекта (член группы)
+  onOpen?: (handle: number) => void;
+  all?: ObjectProps[];
+}) {
   const tabs: [Tab, string][] = [['place', 'Положение']];
   if (o.pen) tabs.push(['pen', 'Линия']);
   if (o.brush) tabs.push(['brush', 'Заливка']);
   if (o.font || o.text !== undefined) tabs.push(['text', 'Текст']);
+  if (o.src) tabs.push(['bmp', 'BMP']);
+  if (o.members) tabs.push(['group', 'Группа']);
   tabs.push(['hyper', 'Гипербаза']);
+  if (vars) tabs.push(['vars', 'Переменные']);
   if (o.points) tabs.push(['points', 'Точки']);
+  tabs.push(['info', 'Информация']);
   const [tab, setTab] = useState<Tab>('place');
   const num = (label: string, value: number, apply: (v: number) => void, step = 1) => (
     <label className="prop"><span>{label}</span>
@@ -100,7 +142,37 @@ export function ObjectDialog({ o, set, resize, onClose }: { o: ObjectProps; set:
             <label className="check"><input type="checkbox" checked={o.font.underline} onChange={e => set('font.underline', e.target.checked ? 1 : 0)} />подчёркнутый</label>
           </>}
         </>}
+        {tab === 'bmp' && o.src && <>
+          <div className="muted small">Часть растра, выводимая на экран (исходный прямоугольник, SetBitmapSrcRect2d).</div>
+          <div className="dialog-cols">
+            {(['X', 'Y', 'Ширина', 'Высота'] as const).map((l, i) => num(l, o.src![i], v => { const r = [...o.src!]; r[i] = v; set('src', r.join(',')); }))}
+          </div>
+          <button type="button" className="small" onClick={() => resize({ w: o.src![2], h: o.src![3] })}>Размер объекта по прямоугольнику</button>
+        </>}
+        {tab === 'group' && o.members && (
+          <div className="scroll list" style={{ maxHeight: 280, border: '1px solid var(--border)', borderRadius: 6 }}>
+            {o.members.map(h => { const m = all?.find(x => x.handle === h); return (
+              <div key={h} className="row" style={{ cursor: onOpen ? 'pointer' : undefined }} onDoubleClick={() => onOpen?.(h)} title="Двойной щелчок — свойства объекта">
+                <span className="mono muted">#{h}</span><span>{m ? m.kind : 'объект'}</span>{m?.name && <span className="muted">{m.name}</span>}
+              </div>
+            ); })}
+          </div>
+        )}
         {tab === 'hyper' && <HyperFields o={o} set={set} />}
+        {tab === 'vars' && vars && <VarsTab text={vars.text} vars={vars.classVars} onChange={vars.onChange} />}
+        {tab === 'info' && (
+          <table className="vars"><tbody>
+            <tr><td className="muted">Тип</td><td>{o.kind}</td></tr>
+            <tr><td className="muted">Дескриптор</td><td className="mono">{o.handle}</td></tr>
+            <tr><td className="muted">Z-порядок</td><td className="mono">{o.zorder ?? '— (член группы)'}</td></tr>
+            {o.parent !== null && <tr><td className="muted">Группа</td><td className="mono">#{o.parent}</td></tr>}
+            <tr><td className="muted">Габарит</td><td className="mono">{o.x}, {o.y} · {o.w}×{o.h}</td></tr>
+            {o.points && <tr><td className="muted">Точек</td><td className="mono">{o.points.length}</td></tr>}
+            {o.members && <tr><td className="muted">Членов группы</td><td className="mono">{o.members.length}</td></tr>}
+            {o.src && <tr><td className="muted">Исходный прямоугольник</td><td className="mono">{o.src.join(', ')}</td></tr>}
+            {o.hyper && <tr><td className="muted">Гиперссылка</td><td>{o.hyper.target || '—'}</td></tr>}
+          </tbody></table>
+        )}
         {tab === 'points' && o.points && (
           <div className="scroll" style={{ maxHeight: 320 }}>
             <table className="vars"><tbody>

@@ -138,6 +138,52 @@ pub fn merge_object_data(raw: Option<&[u8]>, hyper: Option<&Hyper>) -> Option<Ve
     Some(head)
 }
 
+/// Элементы данных объекта: номер → байты.
+fn object_items(raw: &[u8]) -> Vec<(u16, Vec<u8>)> {
+    let mut items = Vec::new();
+    if object_data_len(raw).is_none() {
+        return items;
+    }
+    let mut at = 7;
+    for _ in 0..raw[6] {
+        let id = u16::from_le_bytes([raw[at], raw[at + 1]]);
+        let n = u16::from_le_bytes([raw[at + 2], raw[at + 3]]) as usize;
+        items.push((id, raw[at + 4..at + 4 + n].to_vec()));
+        at += 4 + n;
+    }
+    items
+}
+
+/// Переменные объекта (закладка «Переменные»): элемент `0x0d`, строка вида
+/// `переменные имиджа;переменные или псевдонимы другого имиджа`.
+pub fn object_vars(raw: &[u8]) -> Option<String> {
+    let (_, data) = object_items(raw).into_iter().find(|(id, _)| *id == 0x0d)?;
+    let end = data.iter().position(|&b| b == 0).unwrap_or(data.len());
+    Some(super::cp1251::decode(&data[..end]))
+}
+
+/// Заменяет переменные объекта; пустая строка убирает элемент. `None` — данных не осталось.
+pub fn set_object_vars(raw: Option<&[u8]>, text: &str) -> Option<Vec<u8>> {
+    let head = raw.filter(|r| object_data_len(r).is_some()).map(|r| r[..7].to_vec()).unwrap_or_else(|| HYPER_HEAD.to_vec());
+    let mut items: Vec<(u16, Vec<u8>)> = raw.map(object_items).unwrap_or_default().into_iter().filter(|(id, _)| *id != 0x0d).collect();
+    if !text.is_empty() {
+        let mut bytes = super::cp1251::encode(text);
+        bytes.push(0);
+        items.push((0x0d, bytes));
+    }
+    if items.is_empty() {
+        return None;
+    }
+    let mut out = head;
+    out[6] = items.len() as u8;
+    for (id, data) in items {
+        out.extend_from_slice(&id.to_le_bytes());
+        out.extend_from_slice(&(data.len() as u16).to_le_bytes());
+        out.extend_from_slice(&data);
+    }
+    Some(out)
+}
+
 /// Тело блока гиперссылки (без тега и длины блока).
 pub fn write_hyper(h: &Hyper) -> Vec<u8> {
     let mut fields = Vec::new();
@@ -985,6 +1031,11 @@ mod tests {
         assert_eq!(merged[6], 2);
         assert_eq!(parse_hyper(&merged).unwrap(), h);
         assert_eq!(merge_object_data(Some(&merged), None).unwrap(), vars);
+        // закладка «Переменные»: как в «Роботе» — `_HObject,_HPrev;out,in`
+        let with = set_object_vars(Some(&page), "_HObject,_HPrev;out,in").unwrap();
+        assert_eq!(object_vars(&with).as_deref(), Some("_HObject,_HPrev;out,in"));
+        assert_eq!(parse_hyper(&with).unwrap().target, "window_2");
+        assert_eq!(set_object_vars(Some(&with), "").unwrap(), page);
         assert_eq!(merge_object_data(Some(&page), Some(&parse_hyper(&page).unwrap())).unwrap(), page);
     }
 

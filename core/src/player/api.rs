@@ -1592,6 +1592,11 @@ pub(crate) fn set_object_field(space: &mut Space, handle: u32, field: &str, valu
                 _ => false,
             }
         }
+        // исходный прямоугольник растра (закладка BMP): «x,y,w,h»
+        "src" => {
+            let v: Vec<f64> = value.split(',').filter_map(|p| p.trim().parse().ok()).collect();
+            v.len() == 4 && space.objects.get_mut(&handle).map(|o| if let crate::gfx::Shape::Bitmap { src, .. } = &mut o.shape { *src = (v[0], v[1], v[2].max(0.0), v[3].max(0.0)); }).is_some()
+        }
         // гипербаза: hyper.mode (-1 — снять ссылку), hyper.target/window/object/effect
         "hyper.mode" | "hyper.target" | "hyper.window" | "hyper.object" | "hyper.effect" => space.objects.get_mut(&handle).map(|o| {
             if field == "hyper.mode" && num < 0.0 {
@@ -1670,7 +1675,8 @@ pub(crate) fn object_json(sp: &Space, o: &crate::gfx::Object) -> String {
             }
         }
         Shape::Control { class, text, enabled, checked, .. } => extra.push_str(&format!(",\"class\":{},\"text\":{},\"enabled\":{enabled},\"checked\":{checked}", json_string(class), json_string(text))),
-        Shape::Group { children } => extra.push_str(&format!(",\"children\":{}", children.len())),
+        Shape::Group { children } => extra.push_str(&format!(",\"children\":{},\"members\":[{}]", children.len(), children.iter().map(|c| c.to_string()).collect::<Vec<_>>().join(","))),
+        Shape::Bitmap { src, .. } => extra.push_str(&format!(",\"src\":[{},{},{},{}]", num(src.0), num(src.1), num(src.2), num(src.3))),
         _ => {}
     }
     if let Some(h) = &o.hyper {

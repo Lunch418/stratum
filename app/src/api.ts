@@ -43,6 +43,8 @@ export interface ObjectProps {
   font?: { face: string; size: number; bold: boolean; italic: boolean; underline: boolean; fg: string; bg: string }; enabled?: boolean; checked?: boolean;
   /// гиперссылка (закладка «Гипербаза»): режим 0 окно, 1 приложение, 2 проект, 3 ничего, 4 команда
   hyper?: { mode: number; target: string; window: string; object: string; effect: string };
+  /// члены группы и исходный прямоугольник растра
+  members?: number[]; src?: [number, number, number, number];
 }
 export interface ParseError { line: number; column: number; message: string }
 

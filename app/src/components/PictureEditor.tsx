@@ -12,7 +12,7 @@ import { BitmapEditor } from './BitmapEditor';
 
 type Tool = 'select' | 'line' | 'polyline' | 'rect' | 'roundrect' | 'ellipse' | 'arc' | 'text' | 'points' | 'pan';
 type Kind = 'image' | 'scheme' | 'icon';
-interface State { kind: Kind; origin: [number, number]; client: [number, number]; scale: number; view: [number, number, number, number]; svg: string; objects: ObjectProps[] }
+interface State { kind: Kind; origin: [number, number]; client: [number, number]; scale: number; view: [number, number, number, number]; svg: string; objects: ObjectProps[]; objectVars?: Record<string, string> }
 type Preview = { dx?: number; dy?: number; resize?: { x: number; y: number; w: number; h: number }; point?: { index: number; p: [number, number] } } | null;
 
 const TOOLS: { id: Tool; label: string; hint: string }[] = [
@@ -322,7 +322,8 @@ export function PictureEditor({ kind }: { kind: Kind }) {
       {objDialog !== null && (() => {
         const o = state.objects.find(x => x.handle === objDialog);
         if (!o) return null;
-        return <ObjectDialog o={o} onClose={() => setObjDialog(null)}
+        return <ObjectDialog key={o.handle} o={o} onClose={() => setObjDialog(null)} all={state.objects} onOpen={h => setObjDialog(h)}
+          vars={kind !== 'icon' && klass ? { text: state.objectVars?.[String(o.handle)] ?? '', classVars: klass.vars.map(v => v.name), onChange: t => { if (editable) op({ op: 'objvars', handle: o.handle, value: t }); } } : undefined}
           set={(field, value) => { if (editable) op({ op: 'set', handle: o.handle, field, value }); }}
           resize={p => { if (editable) op({ op: 'resize', handle: o.handle, ...p }); }} />;
       })()}

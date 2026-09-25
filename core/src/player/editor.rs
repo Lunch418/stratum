@@ -468,7 +468,7 @@ pub fn handle(method: &str, class: &str, kind: Kind, body: &str, s: &mut Shared)
     match method {
         "GET" => {
             let sp = open(&s.project.classes[i], kind);
-            Ok(state_json(&sp, kind))
+            Ok(with_object_vars(state_json(&sp, kind), &s.project.classes[i], kind))
         }
         "POST" => {
             if i >= s.project.own_classes {
@@ -486,14 +486,47 @@ pub fn handle(method: &str, class: &str, kind: Kind, body: &str, s: &mut Shared)
             };
             let mut sp = open(&s.project.classes[i], kind);
             let mut last = 0;
+            // «Переменные» объекта хранятся в данных объекта рисунка, а не в пространстве
+            let mut vars_ops: Vec<(u16, String)> = Vec::new();
             for o in &ops {
+                if o.str_or("op", "") == "objvars" {
+                    last = o.num_or("handle", 0.0) as Handle;
+                    vars_ops.push((last as u16, o.str_or("value", "")));
+                    continue;
+                }
                 last = apply(&mut sp, o).map_err(|e| ("400 Bad Request", e))?;
             }
             s.remember();
-            store(&mut s.project.classes[i], kind, &sp);
-            Ok(format!("{{\"ok\":true,\"handle\":{last},\"state\":{}}}", state_json(&sp, kind)))
+            let c = &mut s.project.classes[i];
+            store(c, kind, &sp);
+            if !vars_ops.is_empty() {
+                if let Some(mut pic) = blob(c, kind).as_deref().and_then(|b| vdr::parse(b, &c.name).ok()) {
+                    for (h, text) in vars_ops {
+                        let raw = pic.object_data.iter().find(|(x, _)| *x == h).map(|(_, d)| d.clone());
+                        pic.object_data.retain(|(x, _)| *x != h);
+                        if let Some(d) = vdr::set_object_vars(raw.as_deref(), &text) {
+                            pic.object_data.push((h, d));
+                        }
+                    }
+                    *blob_mut(c, kind) = Some(vdr::write(&pic));
+                }
+            }
+            Ok(format!("{{\"ok\":true,\"handle\":{last},\"state\":{}}}", with_object_vars(state_json(&sp, kind), c, kind)))
         }
         _ => Err(("405 Method Not Allowed", "метод".into())),
+    }
+}
+
+/// Дописывает к состоянию редактора переменные объектов: `"objectVars":{"handle":"…"}`.
+fn with_object_vars(state: String, c: &cls::Class, kind: Kind) -> String {
+    let vars: Vec<String> = blob(c, kind)
+        .as_deref()
+        .and_then(|b| vdr::parse(b, &c.name).ok())
+        .map(|pic| pic.object_data.iter().filter_map(|(h, d)| vdr::object_vars(d).map(|v| format!("\"{h}\":{}", super::json_string(&v)))).collect())
+        .unwrap_or_default();
+    match state.strip_suffix('}') {
+        Some(head) => format!("{head},\"objectVars\":{{{}}}}}", vars.join(",")),
+        None => state,
     }
 }
 
