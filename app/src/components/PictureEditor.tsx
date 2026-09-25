@@ -9,6 +9,7 @@ import { classByName, useStore } from '../store';
 import { Icon } from './Icon';
 import { FilePickDialog, loadEnv } from './Options';
 import { BitmapEditor } from './BitmapEditor';
+import { ZoomSelect } from './ZoomSelect';
 
 type Tool = 'select' | 'line' | 'polyline' | 'rect' | 'roundrect' | 'ellipse' | 'arc' | 'text' | 'points' | 'pan';
 type Kind = 'image' | 'scheme' | 'icon';
@@ -220,6 +221,13 @@ export function PictureEditor({ kind }: { kind: Kind }) {
     }
   }
 
+  // масштаб относительно середины холста («Выбор масштаба»)
+  function zoomTo(k: number) {
+    const r = svgRef.current?.getBoundingClientRect();
+    const mx = (r?.width ?? 0) / 2, my = (r?.height ?? 0) / 2;
+    setView(v => ({ k, x: mx - (mx - v.x) * (k / v.k), y: my - (my - v.y) * (k / v.k) }));
+  }
+
   function onWheel(e: React.WheelEvent) {
     e.preventDefault();
     const r = svgRef.current!.getBoundingClientRect();
@@ -259,7 +267,7 @@ export function PictureEditor({ kind }: { kind: Kind }) {
         <input type="number" value={state.client[1]} onChange={e => op({ op: 'page', h: Number(e.target.value) })} title="Высота листа" />
         <span className="spacer" />
         <span className="muted small mono">{cursor ? `${Math.round(cursor[0])}, ${Math.round(cursor[1])}` : ''}</span>
-        <button className="small ghost mono" onClick={() => setView({ x: 40, y: 40, k: 1 })} title="Масштаб 100 %">{Math.round(view.k * 100)}%</button>
+        <ZoomSelect k={view.k} onSet={zoomTo} />
       </div>
       <svg ref={svgRef} className="canvas" onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp} onContextMenu={e => e.preventDefault()} onDoubleClick={() => { if (tool === 'polyline') finishPolyline(); else if (tool === 'select' && one) setObjDialog(one.handle); }}>
         <g transform={`translate(${view.x} ${view.y}) scale(${view.k})`}>

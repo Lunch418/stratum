@@ -15,6 +15,9 @@ export interface MenuContext {
   newClass: () => void;
   /// создать имидж и сразу поставить на текущую схему
   newClassOnScheme: () => void;
+  /// «Вид → Панель инструментов / Строка состояния»
+  view: { toolbar: boolean; statusbar: boolean };
+  toggleView: (k: 'toolbar' | 'statusbar') => void;
 }
 
 const MDI = 'В новой среде вместо окон MDI — панели с разделителями';
@@ -72,8 +75,8 @@ export function buildMenus(ctx: MenuContext): Menu[] {
       { label: 'Поиск по проекту', hint: 'Ctrl+Shift+F', run: () => s.setBottomTab('search') },
     ] },
     { title: 'Вид', items: [
-      { label: 'Панель инструментов', disabled: true, why: 'Панели закреплены; их ширину меняют разделители' },
-      { label: 'Строка состояния', checked: true, disabled: true, why: 'Строка состояния всегда внизу' },
+      { label: 'Панель инструментов', checked: ctx.view.toolbar, run: () => ctx.toggleView('toolbar') },
+      { label: 'Строка состояния', checked: ctx.view.statusbar, run: () => ctx.toggleView('statusbar') },
       { sep: true },
       { label: 'Библиотеки', checked: true, run: () => s.showToast('Библиотеки — раздел в иерархии слева') },
       bottom('messages', 'Сообщения'),
@@ -94,7 +97,7 @@ export function buildMenus(ctx: MenuContext): Menu[] {
       { label: s.theme === 'light' ? 'Тёмная тема' : 'Светлая тема', run: s.toggleTheme },
     ] },
     { title: 'Вставка', items: [
-      { label: 'Имидж…', hint: 'перетащить из иерархии', run: () => { s.setTab('scheme'); s.showToast('Перетащите имидж из иерархии на схему'); } },
+      { label: 'Имидж…', hint: 'или перетащить из иерархии', run: () => { s.setTab('scheme'); ctx.open('chooseClass'); }, disabled: noProject },
       { label: 'Связь', run: () => { s.setTab('scheme'); s.showToast('Потяните от порта блока к другому блоку'); } },
       { label: 'Создать и вставить новый имидж', run: ctx.newClassOnScheme, disabled: noProject || lib },
       { label: 'Контактная площадка', hint: 'щелчок на схеме', disabled: noProject || lib, run: () => { if (s.tab !== 'scheme') s.setTab('scheme'); setTimeout(() => window.dispatchEvent(new CustomEvent('insert-pad')), 50); } },

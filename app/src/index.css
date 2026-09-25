@@ -395,6 +395,10 @@ button.attention { border-color: var(--state-pause); }
 @keyframes hyper-up { from { transform: translateY(40px); opacity: 0; } }
 @keyframes hyper-down { from { transform: translateY(-40px); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .model .win[class*="fx-"] .body { animation: none; } }
+.ide.no-statusbar { grid-template-rows: auto 1fr; }
+.ide.no-statusbar > .statusbar { display: none; }
+.ide.no-toolbar .topbar > .spacer ~ button { display: none; }
+.zoom-select { width: auto; min-width: 72px; }
 .model-view { display: flex; flex-direction: column; height: 100%; }
 .model-view > .model { flex: 1; min-height: 0; height: auto; }
 .model-toolbar { display: flex; gap: 6px; align-items: center; padding: 4px 8px; border-bottom: 1px solid var(--border); background: var(--bg-surface); }

@@ -24,6 +24,7 @@ import { MenuBar } from './components/MenuBar';
 import { SheetDialog, ProjectOptionsDialog, EnvOptionsDialog, ClassPropsDialog, CalcOrderDialog, FilePickDialog, AboutDialog, DeleteClassesDialog, loadEnv } from './components/Options';
 import { buildMenus, commandsFromMenus } from './menus';
 import { PrintDialog } from './components/PrintDialog';
+import { ChooseClassDialog } from './components/ChooseClassDialog';
 
 export default function App() {
   const s = useStore();
@@ -31,6 +32,11 @@ export default function App() {
   const dialog = s.dialog;
   const setDialog = s.setDialog;
   const env = loadEnv();
+  // «Вид → Панель инструментов / Строка состояния»
+  const [view, setView] = useState<{ toolbar: boolean; statusbar: boolean }>(() => {
+    try { return { toolbar: true, statusbar: true, ...JSON.parse(localStorage.getItem('view') ?? '{}') as object }; } catch { return { toolbar: true, statusbar: true }; }
+  });
+  const toggleView = (k: 'toolbar' | 'statusbar') => setView(v => { const n = { ...v, [k]: !v[k] }; try { localStorage.setItem('view', JSON.stringify(n)); } catch { /* приватный режим */ } return n; });
   // индикатор производительности: тактов в секунду по кадрам ядра
   const perf = useRef<{ t: number; tick: number }>({ t: 0, tick: 0 });
   const [tps, setTps] = useState(0);
@@ -156,7 +162,7 @@ export default function App() {
     await api.addChild(scheme, name, x, 0);
     s.markUnsaved(); await s.reload(); s.select(name); s.setTab('scheme'); s.showToast(`${name} создан и поставлен на схему ${scheme}`);
   };
-  const menus = buildMenus({ running, canBack: !!frame?.canBack, save, open: setDialog, newClass, newClassOnScheme });
+  const menus = buildMenus({ running, canBack: !!frame?.canBack, save, open: setDialog, newClass, newClassOnScheme, view, toggleView });
   const commands: Command[] = [
     ...commandsFromMenus(menus),
     ...(s.project?.classes ?? []).filter(c => !c.library).map(c => ({ id: 'code:' + c.name, title: `Код: ${c.name}`, group: 'имидж', run: () => { s.select(c.name); s.setTab('code'); } })),
@@ -165,7 +171,7 @@ export default function App() {
   ];
 
   return (
-    <div className="ide">
+    <div className={`ide${view.toolbar ? '' : ' no-toolbar'}${view.statusbar ? '' : ' no-statusbar'}`}>
       <header className="topbar">
         <span className="brand">Stratum<span className="brand-accent">Modern</span></span>
         <MenuBar menus={menus} />
@@ -206,6 +212,7 @@ export default function App() {
       {dialog === 'calcOrder' && <CalcOrderDialog onClose={() => setDialog(null)} />}
       {dialog === 'about' && <AboutDialog onClose={() => setDialog(null)} />}
       {dialog === 'print' && <PrintDialog onClose={() => setDialog(null)} />}
+      {dialog === 'chooseClass' && <ChooseClassDialog onClose={() => setDialog(null)} />}
       {s.hyperProject && (
         <div className="modal-backdrop" onMouseDown={() => s.setHyperProject(null)}>
           <form className="modal" style={{ width: 460 }} onMouseDown={e => e.stopPropagation()} onSubmit={e => {

@@ -3,7 +3,7 @@ import { api, type ClassInfo, type Frame, type Instance, type Project } from './
 
 export type Tab = 'scheme' | 'code' | 'model' | 'graph' | 'picture' | 'icon';
 export type DialogId = 'saveAs' | 'export' | 'open' | 'stateSave' | 'stateLoad' | 'new' | 'info' | 'sheet' | 'projectOptions' | 'envOptions'
-  | 'classProps' | 'calcOrder' | 'insertFile' | 'about' | 'newClass' | 'imageSave' | 'imageLoad' | 'linkStyle' | 'deleteClasses' | 'print' | 'exportVdr';
+  | 'classProps' | 'calcOrder' | 'insertFile' | 'about' | 'newClass' | 'imageSave' | 'imageLoad' | 'linkStyle' | 'deleteClasses' | 'print' | 'exportVdr' | 'chooseClass';
 /// Слои схемы (меню «Формат → Слои» оригинала): сетка, имиджи, связи, графика.
 export interface Layers { grid: boolean; images: boolean; links: boolean; graphics: boolean }
 

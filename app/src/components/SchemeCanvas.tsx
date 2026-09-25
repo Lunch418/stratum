@@ -10,6 +10,7 @@ import { api, type ClassInfo } from '../api';
 import { classByName, useStore } from '../store';
 import { LinkDialog } from './LinkDialog';
 import { suggestPairs } from '../autolink';
+import { ZoomSelect } from './ZoomSelect';
 import type { LinkStyle } from '../api';
 
 export const DRAG_CLASS = 'application/x-stratum-class';
@@ -167,6 +168,13 @@ export function SchemeCanvas() {
   function toScene(e: { clientX: number; clientY: number }) {
     const r = svgRef.current!.getBoundingClientRect();
     return { x: (e.clientX - r.left - view.x) / view.k, y: (e.clientY - r.top - view.y) / view.k };
+  }
+
+  // масштаб относительно середины холста («Выбор масштаба»)
+  function zoomTo(k: number) {
+    const r = svgRef.current?.getBoundingClientRect();
+    const mx = (r?.width ?? 0) / 2, my = (r?.height ?? 0) / 2;
+    setView(v => ({ k, x: mx - (mx - v.x) * (k / v.k), y: my - (my - v.y) * (k / v.k) }));
   }
 
   function onWheel(e: React.WheelEvent) {
@@ -476,7 +484,7 @@ export function SchemeCanvas() {
         {editable && <button className={`small${placingPad ? ' active' : ''}`} onClick={() => setPlacingPad(v => !v)} title="Вставка → Контактная площадка: щёлкните на листе">+ Площадка</button>}
         <button className="small" onClick={fitAll} title="Shift+1">Показать всё</button>
         <button className="small" onClick={() => setView(v => ({ ...v, k: 1 }))} title="Shift+0">100%</button>
-        <span className="muted mono small" style={{ alignSelf: 'center', padding: '0 6px' }}>{Math.round(view.k * 100)}%</span>
+        <ZoomSelect k={view.k} onSet={zoomTo} onFit={fitAll} />
       </div>
       {editable && !klass.children.length && (
         <div className="hint muted">Перетащите имидж из иерархии на холст, чтобы добавить его на схему.</div>
