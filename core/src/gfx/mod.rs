@@ -81,7 +81,7 @@ impl Dib {
         if x < 0 || y < 0 || x >= self.width as i64 || y >= self.height as i64 {
             return None;
         }
-        let o = ((y as u32 * self.width + x as u32) * 3) as usize;
+        let o = (y as usize * self.width as usize + x as usize) * 3;
         let p = self.pixels.as_ref()?;
         Some(p[o] as u32 | (p[o + 1] as u32) << 8 | (p[o + 2] as u32) << 16)
     }
@@ -91,7 +91,7 @@ impl Dib {
         if x < 0 || y < 0 || x >= self.width as i64 || y >= self.height as i64 {
             return None;
         }
-        let o = ((y as u32 * self.width + x as u32) * 3) as usize;
+        let o = (y as usize * self.width as usize + x as usize) * 3;
         let p = self.pixels.as_mut()?;
         p[o] = (color & 0xff) as u8;
         p[o + 1] = ((color >> 8) & 0xff) as u8;
@@ -878,10 +878,15 @@ pub fn decode_bmp(bmp: &[u8]) -> Option<(u32, u32, Vec<u8>)> {
     } else {
         0
     };
-    let palette = &bmp[14 + header..];
-    let palette = &palette[..(colors * 4).min(palette.len())];
-    let stride = (w as usize * bpp).div_ceil(32) * 4;
-    let mut out = vec![0u8; (w * h) as usize * 3];
+    // размеры из файла: палитра и строки должны уместиться в сам файл —
+    // иначе испорченный растр паникует или просит гигабайты памяти
+    let palette = bmp.get(14usize.saturating_add(header)..).unwrap_or(&[]);
+    let palette = &palette[..colors.saturating_mul(4).min(palette.len())];
+    let stride = (w as usize).checked_mul(bpp)?.div_ceil(32) * 4;
+    if offset.checked_add(stride.checked_mul(h as usize)?)? > bmp.len() {
+        return None;
+    }
+    let mut out = vec![0u8; (w as usize).checked_mul(h as usize)?.checked_mul(3)?];
     for row in 0..h as usize {
         let src_row = if top_down { row } else { h as usize - 1 - row };
         let line = bmp.get(offset + src_row * stride..offset + (src_row + 1) * stride)?;

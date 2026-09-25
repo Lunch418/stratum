@@ -444,6 +444,11 @@ fn read_chunk(r: &mut Reader, ctx: &Ctx, id: u16, pic: &mut Picture) -> Result<(
     let at = r.pos;
     r.u16()?;
     let size = if ctx.sized { Some(r.u32()? as usize) } else { None };
+    // размер меньше заголовка чанка вернул бы чтение на тот же чанк: разбор
+    // зацикливался и копил объекты, пока не кончалась память
+    if size.is_some_and(|s| s < 12) {
+        return r.err("чанк короче своего заголовка");
+    }
     let count = r.u16()?;
     r.u16()?; // capacity
     r.u16()?; // delta
@@ -981,7 +986,9 @@ fn read_bmp(r: &mut Reader) -> Result<Vec<u8>> {
     if r.peek_u16(r.pos) != Some(0x4D42) {
         return r.err("растр без заголовка BM");
     }
-    let size = u32::from_le_bytes([r.data[r.pos + 2], r.data[r.pos + 3], r.data[r.pos + 4], r.data[r.pos + 5]]) as usize;
+    // «BM» у самого конца файла: поля размера нет — ошибка, а не паника
+    let Some(b) = r.data.get(r.pos + 2..r.pos + 6) else { return r.err("растр обрезан") };
+    let size = u32::from_le_bytes([b[0], b[1], b[2], b[3]]) as usize;
     r.bytes(size)
 }
 
@@ -1018,6 +1025,22 @@ impl Picture {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn chunk_shorter_than_its_header_does_not_loop() {
+        let mut data = write(&Picture { version: 0x0300, zorder: vec![1, 2], ..Default::default() });
+        // чанк Z-порядка: id 1021 и сразу размер; размер 0 — порча файла
+        let at = data.windows(2).position(|b| b == chunk::ZORDER.to_le_bytes()).expect("нет чанка Z-порядка");
+        data[at + 2..at + 6].copy_from_slice(&0u32.to_le_bytes());
+        assert!(parse(&data, "x.vdr").is_err());
+    }
+
+    #[test]
+    fn bitmap_signature_at_end_of_file_is_an_error() {
+        for data in [&b"BM"[..], b"BM\x10", b"BM\x10\0\0"] {
+            assert!(read_bmp(&mut Reader::new(data, "x.vdr")).is_err());
+        }
+    }
 
     #[test]
     fn hyperlink_blocks_of_the_corpus_round_trip() {
