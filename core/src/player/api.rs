@@ -101,6 +101,32 @@ fn class_json(c: &cls::Class, library: bool, model: Option<&lang::Model>) -> Str
     )
 }
 
+/// Сравнение для поиска: с учётом регистра или без, по словам целиком или по подстроке.
+struct Matcher {
+    needle: String,
+    case: bool,
+    word: bool,
+}
+
+impl Matcher {
+    fn new(q: &str, case: bool, word: bool) -> Self {
+        Matcher { needle: if case { q.to_string() } else { q.to_lowercase() }, case, word }
+    }
+
+    fn is_in(&self, hay: &str) -> bool {
+        if hay.is_empty() {
+            return false;
+        }
+        let low;
+        let hay = if self.case { hay } else { low = hay.to_lowercase(); &low };
+        if !self.word {
+            return hay.contains(&self.needle);
+        }
+        let is_word = |c: Option<char>| c.is_some_and(|c| c.is_alphanumeric() || c == '_');
+        hay.match_indices(&self.needle).any(|(at, m)| !is_word(hay[..at].chars().next_back()) && !is_word(hay[at + m.len()..].chars().next()))
+    }
+}
+
 /// Свободный дескриптор на листе: не занят ни блоком, ни связью, ни площадкой.
 fn free_handle(c: &cls::Class) -> u16 {
     let used = c.children.iter().map(|x| x.handle).chain(c.links.iter().map(|l| l.handle)).chain(c.pads.iter().map(|p| p.id));
@@ -1314,34 +1340,89 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
             }
         }
         // поиск по текстам и переменным всех имиджей проекта
+        // поиск по проекту (диалог «Поиск» оригинала): q; in — где искать через
+        // запятую: text, comments, vars, values, classes, objects, handles, info;
+        // case=1 — различать регистр, word=1 — только слова целиком, libs=1 — и в библиотеках
         ("GET", ["search"]) => {
             let q = super::param(query, "q").map(super::url_decode).unwrap_or_default();
-            let q_low = q.to_lowercase();
-            if q_low.trim().is_empty() {
+            if q.trim().is_empty() {
                 return json("[]".into());
             }
-            let libs = super::param(query, "libs").is_some_and(|v| v == "1");
+            let flag = |k: &str| super::param(query, k).is_some_and(|v| v == "1");
+            let (libs, case, word) = (flag("libs"), flag("case"), flag("word"));
+            let within = super::param(query, "in").map(super::url_decode).unwrap_or_else(|| "text,comments,vars,classes,objects,info".into());
+            let on = |k: &str| within.split(',').any(|w| w.trim() == k);
+            let m = Matcher::new(q.trim(), case, word);
             let s = shared.lock().unwrap();
             let mut hits: Vec<String> = Vec::new();
+            let hit = |hits: &mut Vec<String>, class: &str, line: usize, text: &str, kind: &str, extra: String| {
+                if hits.len() < 1000 {
+                    hits.push(format!("{{\"class\":{},\"line\":{line},\"text\":{},\"kind\":\"{kind}\"{extra}}}", json_string(class), json_string(text)));
+                }
+            };
             for (i, c) in s.project.classes.iter().enumerate() {
                 if i >= s.project.own_classes && !libs {
                     break;
                 }
-                for (n, line) in c.text.lines().enumerate() {
-                    if line.to_lowercase().contains(&q_low) {
-                        hits.push(format!("{{\"class\":{},\"line\":{},\"text\":{},\"kind\":\"text\"}}", json_string(&c.name), n + 1, json_string(line.trim())));
-                        if hits.len() > 500 {
-                            break;
+                if on("text") || on("comments") {
+                    for (n, line) in c.text.lines().enumerate() {
+                        let (code, comment) = match line.find("//") {
+                            Some(k) => (&line[..k], &line[k..]),
+                            None => (line, ""),
+                        };
+                        let found = (on("text") && m.is_in(code)) || (on("comments") && m.is_in(comment));
+                        if found {
+                            let kind = if on("text") && m.is_in(code) { "text" } else { "comment" };
+                            hit(&mut hits, &c.name, n + 1, line.trim(), kind, String::new());
                         }
                     }
                 }
-                for v in &c.vars {
-                    if v.name.to_lowercase().contains(&q_low) || v.description.to_lowercase().contains(&q_low) {
-                        hits.push(format!("{{\"class\":{},\"line\":0,\"text\":{},\"kind\":\"var\"}}", json_string(&c.name), json_string(&format!("{} {} = {} {}", v.var_type, v.name, v.default, v.description))));
+                if on("vars") || on("info") {
+                    for v in &c.vars {
+                        if (on("vars") && m.is_in(&v.name)) || (on("info") && (m.is_in(&v.description) || m.is_in(&v.default))) {
+                            hit(&mut hits, &c.name, 0, &format!("{} {} = {} {}", v.var_type, v.name, v.default, v.description), "var", format!(",\"var\":{}", json_string(&v.name)));
+                        }
                     }
                 }
-                if c.name.to_lowercase().contains(&q_low) {
-                    hits.push(format!("{{\"class\":{},\"line\":0,\"text\":\"имидж\",\"kind\":\"class\"}}", json_string(&c.name)));
+                if on("classes") && m.is_in(&c.name) {
+                    hit(&mut hits, &c.name, 0, "имидж", "class", String::new());
+                }
+                if on("info") && m.is_in(&c.description) {
+                    hit(&mut hits, &c.name, 0, &format!("описание: {}", c.description.lines().next().unwrap_or("")), "class", String::new());
+                }
+                if on("objects") || on("handles") {
+                    for ch in &c.children {
+                        let by_name = on("objects") && m.is_in(cls::Class::instance_name(ch));
+                        let by_handle = on("handles") && ch.handle.to_string() == q.trim();
+                        if by_name || by_handle {
+                            hit(&mut hits, &c.name, 0, &format!("на схеме: {} [{}] #{}", cls::Class::instance_name(ch), ch.class_name, ch.handle), "instance", format!(",\"handle\":{}", ch.handle));
+                        }
+                    }
+                    for (kind, blob) in [("image", &c.image), ("icon", &c.icon)] {
+                        let Some(pic) = blob.as_deref().and_then(|b| vdr::parse(b, &c.name).ok()) else { continue };
+                        for o in &pic.objects {
+                            let by_name = on("objects") && !o.name.is_empty() && m.is_in(&o.name);
+                            let by_handle = on("handles") && o.handle.to_string() == q.trim();
+                            if by_name || by_handle {
+                                let place = if kind == "icon" { "в иконке" } else { "в рисунке" };
+                                hit(&mut hits, &c.name, 0, &format!("{place}: {} #{}", if o.name.is_empty() { "объект" } else { &o.name }, o.handle), "object", format!(",\"handle\":{},\"picture\":\"{kind}\"", o.handle));
+                            }
+                        }
+                    }
+                }
+            }
+            if on("values") {
+                for (i, inst) in s.sim.instances().iter().enumerate() {
+                    if !libs && !s.project.classes[..s.project.own_classes].iter().any(|c| c.name.eq_ignore_ascii_case(&inst.class_name)) {
+                        continue;
+                    }
+                    for n in inst.var_names() {
+                        let Some(v) = s.sim.value(i, n) else { continue };
+                        let text = v.to_string();
+                        if m.is_in(&text) {
+                            hit(&mut hits, &inst.class_name, 0, &format!("{}.{} = {}", inst.path, n, text), "value", format!(",\"instance\":{i},\"var\":{}", json_string(n)));
+                        }
+                    }
                 }
             }
             json(format!("[{}]", hits.join(",")))
@@ -1640,4 +1721,19 @@ fn default_icon(name: &str) -> String {
          <text x=\"16\" y=\"21\" font-size=\"12\" text-anchor=\"middle\" font-family=\"sans-serif\" fill=\"#3b4252\">{}</text></svg>",
         initial.replace('<', "&lt;")
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn search_matcher_respects_case_and_words() {
+        let m = Matcher::new("pos", false, true);
+        assert!(m.is_in("x := Pos + 1"));
+        assert!(!m.is_in("xpos := 1"));
+        assert!(Matcher::new("Pos", true, false).is_in("xPos"));
+        assert!(!Matcher::new("Pos", true, false).is_in("xpos"));
+        assert!(Matcher::new("скорость", false, true).is_in("// Скорость шара"));
+    }
 }

@@ -378,6 +378,9 @@ button.attention { border-color: var(--state-pause); }
 .icon-grid .icon-cell { width: 32px; height: 32px; border: 1px solid transparent; border-radius: 4px; cursor: pointer; background-color: #fff; background-repeat: no-repeat; }
 .icon-grid .icon-cell:hover { border-color: var(--accent); }
 
+.search-opt { text-transform: none; letter-spacing: 0; display: flex; gap: 4px; align-items: center; font-weight: 500; }
+.search-where { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 6px 10px; border-bottom: 1px solid var(--border); font-size: 12px; background: var(--bg-surface); }
+.search-kind { min-width: 84px; font-size: 11px; }
 .model-view { display: flex; flex-direction: column; height: 100%; }
 .model-view > .model { flex: 1; min-height: 0; height: auto; }
 .model-toolbar { display: flex; gap: 6px; align-items: center; padding: 4px 8px; border-bottom: 1px solid var(--border); background: var(--bg-surface); }
