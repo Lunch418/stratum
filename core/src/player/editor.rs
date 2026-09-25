@@ -62,7 +62,12 @@ pub fn open(c: &cls::Class, kind: Kind) -> Space {
 
 /// Записывает пространство обратно в имидж.
 pub fn store(c: &mut cls::Class, kind: Kind, sp: &Space) {
-    let pic = sp.to_picture();
+    let mut pic = sp.to_picture();
+    // данные объектов (переменные объекта и т. п.) пространство не хранит —
+    // берём их из прежнего рисунка для уцелевших объектов
+    if let Some(old) = blob(c, kind).as_deref().and_then(|b| vdr::parse(b, &c.name).ok()) {
+        pic.object_data = old.object_data.into_iter().filter(|(h, _)| pic.objects.iter().any(|o| o.handle == *h)).collect();
+    }
     *blob_mut(c, kind) = Some(vdr::write(&pic));
 }
 

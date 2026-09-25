@@ -24,6 +24,9 @@ pub struct Picture {
     pub page: Option<Vec<u8>>,
     /// Гиперссылки объектов (закладка «Гипербаза»): handle объекта → ссылка.
     pub hypers: Vec<(u16, Hyper)>,
+    /// Данные объектов (блок `0x03FE`) как есть: кроме гиперссылки там
+    /// переменные объекта и прочее — при записи сохраняются.
+    pub object_data: Vec<(u16, Vec<u8>)>,
     /// Приложения ломаных (стрелки и т. п.) как есть: handle → байты.
     pub arrows: Vec<(u16, Vec<u8>)>,
 }
@@ -101,6 +104,38 @@ pub fn parse_hyper(data: &[u8]) -> Option<Hyper> {
         }
     }
     Some(h)
+}
+
+/// Данные объекта для записи: прежние элементы, кроме гиперссылки, и
+/// гиперссылка `hyper`; `None` — писать нечего.
+pub fn merge_object_data(raw: Option<&[u8]>, hyper: Option<&Hyper>) -> Option<Vec<u8>> {
+    let mut items: Vec<(u16, Vec<u8>)> = Vec::new();
+    let mut head = HYPER_HEAD.to_vec();
+    if let Some(raw) = raw.filter(|r| object_data_len(r).is_some()) {
+        head = raw[..7].to_vec();
+        let mut at = 7;
+        for _ in 0..raw[6] {
+            let id = u16::from_le_bytes([raw[at], raw[at + 1]]);
+            let n = u16::from_le_bytes([raw[at + 2], raw[at + 3]]) as usize;
+            if id != 0x0a {
+                items.push((id, raw[at + 4..at + 4 + n].to_vec()));
+            }
+            at += 4 + n;
+        }
+    }
+    if let Some(h) = hyper {
+        items.push((0x0a, write_hyper(h)[11..].to_vec()));
+    }
+    if items.is_empty() {
+        return None;
+    }
+    head[6] = items.len() as u8;
+    for (id, data) in items {
+        head.extend_from_slice(&id.to_le_bytes());
+        head.extend_from_slice(&(data.len() as u16).to_le_bytes());
+        head.extend_from_slice(&data);
+    }
+    Some(head)
 }
 
 /// Тело блока гиперссылки (без тега и длины блока).
@@ -343,6 +378,7 @@ fn read_object_data_v2(tail: &[u8], pic: &mut Picture) {
             if let Some(h) = parse_hyper(&tail[i..i + n]) {
                 pic.hypers.push((handle, h));
             }
+            pic.object_data.push((handle, tail[i..i + n].to_vec()));
         }
         i += n;
     }
@@ -434,6 +470,7 @@ fn read_item(r: &mut Reader, ctx: &Ctx, id: u16, pic: &mut Picture) -> Result<()
                         if let Some(h) = parse_hyper(&data) {
                             pic.hypers.push((handle, h));
                         }
+                        pic.object_data.push((handle, data.to_vec()));
                     }
                     _ => {}
                 }
@@ -758,8 +795,9 @@ pub fn write(pic: &Picture) -> Vec<u8> {
                     w.u32(bytes.len() as u32 + 6);
                     w.bytes(&bytes);
                 }
-                if let Some((_, h)) = pic.hypers.iter().find(|(handle, _)| *handle == o.handle) {
-                    let bytes = write_hyper(h);
+                let hyper = pic.hypers.iter().find(|(handle, _)| *handle == o.handle).map(|(_, h)| h);
+                let raw = pic.object_data.iter().find(|(handle, _)| *handle == o.handle).map(|(_, d)| d.as_slice());
+                if let Some(bytes) = merge_object_data(raw, hyper) {
                     w.u16(HYPER_TAG);
                     w.u32(bytes.len() as u32 + 6);
                     w.bytes(&bytes);
@@ -941,6 +979,13 @@ mod tests {
         let vars = hex("010005000200010d0004006162630a");
         assert_eq!(parse_hyper(&vars), None);
         assert_eq!(object_data_len(&vars), Some(vars.len()));
+        // переменные объекта не теряются, гиперссылка добавляется рядом
+        let h = Hyper { target: "стр".into(), ..Default::default() };
+        let merged = merge_object_data(Some(&vars), Some(&h)).unwrap();
+        assert_eq!(merged[6], 2);
+        assert_eq!(parse_hyper(&merged).unwrap(), h);
+        assert_eq!(merge_object_data(Some(&merged), None).unwrap(), vars);
+        assert_eq!(merge_object_data(Some(&page), Some(&parse_hyper(&page).unwrap())).unwrap(), page);
     }
 
     #[test]
