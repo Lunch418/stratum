@@ -37,6 +37,9 @@ enum Event {
     HyperBack,
     /// «Больше не замечать» в предупреждении о математической ошибке.
     IgnoreMath,
+    /// «Моделирование → Очистить → Закрыть окна / Закрыть потоки»
+    CloseWindows,
+    CloseStreams,
     Mouse { window: String, msg: u32, x: f64, y: f64, keys: u32 },
     Key { msg: u32, vk: u32 },
     /// Действие в контроле окна модели: код уведомления и новое значение.
@@ -576,6 +579,20 @@ fn apply_event(s: &mut Shared, ev: Event) {
             s.halt = None;
             s.running = true;
         }
+        Event::CloseWindows => {
+            let names = s.sim.effects.gfx.window_order.clone();
+            for n in names {
+                s.sim.effects.gfx.close_window(&n);
+            }
+        }
+        Event::CloseStreams => {
+            // как CloseStream: файл, открытый на запись, получает содержимое
+            for (_, st) in std::mem::take(&mut s.sim.effects.streams.items) {
+                if let (Some(p), true) = (&st.file, st.writable) {
+                    let _ = std::fs::write(p, &st.data);
+                }
+            }
+        }
         Event::HyperBack => {
             s.sim.effects.gfx.hyper_back();
         }
@@ -888,6 +905,8 @@ fn parse_event(query: &str) -> Option<Event> {
         "dialog" => Event::Dialog { answer: param(query, "answer").map(url_decode).unwrap_or_default() },
         "hyperback" => Event::HyperBack,
         "ignoremath" => Event::IgnoreMath,
+        "closewindows" => Event::CloseWindows,
+        "closestreams" => Event::CloseStreams,
         "mouse" => Event::Mouse {
             window: url_decode(param(query, "win")?),
             msg: num("msg")? as u32,
