@@ -252,21 +252,21 @@ export function PictureEditor({ kind }: { kind: Kind }) {
   return (
     <div className={`picture-editor${loadEnv().handCursor && drag?.kind === 'move' ? ' moving' : ''}`} onWheel={onWheel}>
       <div className="draw-tools">
-        {TOOLS.map(t => <button key={t.id} className={`small icon-only${tool === t.id ? ' active' : ''}`} title={t.hint} onClick={() => { setTool(t.id); setDraft([]); }} disabled={!editable && t.id !== 'select' && t.id !== 'pan'}><Icon name={t.id} /></button>)}
+        {TOOLS.map(t => <button aria-label={t.hint} key={t.id} className={`small icon-only${tool === t.id ? ' active' : ''}`} title={t.hint} onClick={() => { setTool(t.id); setDraft([]); }} disabled={!editable && t.id !== 'select' && t.id !== 'pan'}><Icon name={t.id} /></button>)}
         <span className="sep" />
         <label title="Линия"><input type="color" value={pen.color} onChange={e => setPen({ ...pen, color: e.target.value })} /></label>
         <input type="number" min={0} max={20} value={pen.width} onChange={e => setPen({ ...pen, width: Number(e.target.value) })} style={{ width: 44 }} title="Толщина" />
         <label title="Заливка" style={{ display: 'flex', alignItems: 'center', gap: 2 }}><input type="checkbox" checked={fill.on} onChange={e => setFill({ ...fill, on: e.target.checked })} /><input type="color" value={fill.color} onChange={e => setFill({ ...fill, color: e.target.value })} /></label>
         <span className="sep" />
-        <button className="small icon-only" disabled={sel.length < 2} onClick={() => op({ op: 'group', handles: sel }).then(h => setSel([h]))} title="Группа"><Icon name="group" /></button>
-        <button className="small icon-only" disabled={!one || one.kind !== 'group'} onClick={() => op({ op: 'ungroup', handle: one!.handle }).then(() => setSel([]))} title="Разгруппировать"><Icon name="ungroup" /></button>
-        <button className="small icon-only" disabled={!one} onClick={() => op({ op: 'zorder', handle: one!.handle, to: 'top' })} title="На передний план"><Icon name="up" /></button>
-        <button className="small icon-only" disabled={!one} onClick={() => op({ op: 'zorder', handle: one!.handle, to: 'bottom' })} title="На задний план"><Icon name="down" /></button>
-        <button className="small icon-only" disabled={!sel.length} onClick={() => op(sel.map(h => ({ op: 'delete', handle: h }))).then(() => setSel([]))} title="Удалить (Del)"><Icon name="trash" /></button>
-        <button className="small icon-only" disabled={!editable} onClick={() => setInsertAsk(true)} title="Вставить из файла (.vdr, .bmp)"><Icon name="file" /></button>
-        <button className="small icon-only" disabled={!editable} onClick={() => { const at = cursor ?? [state.origin[0], state.origin[1]]; op({ op: 'bitmap', w: 32, h: 32, x: at[0], y: at[1] }).then(h => { setSel([h]); setBitmapEdit(h); }); }} title="Новая битовая карта 32×32"><Icon name="bitmap" /></button>
-        <button className="small icon-only" disabled={!editable || !one || one.kind !== 'bitmap'} onClick={() => setBitmapEdit(one!.handle)} title="Битовый редактор выбранного растра"><Icon name="pencil" /></button>
-        <button className={`small icon-only${grid ? ' active' : ''}`} onClick={() => useStore.getState().setDialog('sheet')} title="Параметры листа: сетка, окно, слои"><Icon name="grid" /></button>
+        <button aria-label="Группа" className="small icon-only" disabled={sel.length < 2} onClick={() => op({ op: 'group', handles: sel }).then(h => setSel([h]))} title="Группа"><Icon name="group" /></button>
+        <button aria-label="Разгруппировать" className="small icon-only" disabled={!one || one.kind !== 'group'} onClick={() => op({ op: 'ungroup', handle: one!.handle }).then(() => setSel([]))} title="Разгруппировать"><Icon name="ungroup" /></button>
+        <button aria-label="На передний план" className="small icon-only" disabled={!one} onClick={() => op({ op: 'zorder', handle: one!.handle, to: 'top' })} title="На передний план"><Icon name="up" /></button>
+        <button aria-label="На задний план" className="small icon-only" disabled={!one} onClick={() => op({ op: 'zorder', handle: one!.handle, to: 'bottom' })} title="На задний план"><Icon name="down" /></button>
+        <button aria-label="Удалить" className="small icon-only" disabled={!sel.length} onClick={() => op(sel.map(h => ({ op: 'delete', handle: h }))).then(() => setSel([]))} title="Удалить (Del)"><Icon name="trash" /></button>
+        <button aria-label="Вставить из файла" className="small icon-only" disabled={!editable} onClick={() => setInsertAsk(true)} title="Вставить из файла (.vdr, .bmp)"><Icon name="file" /></button>
+        <button aria-label="Новая битовая карта 32×32" className="small icon-only" disabled={!editable} onClick={() => { const at = cursor ?? [state.origin[0], state.origin[1]]; op({ op: 'bitmap', w: 32, h: 32, x: at[0], y: at[1] }).then(h => { setSel([h]); setBitmapEdit(h); }); }} title="Новая битовая карта 32×32"><Icon name="bitmap" /></button>
+        <button aria-label="Битовый редактор выбранного растра" className="small icon-only" disabled={!editable || !one || one.kind !== 'bitmap'} onClick={() => setBitmapEdit(one!.handle)} title="Битовый редактор выбранного растра"><Icon name="pencil" /></button>
+        <button aria-label="Параметры листа: сетка, окно, слои" className={`small icon-only${grid ? ' active' : ''}`} onClick={() => useStore.getState().setDialog('sheet')} title="Параметры листа: сетка, окно, слои"><Icon name="grid" /></button>
         <span className="sep" />
         <input type="number" value={state.client[0]} onChange={e => op({ op: 'page', w: Number(e.target.value) })} title="Ширина листа" />
         <span className="muted small">×</span>

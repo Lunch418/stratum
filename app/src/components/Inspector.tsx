@@ -74,7 +74,7 @@ export function Inspector() {
     return () => { alive = false; clearInterval(id); };
   }, [instance, frame?.running, frame?.tick && !frame.running ? frame.tick : 0]);
 
-  if (!klass) return <><div className="panel-title">Инспектор</div><div className="muted" style={{ padding: 12 }}>Ничего не выбрано.</div></>;
+  if (!klass) return <><div className="panel-title">Инспектор</div><div className="empty">Выберите имидж в иерархии или блок на схеме — здесь появятся его переменные.</div></>;
 
   const vars: Variable[] = [
     ...klass.vars,
@@ -128,7 +128,7 @@ export function Inspector() {
                   <tr key={w}>
                     <td className="mono" style={{ width: '50%' }}>{w}</td>
                     <td className="num">{watchValues.get(w) ?? '…'}</td>
-                    <td style={{ width: 28, padding: 0 }}><button className="small ghost" onClick={() => setWatches(ws => ws.filter(x => x !== w))} title="Убрать">×</button></td>
+                    <td style={{ width: 28, padding: 0 }}><button aria-label="Убрать" className="small ghost" onClick={() => setWatches(ws => ws.filter(x => x !== w))} title="Убрать">×</button></td>
                   </tr>
                 ))}
                 <tr>
@@ -164,7 +164,7 @@ export function Inspector() {
                 {instance !== null && (
                   <td style={{ width: 28, padding: 0 }}>
                     {v.type.toUpperCase() === 'FLOAT' && (
-                      <button className="small ghost" title="На график" onClick={() => api.traceAdd(instance, v.name).then(() => { useStore.getState().setBottomTab('graphs'); showToast('Добавлено на график'); })}>∿</button>
+                      <button aria-label="На график" className="small ghost" title="На график" onClick={() => api.traceAdd(instance, v.name).then(() => { useStore.getState().setBottomTab('graphs'); showToast('Добавлено на график'); })}>∿</button>
                     )}
                   </td>
                 )}

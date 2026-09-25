@@ -68,7 +68,7 @@ export function LinkDialog({ source, target, pairs: initial, style: initialStyle
                   <td><VarPick value={p[0]} vars={srcVars} onChange={v => update(i, 0, v)} /></td>
                   <td className="muted">→</td>
                   <td><VarPick value={p[1]} vars={dstVars} onChange={v => update(i, 1, v)} /></td>
-                  <td><button type="button" className="small ghost" onClick={() => setPairs(ps => ps.filter((_, k) => k !== i))} title="Убрать пару">×</button></td>
+                  <td><button aria-label="Убрать пару" type="button" className="small ghost" onClick={() => setPairs(ps => ps.filter((_, k) => k !== i))} title="Убрать пару">×</button></td>
                 </tr>
               ))}
             </tbody>

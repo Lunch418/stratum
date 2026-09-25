@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { useStore } from '../store';
+import { Icon } from './Icon';
 
 function escapeHtml(s: string) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -61,7 +62,7 @@ export function Help() {
 
   return (
     <>
-      <div className="panel-title">Справка <span className="spacer" />{topic && <button className="small ghost" onClick={() => setHelpTopic(null)}>×</button>}</div>
+      <div className="panel-title">Справка <span className="spacer" />{topic && <button aria-label="Закрыть тему" title="Закрыть тему" className="small ghost icon-only" onClick={() => setHelpTopic(null)}><Icon name="close" /></button>}</div>
       <div className="filter"><input type="search" placeholder="Функция или тема (F1 в коде)" value={query} onChange={e => setQuery(e.target.value)} /></div>
       {hits.length > 0 && (
         <div className="tree" style={{ maxHeight: 160, overflow: 'auto', borderBottom: '1px solid var(--border)' }}>

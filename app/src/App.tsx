@@ -178,22 +178,22 @@ export default function App() {
         <span className="sep" />
         <div className="transport">
         <button className={`primary icon-text${running ? ' paused' : ''}`} onClick={() => api.event(running ? 'type=pause' : 'type=run')} title="Запуск / пауза (F5)"><Icon name={running ? 'pause' : 'play'} />{running ? 'Пауза' : 'Пуск'}</button>
-        <button className="icon-only" onClick={() => api.event('type=step')} title="Один шаг (F10)"><Icon name="step" /></button>
-        <button className="icon-only" onClick={() => api.event('type=back')} title="Такт назад (Shift+F10)" disabled={!frame?.canBack || running}><Icon name="back" /></button>
-        <button className="icon-only" onClick={() => api.event('type=reset').then(() => s.refreshInstances())} title="Стоп и сброс (Ctrl+F2)"><Icon name="stop" /></button>
+        <button aria-label="Один шаг" className="icon-only" onClick={() => api.event('type=step')} title="Один шаг (F10)"><Icon name="step" /></button>
+        <button aria-label="Такт назад" className="icon-only" onClick={() => api.event('type=back')} title="Такт назад (Shift+F10)" disabled={!frame?.canBack || running}><Icon name="back" /></button>
+        <button aria-label="Стоп и сброс" className="icon-only" onClick={() => api.event('type=reset').then(() => s.refreshInstances())} title="Стоп и сброс (Ctrl+F2)"><Icon name="stop" /></button>
         <label className="muted speed" title="Тактов в секунду">
           <input type="range" min={1} max={200} defaultValue={30} onChange={e => api.event('type=speed&fps=' + e.target.value)} />
         </label>
         <span className="counter mono">такт {frame?.tick ?? 0}{frame?.stopped ? ' · стоп' : ''}</span>
         </div>
         <span className="spacer" />
-        <button className="ghost icon-only" onClick={() => setDialog('open')} title="Открыть проект (Ctrl+O)"><Icon name="open" /></button>
-        <button onClick={save} title="Сохранить всё (Ctrl+S)" className={`icon-only${s.unsaved ? ' attention' : ' ghost'}`}><Icon name="save" /></button>
-        <button className="ghost icon-only" onClick={s.undo} disabled={!s.project?.canUndo} title="Отмена (Ctrl+Z)"><Icon name="undo" /></button>
-        <button className="ghost icon-only" onClick={s.redo} disabled={!s.project?.canRedo} title="Повтор (Ctrl+Shift+Z)"><Icon name="redo" /></button>
-        <button className="ghost icon-only" onClick={() => setDialog('info')} disabled={!s.project || s.project.empty} title="Информация о проекте"><Icon name="info" /></button>
-        <button className="ghost icon-only" onClick={() => s.setPaletteOpen(true)} title="Палитра команд (Ctrl+Shift+P)"><Icon name="search" /></button>
-        <button className="ghost icon-only" onClick={s.toggleTheme} title={s.theme === 'light' ? 'Тёмная тема' : 'Светлая тема'}><Icon name={s.theme === 'light' ? 'moon' : 'sun'} /></button>
+        <button aria-label="Открыть проект" className="ghost icon-only" onClick={() => setDialog('open')} title="Открыть проект (Ctrl+O)"><Icon name="open" /></button>
+        <button aria-label="Сохранить всё" onClick={save} title="Сохранить всё (Ctrl+S)" className={`icon-only${s.unsaved ? ' attention' : ' ghost'}`}><Icon name="save" /></button>
+        <button aria-label="Отмена" className="ghost icon-only" onClick={s.undo} disabled={!s.project?.canUndo} title="Отмена (Ctrl+Z)"><Icon name="undo" /></button>
+        <button aria-label="Повтор" className="ghost icon-only" onClick={s.redo} disabled={!s.project?.canRedo} title="Повтор (Ctrl+Shift+Z)"><Icon name="redo" /></button>
+        <button aria-label="Информация о проекте" className="ghost icon-only" onClick={() => setDialog('info')} disabled={!s.project || s.project.empty} title="Информация о проекте"><Icon name="info" /></button>
+        <button aria-label="Палитра команд" className="ghost icon-only" onClick={() => s.setPaletteOpen(true)} title="Палитра команд (Ctrl+Shift+P)"><Icon name="search" /></button>
+        <button aria-label={s.theme === 'light' ? 'Тёмная тема' : 'Светлая тема'} className="ghost icon-only" onClick={s.toggleTheme} title={s.theme === 'light' ? 'Тёмная тема' : 'Светлая тема'}><Icon name={s.theme === 'light' ? 'moon' : 'sun'} /></button>
       </header>
       {dialog === 'open' && <OpenDialog required={!!s.project?.empty} onClose={() => setDialog(null)} />}
       {s.paletteOpen && <Palette commands={commands} onClose={() => s.setPaletteOpen(false)} />}
@@ -275,9 +275,9 @@ export default function App() {
         <section className="center">
           <div className="tabs">
             <button className={s.tab === 'scheme' ? 'active' : ''} onClick={() => s.setTab('scheme')}>Схема</button>
-            <button className={s.tab === 'code' ? 'active' : ''} onClick={() => s.setTab('code')}>Код{s.selectedClass ? ` · ${s.selectedClass}` : ''}</button>
-            <button className={s.tab === 'model' ? 'active' : ''} onClick={() => s.setTab('model')}>Окно модели{frame?.windows.length ? ` (${frame.windows.length})` : ''}</button>
-            <button className={s.tab === 'picture' ? 'active' : ''} onClick={() => s.setTab('picture')}>Рисунок{s.selectedClass ? ` · ${s.selectedClass}` : ''}</button>
+            <button className={s.tab === 'code' ? 'active' : ''} onClick={() => s.setTab('code')}>Код{s.selectedClass && <span className="tab-sub">{s.selectedClass}</span>}</button>
+            <button className={s.tab === 'model' ? 'active' : ''} onClick={() => s.setTab('model')}>Окно модели{frame?.windows.length ? <span className="tab-count">{frame.windows.length}</span> : null}</button>
+            <button className={s.tab === 'picture' ? 'active' : ''} onClick={() => s.setTab('picture')}>Рисунок{s.selectedClass && <span className="tab-sub">{s.selectedClass}</span>}</button>
             <button className={s.tab === 'icon' ? 'active' : ''} onClick={() => s.setTab('icon')}>Иконка</button>
             <button className={s.tab === 'graph' ? 'active' : ''} onClick={() => s.setTab('graph')}>Граф</button>
           </div>
@@ -314,7 +314,7 @@ export default function App() {
         <section className="bottom">
           <div className="tabs small-tabs">
             <button className={s.bottomTab === 'messages' ? 'active' : ''} onClick={() => s.setBottomTab('messages')}>Сообщения</button>
-            <button className={s.bottomTab === 'graphs' ? 'active' : ''} onClick={() => s.setBottomTab('graphs')}>Графики{s.traceCount ? ` (${s.traceCount})` : ''}</button>
+            <button className={s.bottomTab === 'graphs' ? 'active' : ''} onClick={() => s.setBottomTab('graphs')}>Графики{s.traceCount ? <span className="tab-count">{s.traceCount}</span> : null}</button>
             <button className={s.bottomTab === 'debug' ? 'active' : ''} onClick={() => s.setBottomTab('debug')}>Отладка</button>
             <button className={s.bottomTab === 'search' ? 'active' : ''} onClick={() => s.setBottomTab('search')}>Поиск</button>
           </div>

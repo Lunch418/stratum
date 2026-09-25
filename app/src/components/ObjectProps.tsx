@@ -36,7 +36,7 @@ export function ObjectProps() {
   return (
     <>
       <div className="panel-title">Объект #{o.handle} · {kindName(o.kind)} <span className="spacer" />
-        <button className="small ghost" onClick={() => pickObject(null)} title="Снять выбор">×</button>
+        <button aria-label="Снять выбор" className="small ghost" onClick={() => pickObject(null)} title="Снять выбор">×</button>
       </div>
       <div className="props">
         <label className="prop"><span>Имя</span><input type="text" defaultValue={o.name} key={'name' + o.name} onBlur={e => e.target.value !== o.name && set('name', e.target.value)} /></label>

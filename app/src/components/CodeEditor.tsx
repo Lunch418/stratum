@@ -87,22 +87,39 @@ function registerLanguage(monaco: Monaco) {
       return null;
     },
   });
+  // цвета совпадают с токенами index.css: синька — ключевые слова, типы — как метки инспектора
   monaco.editor.defineTheme('stratum-light', {
-    base: 'vs', inherit: true, colors: { 'editor.background': '#ffffff' },
+    base: 'vs', inherit: true,
+    colors: {
+      'editor.background': '#ffffff', 'editorGutter.background': '#ffffff',
+      'editorLineNumber.foreground': '#9aa5ad', 'editorLineNumber.activeForeground': '#1a2227',
+      'editor.lineHighlightBackground': '#f3f6f8', 'editor.lineHighlightBorder': '#00000000',
+      'editor.selectionBackground': '#cfe0ef', 'editor.inactiveSelectionBackground': '#e3ecf4',
+      'editorCursor.foreground': '#1d5b8f', 'editorIndentGuide.background1': '#e4e8eb',
+      'editorWidget.background': '#ffffff', 'editorWidget.border': '#d6dce0',
+    },
     rules: [
-      { token: 'keyword', foreground: '2f6fdb', fontStyle: 'bold' }, { token: 'type', foreground: '8a63d2' },
-      { token: 'support.function', foreground: '1f7a8c' }, { token: 'constant', foreground: 'e07b39' },
-      { token: 'operator.tilde', foreground: 'c93b3b', fontStyle: 'bold' }, { token: 'number.handle', foreground: '1f9e9e' },
-      { token: 'comment', foreground: '6b7280', fontStyle: 'italic' }, { token: 'string', foreground: '1f9d55' },
+      { token: 'keyword', foreground: '1d5b8f', fontStyle: 'bold' }, { token: 'type', foreground: '7443ad' },
+      { token: 'support.function', foreground: '0d7470' }, { token: 'constant', foreground: 'a8511a' },
+      { token: 'operator.tilde', foreground: 'b3261e', fontStyle: 'bold' }, { token: 'number.handle', foreground: '0d7470' },
+      { token: 'comment', foreground: '6b7780', fontStyle: 'italic' }, { token: 'string', foreground: '1b774a' },
     ],
   });
   monaco.editor.defineTheme('stratum-dark', {
-    base: 'vs-dark', inherit: true, colors: { 'editor.background': '#1b1e26' },
+    base: 'vs-dark', inherit: true,
+    colors: {
+      'editor.background': '#161d21', 'editorGutter.background': '#161d21',
+      'editorLineNumber.foreground': '#56646d', 'editorLineNumber.activeForeground': '#e1e7eb',
+      'editor.lineHighlightBackground': '#1c2429', 'editor.lineHighlightBorder': '#00000000',
+      'editor.selectionBackground': '#2b4a66', 'editor.inactiveSelectionBackground': '#243847',
+      'editorCursor.foreground': '#74abdc', 'editorIndentGuide.background1': '#222b30',
+      'editorWidget.background': '#1e272c', 'editorWidget.border': '#2a343a',
+    },
     rules: [
-      { token: 'keyword', foreground: '6fa0ff', fontStyle: 'bold' }, { token: 'type', foreground: 'b39ddb' },
-      { token: 'support.function', foreground: '7fd1dc' }, { token: 'constant', foreground: 'f0a066' },
-      { token: 'operator.tilde', foreground: 'ff6b6b', fontStyle: 'bold' }, { token: 'number.handle', foreground: '5fd0d0' },
-      { token: 'comment', foreground: '8b92a3', fontStyle: 'italic' }, { token: 'string', foreground: '3dcb7a' },
+      { token: 'keyword', foreground: '74abdc', fontStyle: 'bold' }, { token: 'type', foreground: 'bb9be6' },
+      { token: 'support.function', foreground: '4fc2bb' }, { token: 'constant', foreground: 'eb9a63' },
+      { token: 'operator.tilde', foreground: 'f07a6f', fontStyle: 'bold' }, { token: 'number.handle', foreground: '4fc2bb' },
+      { token: 'comment', foreground: '7f8c95', fontStyle: 'italic' }, { token: 'string', foreground: '5cc28d' },
     ],
   });
 }
@@ -175,6 +192,8 @@ export function CodeEditor() {
 
   const onMount: OnMount = (editor, monaco) => {
     editorRef.current = editor; monacoRef.current = monaco;
+    // свой шрифт грузится асинхронно — после загрузки Monaco должен перемерить знаки
+    document.fonts?.ready.then(() => monaco.editor.remeasureFonts());
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => void save());
     // F1 — справка по слову под курсором
     editor.addCommand(monaco.KeyCode.F1, () => {
@@ -184,11 +203,13 @@ export function CodeEditor() {
     });
   };
 
-  if (!klass) return <div className="muted" style={{ padding: 16 }}>Выберите имидж в иерархии.</div>;
+  if (!klass) return <div className="empty">Выберите имидж в иерархии — здесь откроется его текст.</div>;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div className="panel-title">
-        <span>{klass.name}{klass.library ? ' · библиотека' : ''}{dirty ? ' · изменён' : ''}</span>
+        <span>{klass.name}</span>
+        {klass.library && <span className="tag">библиотека, только чтение</span>}
+        {dirty && <span className="tag warn">изменён</span>}
         <span className="spacer" />
         <button className="small" onClick={save} disabled={!dirty} title="Ctrl+S">Сохранить</button>
       </div>
@@ -200,7 +221,7 @@ export function CodeEditor() {
           beforeMount={registerLanguage}
           onMount={onMount}
           onChange={v => { setText(v ?? ''); setDirty(true); }}
-          options={{ fontFamily: 'JetBrains Mono, ui-monospace, monospace', fontSize: env.editorFontSize, minimap: { enabled: env.minimap }, wordWrap: env.wordWrap ? 'on' : 'off', tabSize: 2, scrollBeyondLastLine: false, wordBasedSuggestions: 'off', readOnly: klass.library }}
+          options={{ fontFamily: '"JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace', fontSize: env.editorFontSize, minimap: { enabled: env.minimap }, wordWrap: env.wordWrap ? 'on' : 'off', tabSize: 2, scrollBeyondLastLine: false, wordBasedSuggestions: 'off', readOnly: klass.library }}
         />
       </div>
     </div>

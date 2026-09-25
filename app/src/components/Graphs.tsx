@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import { api, type Trace } from '../api';
 import { useStore } from '../store';
 
-const COLORS = ['#2f6fdb', '#e07b39', '#1f9d55', '#8a63d2', '#c93b3b', '#1f9e9e', '#d08a00', '#6b7280'];
+// цвета рядов — токены темы (--series-1…8), в тёмной теме светлее
+const COLORS = Array.from({ length: 8 }, (_, i) => `var(--series-${i + 1})`);
 
 export function Graphs() {
   const frame = useStore(s => s.frame);
@@ -50,7 +51,7 @@ export function Graphs() {
         </label>
         <span className="muted">{traces.length}</span>
       </div>
-      {!traces.length && <div className="muted" style={{ padding: 12 }}>Нажмите ∿ у переменной в инспекторе, чтобы наблюдать её здесь.</div>}
+      {!traces.length && <div className="empty">Графиков пока нет. Нажмите ∿ у переменной в инспекторе, чтобы следить за её значением по тактам.</div>}
       <div className="graphs" style={{ display: traces.length ? 'grid' : 'none' }}>
         <div className="legend">
           {traces.map((t, i) => {
@@ -60,7 +61,7 @@ export function Graphs() {
                 <span className="swatch" style={{ background: COLORS[i % COLORS.length] }} />
                 <span className="name" title={`${t.path}.${t.var}`}>{t.path.split('\\').pop()}.{t.var}</span>
                 <span className="mono val">{last === null ? '—' : fmt(last)}</span>
-                <button className="small ghost" title="Убрать" onClick={e => { e.stopPropagation(); api.traceRemove(t.id); }}>×</button>
+                <button aria-label="Убрать" className="small ghost" title="Убрать" onClick={e => { e.stopPropagation(); api.traceRemove(t.id); }}>×</button>
               </div>
             );
           })}
@@ -79,9 +80,9 @@ export function Graphs() {
               const d = pts.map((p, k) => `${k ? 'L' : 'M'} ${px(p[0]).toFixed(1)} ${py(p[1]).toFixed(1)}`).join(' ');
               return (
                 <g key={t.id}>
-                  <path d={d} fill="none" stroke={COLORS[i % COLORS.length]} strokeWidth={1.5} />
-                  <text x={W - pad.r - 2} y={py(hi) + 10} textAnchor="end" fill={COLORS[i % COLORS.length]} className="tick">{fmt(hi)}</text>
-                  <text x={W - pad.r - 2} y={py(lo) - 2} textAnchor="end" fill={COLORS[i % COLORS.length]} className="tick">{fmt(lo)}</text>
+                  <path d={d} fill="none" style={{ stroke: COLORS[i % COLORS.length] }} strokeWidth={1.5} strokeLinejoin="round" />
+                  <text x={W - pad.r - 2} y={py(hi) + 10} textAnchor="end" style={{ fill: COLORS[i % COLORS.length] }} className="tick">{fmt(hi)}</text>
+                  <text x={W - pad.r - 2} y={py(lo) - 2} textAnchor="end" style={{ fill: COLORS[i % COLORS.length] }} className="tick">{fmt(lo)}</text>
                 </g>
               );
             })}

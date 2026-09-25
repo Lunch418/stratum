@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react';
 import { api, type ProjectProperty, type Sheet } from '../api';
 import { classByName, useStore } from '../store';
+import { Icon } from './Icon';
 
 export function Tabs<T extends string>({ tabs, value, onChange }: { tabs: [T, string][]; value: T; onChange: (t: T) => void }) {
   return (
@@ -19,7 +20,7 @@ export function Frame({ title, width, children, onClose, onSubmit, action = 'OK'
     <div className="modal-backdrop" onMouseDown={onClose}>
       <form className="modal" style={width ? { width: `min(${width}px, 94vw)` } : undefined} onMouseDown={e => e.stopPropagation()}
         onSubmit={e => { e.preventDefault(); onSubmit?.(); }}>
-        <div className="panel-title">{title}<span className="spacer" /><button type="button" className="small ghost" onClick={onClose}>×</button></div>
+        <div className="panel-title">{title}<span className="spacer" /><button aria-label="Закрыть" title="Закрыть (Esc)" type="button" className="small ghost icon-only" onClick={onClose}><Icon name="close" /></button></div>
         {children}
         <div className="modal-actions">
           <button type="button" className="ghost" onClick={onClose}>{onSubmit ? 'Отмена' : 'Закрыть'}</button>
@@ -258,7 +259,7 @@ export function EnvOptionsDialog({ onClose }: { onClose: () => void }) {
   }
   return (
     <>
-    <Frame title="Параметры среды" width={600} onClose={onClose} onSubmit={submit}>
+    <Frame title="Параметры среды" width={720} onClose={onClose} onSubmit={submit}>
       <Tabs tabs={[['calc', 'Вычисления'], ['2d', '2D-редактор'], ['editor', 'Редактор'], ['libs', 'Библиотеки'], ['method', 'Методы'], ['vars', 'Переменные'], ['user', 'Пользователь'], ['view', 'Вид']]} value={tab} onChange={setTab} />
       <div className="modal-body dialog-page">
         {tab === 'calc' && <fieldset><legend>Вычисления</legend>

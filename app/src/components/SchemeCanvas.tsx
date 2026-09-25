@@ -161,7 +161,8 @@ export function SchemeCanvas() {
     if (!el || !bounds) return;
     const { width, height } = el.getBoundingClientRect();
     const bw = Math.max(bounds.x1 - bounds.x0, 1), bh = Math.max(bounds.y1 - bounds.y0, 1);
-    const k = Math.min(width / (bw + 80), height / (bh + 80), 4);
+    // разрежённую схему не раздуваем: крупнее полутора масштабов блоки только мешают
+    const k = Math.min(width / (bw + 80), height / (bh + 80), 1.5);
     setView({ k, x: (width - bw * k) / 2 - bounds.x0 * k, y: (height - bh * k) / 2 - bounds.y0 * k });
   }
 
@@ -384,9 +385,13 @@ export function SchemeCanvas() {
           <pattern id="grid" width={gridStep[0] * view.k} height={gridStep[1] * view.k} patternUnits="userSpaceOnUse" x={view.x + gridOrigin[0] * view.k} y={view.y + gridOrigin[1] * view.k}>
             <path className="grid" d={`M ${gridStep[0] * view.k} 0 L 0 0 0 ${gridStep[1] * view.k}`} fill="none" />
           </pattern>
+          {/* каждая пятая линия — основная, как на миллиметровке */}
+          <pattern id="grid-major" width={gridStep[0] * 5 * view.k} height={gridStep[1] * 5 * view.k} patternUnits="userSpaceOnUse" x={view.x + gridOrigin[0] * view.k} y={view.y + gridOrigin[1] * view.k}>
+            <path className="grid-major" d={`M ${gridStep[0] * 5 * view.k} 0 L 0 0 0 ${gridStep[1] * 5 * view.k}`} fill="none" />
+          </pattern>
           <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="context-stroke" /></marker>
         </defs>
-        {layers.grid && <rect width="100%" height="100%" fill="url(#grid)" />}
+        {layers.grid && <><rect width="100%" height="100%" fill="url(#grid)" /><rect width="100%" height="100%" fill="url(#grid-major)" /></>}
         <rect width="100%" height="100%" fill="transparent" onContextMenu={e => { e.preventDefault(); if (editable) setSheetMenu({ x: e.clientX, y: e.clientY }); }} />
         <g transform={`translate(${view.x} ${view.y}) scale(${view.k})`}>
           {layers.graphics && background.svg && background.bounds && (

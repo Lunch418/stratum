@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { loadEnv } from './Options';
 import { api } from '../api';
 import { useStore } from '../store';
+import { Icon } from './Icon';
 
 export function NewProjectDialog({ onClose }: { onClose: () => void }) {
   const project = useStore(s => s.project);
@@ -71,7 +72,7 @@ export function InfoDialog({ onClose }: { onClose: () => void }) {
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>
       <div className="modal" style={{ width: 'min(760px, 94vw)' }} onMouseDown={e => e.stopPropagation()}>
-        <div className="panel-title">Информация о проекте <span className="spacer" /><button className="small ghost" onClick={onClose}>×</button></div>
+        <div className="panel-title">Информация о проекте <span className="spacer" /><button aria-label="Закрыть" title="Закрыть (Esc)" className="small ghost icon-only" onClick={onClose}><Icon name="close" /></button></div>
         {!info ? <div className="muted" style={{ padding: 12 }}>Загрузка…</div> : (
           <div className="modal-body" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, maxHeight: '70vh', overflow: 'auto', fontSize: 12 }}>
             <div>

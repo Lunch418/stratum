@@ -62,7 +62,7 @@ export function Debug() {
               <input type="checkbox" checked={b.enabled} onChange={() => api.breakpointToggle(b.id).then(refresh)} title="Включена" />
               <span className="mono" style={{ flex: 1 }}>{b.expr}</span>
               <span className="muted small" title={b.path}>{b.index !== null ? b.path.split('\\').pop() : `все ${b.class}`}</span>
-              <button className="small ghost" onClick={() => api.breakpointRemove(b.id).then(refresh)} title="Убрать">×</button>
+              <button aria-label="Убрать" className="small ghost" onClick={() => api.breakpointRemove(b.id).then(refresh)} title="Убрать">×</button>
             </div>
           ))}
         </div>
