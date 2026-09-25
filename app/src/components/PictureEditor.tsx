@@ -123,9 +123,15 @@ export function PictureEditor({ kind }: { kind: Kind }) {
       // Z-порядок как в оригинале: PgUp/PgDn на одну, с Ctrl — на верх/вниз
       else if ((e.key === 'PageUp' || e.key === 'PageDown') && sel.length === 1 && editable) { e.preventDefault(); op({ op: 'zorder', handle: sel[0], to: e.key === 'PageUp' ? (e.ctrlKey ? 'top' : 'up') : (e.ctrlKey ? 'bottom' : 'down') }); }
       else if (e.key === 'Enter' && tool === 'polyline' && draft.length >= 2) finishPolyline();
+      // инструменты как в редакторе оригинала: Ctrl+P ломаная, Ctrl+B прямоугольник,
+      // Ctrl+U скруглённый, Ctrl+E эллипс, Ctrl+T текст (перекрывают общие клавиши)
+      else if (e.ctrlKey && !e.shiftKey && !e.altKey && editable) {
+        const t = ({ p: 'polyline', b: 'rect', u: 'roundrect', e: 'ellipse', t: 'text' } as Record<string, Tool>)[e.key.toLowerCase()];
+        if (t) { e.preventDefault(); e.stopImmediatePropagation(); setTool(t); setDraft([]); }
+      }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
   }, [sel, tool, draft, editable, klass?.name]);
 
   async function finishPolyline() {
