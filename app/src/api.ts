@@ -122,6 +122,13 @@ export const api = {
     const r = await fetch(`/api/class/new?name=${encodeURIComponent(name)}`, { method: 'POST' });
     const j = await r.json();
     if (!r.ok) throw new Error(j.error ?? r.statusText);
+    // «Параметры среды → 2D-редактор → Шаблоны»: рисунок и схема нового имиджа из .vdr
+    let tpl: { image?: string; scheme?: string } = {};
+    try { tpl = (JSON.parse(localStorage.getItem('env') ?? '{}') as { templates?: typeof tpl }).templates ?? {}; } catch { /* нет настроек */ }
+    for (const kind of ['image', 'scheme'] as const) {
+      const file = tpl[kind]?.trim();
+      if (file) await fetch(`/api/picture/${encodeURIComponent(name)}?kind=${kind}`, { method: 'POST', body: JSON.stringify({ op: 'insert', file, x: 0, y: 0 }) });
+    }
   },
   traces: (since = 0) => get<{ tick: number; traces: Trace[] }>(`/api/traces?since=${since}`),
   traceAdd: (index: number, name: string) =>

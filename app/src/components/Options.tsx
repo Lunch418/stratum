@@ -205,16 +205,19 @@ export interface EnvOptions {
   syntax: boolean; editorFontSize: number; wordWrap: boolean; minimap: boolean;
   /// «Пользователь»: данные автора и копирование их в новый проект
   user: UserInfo; copyUser: boolean;
+  /// «2D-редактор → Шаблоны»: файлы .vdr для рисунка и схемы нового имиджа
+  templates: { image: string; scheme: string };
 }
 export const defaultEnv: EnvOptions = {
   autosave: 30, pollMs: 40, circlePoints: 32, gridAuto: false, fontSize: 13, confirmClose: true,
   statusTicks: true, statusPerf: false, handCursor: true, syntax: true, editorFontSize: 13, wordWrap: false, minimap: false,
   user: { name: '', org: '', email: '', addr: '', phone: '', notes: '' }, copyUser: true,
+  templates: { image: '', scheme: '' },
 };
 export function loadEnv(): EnvOptions {
   try {
     const saved = JSON.parse(localStorage.getItem('env') ?? '{}') as Partial<EnvOptions>;
-    return { ...defaultEnv, ...saved, user: { ...defaultEnv.user, ...(saved.user ?? {}) } };
+    return { ...defaultEnv, ...saved, user: { ...defaultEnv.user, ...(saved.user ?? {}) }, templates: { ...defaultEnv.templates, ...(saved.templates ?? {}) } };
   } catch { return defaultEnv; }
 }
 
@@ -227,6 +230,13 @@ export function EnvOptionsDialog({ onClose }: { onClose: () => void }) {
   const showToast = useStore(s => s.showToast);
   const libs = [...new Set((project?.classes ?? []).filter(c => c.library).map(c => c.source.replace(/[\\/][^\\/]*$/, '')))];
   const set = (p: Partial<EnvOptions>) => setEnv(e => ({ ...e, ...p }));
+  const [browse, setBrowse] = useState<'image' | 'scheme' | null>(null);
+  const tplField = (label: string, k: 'image' | 'scheme') => (
+    <label className="prop"><span>{label}</span><span style={{ display: 'flex', gap: 6, flex: 1 }}>
+      <input type="text" className="mono" value={env.templates[k]} placeholder="нет — пустой лист" onChange={e => setEnv(v => ({ ...v, templates: { ...v.templates, [k]: e.target.value } }))} />
+      <button type="button" className="small" onClick={() => setBrowse(k)}>Обзор…</button>
+    </span></label>
+  );
   const setUser = (p: Partial<UserInfo>) => setEnv(e => ({ ...e, user: { ...e.user, ...p } }));
   const userField = (label: string, k: keyof UserInfo) => (
     <label className="prop"><span>{label}</span><input type="text" value={env.user[k]} onChange={e => setUser({ [k]: e.target.value })} /></label>
@@ -238,6 +248,7 @@ export function EnvOptionsDialog({ onClose }: { onClose: () => void }) {
     showToast('Параметры среды сохранены'); onClose();
   }
   return (
+    <>
     <Frame title="Параметры среды" width={600} onClose={onClose} onSubmit={submit}>
       <Tabs tabs={[['calc', 'Вычисления'], ['2d', '2D-редактор'], ['editor', 'Редактор'], ['libs', 'Библиотеки'], ['user', 'Пользователь'], ['view', 'Вид']]} value={tab} onChange={setTab} />
       <div className="modal-body dialog-page">
@@ -252,6 +263,9 @@ export function EnvOptionsDialog({ onClose }: { onClose: () => void }) {
           <Num label="Точек в окружности" value={env.circlePoints} onChange={v => set({ circlePoints: Math.min(360, Math.max(8, v)) })} />
           <Check label="Сетка автоматически включается" value={env.gridAuto} onChange={v => set({ gridAuto: v })} />
           <Check label="Курсор-рука при перемещении объектов" value={env.handCursor} onChange={v => set({ handCursor: v })} />
+          <div className="muted small" style={{ marginTop: 6 }}>Шаблоны нового имиджа (файлы .vdr):</div>
+          {tplField('Изображение', 'image')}
+          {tplField('Схема', 'scheme')}
         </fieldset>}
         {tab === 'editor' && <fieldset><legend>Редактор текста</legend>
           <Check label="Использовать редактор с выделением синтаксиса" value={env.syntax} onChange={v => set({ syntax: v })} />
@@ -277,6 +291,9 @@ export function EnvOptionsDialog({ onClose }: { onClose: () => void }) {
         </fieldset>}
       </div>
     </Frame>
+    {browse && <FilePickDialog title="Шаблон — файл .vdr" ext="vdr" onClose={() => setBrowse(null)}
+      onPick={p => { const k = browse; setBrowse(null); setEnv(v => ({ ...v, templates: { ...v.templates, [k]: p } })); }} />}
+    </>
   );
 }
 
