@@ -67,6 +67,7 @@ pub fn store(c: &mut cls::Class, kind: Kind, sp: &Space) {
     // берём их из прежнего рисунка для уцелевших объектов
     if let Some(old) = blob(c, kind).as_deref().and_then(|b| vdr::parse(b, &c.name).ok()) {
         pic.object_data = old.object_data.into_iter().filter(|(h, _)| pic.objects.iter().any(|o| o.handle == *h)).collect();
+        pic.extra = old.extra;
     }
     *blob_mut(c, kind) = Some(vdr::write(&pic));
 }

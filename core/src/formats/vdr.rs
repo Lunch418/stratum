@@ -27,6 +27,9 @@ pub struct Picture {
     /// Данные объектов (блок `0x03FE`) как есть: кроме гиперссылки там
     /// переменные объекта и прочее — при записи сохраняются.
     pub object_data: Vec<(u16, Vec<u8>)>,
+    /// 3.x: нераспознанные чанки после известных (данные самого листа —
+    /// блоки 0x03FC/0x03FD и т. п.) как есть; пишутся обратно в конец.
+    pub extra: Vec<u8>,
     /// Приложения ломаных (стрелки и т. п.) как есть: handle → байты.
     pub arrows: Vec<(u16, Vec<u8>)>,
 }
@@ -359,9 +362,10 @@ pub fn parse(data: &[u8], path: &str) -> Result<Picture> {
     let ctx = Ctx { sized: version >= 0x0300, wide: version >= 0x0200 };
     let mut pic = Picture { version, ..Default::default() };
 
+    let mut total = 0usize;
     let tools_at = if ctx.sized {
         r.u16()?;
-        r.u32()?;
+        total = r.u32()? as usize;
         None
     } else {
         r.u32()?;
@@ -398,6 +402,11 @@ pub fn parse(data: &[u8], path: &str) -> Result<Picture> {
     }
     if !ctx.sized {
         read_object_data_v2(&r.data[r.pos.min(r.data.len())..], &mut pic);
+    } else if total > 0 {
+        let end = (start + total).min(r.data.len());
+        if r.pos < end {
+            pic.extra = r.data[r.pos..end].to_vec();
+        }
     }
     Ok(pic)
 }
@@ -961,6 +970,7 @@ pub fn write(pic: &Picture) -> Vec<u8> {
             });
         });
     }
+    w.bytes(&pic.extra);
     let total = w.pos() as u32;
     w.patch_u32(total_at, total);
     w.data
@@ -1037,6 +1047,17 @@ mod tests {
         assert_eq!(parse_hyper(&with).unwrap().target, "window_2");
         assert_eq!(set_object_vars(Some(&with), "").unwrap(), page);
         assert_eq!(merge_object_data(Some(&page), Some(&parse_hyper(&page).unwrap())).unwrap(), page);
+    }
+
+    #[test]
+    fn keeps_unknown_sheet_chunks_of_a_new_picture() {
+        // «Робот»: за известными чанками 3.x идут данные листа (0x03FD, 0x03FC)
+        let Some(data) = fixture("PROJECTS/samples/ROBOT/ROBOT3.VDR") else { return };
+        let pic = parse(&data, "ROBOT3.VDR").unwrap();
+        assert!(!pic.extra.is_empty());
+        let back = parse(&write(&pic), "copy").unwrap();
+        assert_eq!(back.extra, pic.extra);
+        assert_eq!(back.objects.len(), pic.objects.len());
     }
 
     #[test]

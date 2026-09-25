@@ -190,6 +190,94 @@ impl Class {
         if child.name.is_empty() { &child.class_name } else { &child.name }
     }
 
+    /// Перед записью в `.cls`: у каждой площадки на листе должен быть растр,
+    /// как у оригинала, — двойная битовая карта из `VARPOINT.DBM` (ячейка
+    /// 32×32 в левом верхнем углу). Растры уже существующих площадок
+    /// переносятся на новые места.
+    pub fn draw_pads(&mut self) {
+        use super::vdr;
+        if self.pads.is_empty() {
+            return;
+        }
+        let in_image = self.image.is_some() || self.scheme.is_none();
+        let blob = if in_image { &self.image } else { &self.scheme };
+        let mut pic = blob
+            .as_deref()
+            .and_then(|b| vdr::parse(b, &self.name).ok())
+            .unwrap_or_else(|| vdr::Picture { version: 0x0300, scale: (100.0, 100.0), ..Default::default() });
+        let mut changed = false;
+        for p in &self.pads {
+            if let Some(o) = pic.objects.iter_mut().find(|o| o.handle == p.id) {
+                let mut moved = None;
+                if let vdr::ObjectKind::Bitmap { x, y, w, h, .. } = &mut o.kind {
+                    if (*x, *y) != (p.x, p.y) {
+                        moved = Some((*x, *y, *w, *h));
+                        (*x, *y) = (p.x, p.y);
+                        changed = true;
+                    }
+                }
+                // концы линий связей, что упирались в площадку, едут вместе с ней
+                if let Some((ox, oy, w, h)) = moved {
+                    let (dx, dy) = (p.x - ox, p.y - oy);
+                    for l in self.links.iter().filter(|l| l.pad == p.id) {
+                        let Some(line) = pic.objects.iter_mut().find(|o| o.handle == l.handle) else { continue };
+                        if let vdr::ObjectKind::Polyline { x, y, w: lw, h: lh, points, .. } = &mut line.kind {
+                            for pt in points.iter_mut() {
+                                if pt.0 >= ox - 2.0 && pt.0 <= ox + w + 2.0 && pt.1 >= oy - 2.0 && pt.1 <= oy + h + 2.0 {
+                                    *pt = (pt.0 + dx, pt.1 + dy);
+                                }
+                            }
+                            let xs = points.iter().map(|p| p.0);
+                            let ys = points.iter().map(|p| p.1);
+                            (*x, *y) = (xs.clone().fold(f64::MAX, f64::min), ys.clone().fold(f64::MAX, f64::min));
+                            (*lw, *lh) = (xs.fold(f64::MIN, f64::max) - *x, ys.fold(f64::MIN, f64::max) - *y);
+                        }
+                    }
+                }
+                continue;
+            }
+            let varpoint = |d: &&vdr::Dib| d.double && d.file.as_deref().is_some_and(|f| f.eq_ignore_ascii_case("VARPOINT.DBM"));
+            let dib = match pic.dibs.iter().find(varpoint) {
+                Some(d) => d.handle,
+                None => {
+                    let h = pic.dibs.iter().filter(|d| d.double).map(|d| d.handle).max().unwrap_or(0) + 1;
+                    pic.dibs.push(vdr::Dib { handle: h, bmp: Vec::new(), mask: Vec::new(), file: Some("VARPOINT.DBM".into()), double: true });
+                    h
+                }
+            };
+            pic.objects.push(vdr::Object { handle: p.id, name: String::new(), flags: 0, kind: vdr::ObjectKind::Bitmap { x: p.x, y: p.y, w: 32.0, h: 32.0, src: (0.0, 0.0, 32.0, 32.0), dib, masked: true } });
+            pic.zorder.push(p.id);
+            changed = true;
+        }
+        // линии связей через площадки, которых на листе нет (связи из IDE):
+        // оригинал рисует связь ломаной с handle самой связи и флагами 0x1800
+        for l in &self.links {
+            let Some(p) = self.pads.iter().find(|p| p.id == l.pad && (l.source == 0 || l.target == 0)) else { continue };
+            if pic.objects.iter().any(|o| o.handle == l.handle) {
+                continue;
+            }
+            let other = if l.source == 0 { l.target } else { l.source };
+            let Some(c) = self.child(other) else { continue };
+            let pen = match pic.pens.iter().find(|q| q.color == 0 && q.width <= 1 && q.style == 0) {
+                Some(q) => q.handle,
+                None => {
+                    let h = pic.pens.iter().map(|q| q.handle).max().unwrap_or(0) + 1;
+                    pic.pens.push(vdr::Pen { handle: h, color: 0, style: 0, width: 1, rop: 13 });
+                    h
+                }
+            };
+            let (a, b) = ((p.x + 16.0, p.y + 16.0), (c.x + 16.0, c.y + 16.0));
+            let (x, y) = (a.0.min(b.0), a.1.min(b.1));
+            pic.objects.push(vdr::Object { handle: l.handle, name: String::new(), flags: 0x1800, kind: vdr::ObjectKind::Polyline { x, y, w: (a.0 - b.0).abs(), h: (a.1 - b.1).abs(), pen, brush: 0, points: vec![a, b] } });
+            pic.zorder.push(l.handle);
+            changed = true;
+        }
+        if changed {
+            let data = Some(vdr::write(&pic));
+            if in_image { self.image = data } else { self.scheme = data }
+        }
+    }
+
     /// Найти контактные площадки по графике листа оригинала: линия связи с
     /// handle самой связи одним концом приходит к блоку, другим — к растру вне
     /// групп; этот растр и есть площадка.
@@ -526,6 +614,19 @@ mod tests {
         assert_eq!(cls.version, 0x3003);
         assert!(cls.vars.iter().any(|v| v.name == "WindowName" && v.var_type == "STRING"));
         assert!(cls.text.contains("SetControlText2d"));
+    }
+
+    #[test]
+    fn pads_survive_export_to_cls() {
+        // площадка, поставленная в IDE, рисуется растром VARPOINT.DBM и находится снова
+        let mut cls = Class { name: "Лист".into(), version: 0x3003, ..Default::default() };
+        cls.children.push(Child { class_name: "Блок".into(), handle: 3, name: String::new(), x: 200.0, y: 40.0, flags: 0 });
+        cls.links.push(Link { source: 0, target: 3, handle: 5, vars: vec![("x".into(), "x".into())], pad: 7, ..Default::default() });
+        cls.pads.push(Pad { id: 7, x: 16.0, y: 40.0 });
+        cls.draw_pads();
+        let back = parse(&write(&cls), "mem").unwrap();
+        assert_eq!(back.pads, cls.pads);
+        assert_eq!(back.links[0].pad, 7);
     }
 
     #[test]

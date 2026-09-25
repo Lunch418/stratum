@@ -129,7 +129,15 @@ impl Matcher {
 
 /// Свободный дескриптор на листе: не занят ни блоком, ни связью, ни площадкой.
 fn free_handle(c: &cls::Class) -> u16 {
-    let used = c.children.iter().map(|x| x.handle).chain(c.links.iter().map(|l| l.handle)).chain(c.pads.iter().map(|p| p.id));
+    // и не занят объектом графики листа: при экспорте в .cls площадки и линии
+    // связей ложатся туда же
+    let drawn: Vec<u16> = [c.image.as_deref(), c.scheme.as_deref()]
+        .into_iter()
+        .flatten()
+        .filter_map(|b| vdr::parse(b, &c.name).ok())
+        .flat_map(|p| p.objects.into_iter().map(|o| o.handle).collect::<Vec<_>>())
+        .collect();
+    let used = c.children.iter().map(|x| x.handle).chain(c.links.iter().map(|l| l.handle)).chain(c.pads.iter().map(|p| p.id)).chain(drawn);
     used.max().unwrap_or(0).saturating_add(1).max(1)
 }
 

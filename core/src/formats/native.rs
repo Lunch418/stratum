@@ -434,7 +434,9 @@ pub fn export_stratum2000(dir: &Path, project: &LoadedProject) -> std::io::Resul
     }
     let compiled = compile_classes(project);
     for (cls, stem) in compiled.iter().zip(unique_stems(project, "")) {
-        std::fs::write(dir.join(format!("{stem}.cls")), super::cls::write(cls))?;
+        let mut cls = cls.clone();
+        cls.draw_pads();
+        std::fs::write(dir.join(format!("{stem}.cls")), super::cls::write(&cls))?;
     }
     Ok(())
 }
