@@ -204,6 +204,9 @@ pub struct Space {
     pub window_size: String,
     /// Стиль окна: "dialog" — с рамкой диалога, "popup" — без заголовка.
     pub window_style: String,
+    /// Дочернее окно (`CreateWindowEx` со стилем WS_CHILD): имя родителя и
+    /// смещение от левого верхнего угла его окна; рамки у него нет.
+    pub child_of: Option<(String, (f64, f64))>,
     /// Наибольший выданный дескриптор: объекты и инструменты нумеруются
     /// одним счётчиком, как в оригинале.
     next: Handle,
@@ -216,6 +219,8 @@ pub struct Space {
 pub const DEFAULT_CLIENT: (f64, f64) = (625.0, 611.0);
 /// Рамка и заголовок: окно больше клиентской области на столько.
 pub const WINDOW_FRAME: (f64, f64) = (8.0, 34.0);
+/// Смещение клиентской области от угла окна: рамка слева и рамка с заголовком сверху.
+pub const WINDOW_BORDER: (f64, f64) = (4.0, 30.0);
 /// Шаг каскада (заголовок + рамка) и число ступеней до возврата в угол.
 pub const CASCADE_STEP: f64 = 29.0;
 pub const CASCADE_STEPS: usize = 11;

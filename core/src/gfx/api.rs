@@ -3,7 +3,7 @@
 //! Сигнатуры — из `docs/lang/functions.md`. Возвращаемые значения как в
 //! оригинале: дескриптор или 0 при ошибке, 1/0 для успеха.
 
-use super::{Brush, Dib, Font, Gfx, Handle, Object, Pen, Shape, Space, TextPart, WINDOW_FRAME, WORKSPACE_ON_SCREEN};
+use super::{Brush, Dib, Font, Gfx, Handle, Object, Pen, Shape, Space, TextPart, WINDOW_BORDER, WINDOW_FRAME, WORKSPACE_ON_SCREEN};
 use crate::runtime::value::Value;
 
 fn f(args: &[Value], i: usize) -> f64 {
@@ -37,34 +37,7 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
         // ── окна ──────────────────────────────────────────────────────────
         "getwindowspace" => handle(gfx.window_space(&s(args, 0)).unwrap_or(0)),
         "iswindowexist" => ok(gfx.window_space(&s(args, 0)).is_some()),
-        "openschemewindow" => {
-            let window = s(args, 0);
-            let class = s(args, 1);
-            let sp = gfx.open_window(&window);
-            if let Some(space) = gfx.space_mut(sp) {
-                space.source_class = class.clone();
-            }
-            if !class.is_empty() {
-                gfx.hyper_current.insert(window.clone(), class.clone());
-                if let Some(pic) = gfx.pictures.get(&class.to_lowercase()).cloned() {
-                    gfx.space_mut(sp).unwrap().load(&pic);
-                    embed_children(gfx, sp, &class);
-                    gfx.resolve_dibs(sp);
-                    gfx.fit_client(sp);
-                }
-                // «Параметры листа → Окно»: заданный размер и маска слоёв
-                if let Some(sheet) = gfx.sheets.get(&class.to_lowercase()).cloned() {
-                    let space = gfx.space_mut(sp).unwrap();
-                    if sheet.window_size == "fixed" && sheet.window_wh.0 > 0.0 && sheet.window_wh.1 > 0.0 {
-                        space.client = sheet.window_wh;
-                    }
-                    space.window_size = sheet.window_size.clone();
-                    space.window_style = sheet.window_style.clone();
-                    space.layers = sheet.layers;
-                }
-            }
-            handle(sp)
-        }
+        "openschemewindow" => handle(open_scheme_window(gfx, &s(args, 0), &s(args, 1))),
         "loadspacewindow" => {
             let window = s(args, 0);
             let file = s(args, 1);
@@ -81,7 +54,39 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
             }
             handle(sp)
         }
-        "createwindow" | "createwindowex" => handle(gfx.open_window(&s(args, 0))),
+        "createwindow" => handle(gfx.open_window(&s(args, 0))),
+        // CreateWindowEx(окно, родитель, источник, x, y, ширина, высота, стиль):
+        // источник — имя имиджа (окно его схемы, как OpenSchemeWindow) или
+        // файл .vdr; пустая строка — пустое окно (сверено в Wine: L3, LGSpaceEx)
+        "createwindowex" => {
+            let (window, source) = (s(args, 0), s(args, 2));
+            let sp = if source.to_lowercase().ends_with(".vdr") {
+                let sp = gfx.open_window(&window);
+                if let Some(pic) = gfx.load_picture_file(&source) {
+                    gfx.space_mut(sp).unwrap().load(&pic);
+                    gfx.resolve_dibs(sp);
+                }
+                sp
+            } else {
+                open_scheme_window(gfx, &window, &source)
+            };
+            let (w, hh) = (f(args, 5), f(args, 6));
+            // дочернее окно без рамки встаёт в клиентскую область родителя:
+            // x, y — в координатах листа родителя (сверено в Wine: L3,
+            // окно «OSC» в «test»: 85 + 4 + (240 − 120) = 209)
+            let parent = s(args, 1);
+            let child = s(args, 7).to_uppercase().contains("WS_CHILD");
+            let offset = window_space(gfx, &parent).map(|p| (WINDOW_BORDER.0 + f(args, 3) - p.origin.0, WINDOW_BORDER.1 + f(args, 4) - p.origin.1));
+            if let Some(space) = gfx.space_mut(sp) {
+                if w > 0.0 && hh > 0.0 {
+                    space.client = (w, hh);
+                }
+                if let (true, Some(offset)) = (child, offset) {
+                    space.child_of = Some((parent, offset));
+                }
+            }
+            handle(sp)
+        }
         "closewindow" => ok(gfx.close_window(&s(args, 0))),
         "getclientwidth" => num(window_space(gfx, &s(args, 0)).map(|sp| sp.client.0).unwrap_or(0.0)),
         "getclientheight" => num(window_space(gfx, &s(args, 0)).map(|sp| sp.client.1).unwrap_or(0.0)),
@@ -108,10 +113,10 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
         "setwindowtitle" | "setwindowprop" | "bringwindowtotop"
         | "setwindowtransparent" | "setwindowtransparentcolor" => ok(window_space(gfx, &s(args, 0)).is_some()),
         // положение — в экранных координатах, размер — с рамкой и заголовком
-        "getwindoworgx" => num(window_space(gfx, &s(args, 0)).map(|sp| sp.org.0 + WORKSPACE_ON_SCREEN.0).unwrap_or(0.0)),
-        "getwindoworgy" => num(window_space(gfx, &s(args, 0)).map(|sp| sp.org.1 + WORKSPACE_ON_SCREEN.1).unwrap_or(0.0)),
-        "getwindowwidth" => num(window_space(gfx, &s(args, 0)).map(|sp| sp.client.0 + WINDOW_FRAME.0).unwrap_or(0.0)),
-        "getwindowheight" => num(window_space(gfx, &s(args, 0)).map(|sp| sp.client.1 + WINDOW_FRAME.1).unwrap_or(0.0)),
+        "getwindoworgx" => num(window_screen_org(gfx, &s(args, 0), 0).map(|o| o.0).unwrap_or(0.0)),
+        "getwindoworgy" => num(window_screen_org(gfx, &s(args, 0), 0).map(|o| o.1).unwrap_or(0.0)),
+        "getwindowwidth" => num(window_space(gfx, &s(args, 0)).map(|sp| sp.client.0 + if sp.child_of.is_some() { 0.0 } else { WINDOW_FRAME.0 }).unwrap_or(0.0)),
+        "getwindowheight" => num(window_space(gfx, &s(args, 0)).map(|sp| sp.client.1 + if sp.child_of.is_some() { 0.0 } else { WINDOW_FRAME.1 }).unwrap_or(0.0)),
         // GetWindowProp(name, prop): "hwnd" и прочие свойства ОС нам недоступны
         // GetWindowProp(окно, "Classname" | "Filename") — из чего открыто окно
         "getwindowprop" => Value::Str(window_space(gfx, &s(args, 0)).map(|sp| match s(args, 1).to_ascii_lowercase().as_str() {
@@ -875,6 +880,15 @@ fn window_space<'a>(gfx: &'a Gfx, name: &str) -> Option<&'a Space> {
     gfx.window_space(name).and_then(|h| gfx.space(h))
 }
 
+/// Левый верхний угол окна на экране; дочернее окно — от угла родителя.
+fn window_screen_org(gfx: &Gfx, name: &str, depth: u32) -> Option<(f64, f64)> {
+    let sp = window_space(gfx, name)?;
+    match &sp.child_of {
+        Some((parent, off)) if depth < 16 => window_screen_org(gfx, parent, depth + 1).map(|p| (p.0 + off.0, p.1 + off.1)),
+        _ => Some((sp.org.0 + WORKSPACE_ON_SCREEN.0, sp.org.1 + WORKSPACE_ON_SCREEN.1)),
+    }
+}
+
 fn window_space_mut<'a>(gfx: &'a mut Gfx, name: &str) -> Option<&'a mut Space> {
     let h = gfx.window_space(name)?;
     gfx.space_mut(h)
@@ -1071,6 +1085,36 @@ pub fn insert_objects(sp: &mut Space, pic: &super::Picture) -> (Vec<Handle>, Vec
 /// значков его схемы в нём нет. Установлено по снимку оригинала
 /// («Солнечная система»: текст NumberView получает номера 16, 21, 26, а
 /// GetObject2dByName(HSpace, _HObject, "text") находит его внутри значка).
+/// Окно схемы имиджа (OpenSchemeWindow): рисунок схемы с рисунками детей.
+fn open_scheme_window(gfx: &mut Gfx, window: &str, class: &str) -> Handle {
+    let window = window.to_string();
+    let class = class.to_string();
+    let sp = gfx.open_window(&window);
+    if let Some(space) = gfx.space_mut(sp) {
+        space.source_class = class.clone();
+    }
+    if !class.is_empty() {
+        gfx.hyper_current.insert(window.clone(), class.clone());
+        if let Some(pic) = gfx.pictures.get(&class.to_lowercase()).cloned() {
+            gfx.space_mut(sp).unwrap().load(&pic);
+            embed_children(gfx, sp, &class);
+            gfx.resolve_dibs(sp);
+            gfx.fit_client(sp);
+        }
+        // «Параметры листа → Окно»: заданный размер и маска слоёв
+        if let Some(sheet) = gfx.sheets.get(&class.to_lowercase()).cloned() {
+            let space = gfx.space_mut(sp).unwrap();
+            if sheet.window_size == "fixed" && sheet.window_wh.0 > 0.0 && sheet.window_wh.1 > 0.0 {
+                space.client = sheet.window_wh;
+            }
+            space.window_size = sheet.window_size.clone();
+            space.window_style = sheet.window_style.clone();
+            space.layers = sheet.layers;
+        }
+    }
+    sp
+}
+
 fn embed_children(gfx: &mut Gfx, sp: Handle, class: &str) {
     let mut children = gfx.class_children.get(&crate::lang::fold(class)).cloned().unwrap_or_default();
     // рисунки раздаются по имиджам: сначала все экземпляры имиджа, который
