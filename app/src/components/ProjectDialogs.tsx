@@ -28,6 +28,11 @@ export function NewProjectDialog({ onClose }: { onClose: () => void }) {
         const props: [string, string][] = [['user_name', [u.name, u.org].filter(Boolean).join(', ')], ['user_email', u.email], ['user_addr', [u.addr, u.phone].filter(Boolean).join('; ')], ['info', u.notes]];
         for (const [k, v] of props) if (v) await api.setProjectProperty(k, v);
       }
+      // «Параметры среды → Методы, Переменные»: свойства нового проекта
+      const pd = env.projectDefaults;
+      await api.setProjectProperty('lin_method', pd.lin_method);
+      await api.setProjectProperty('nl_method', pd.nl_method);
+      for (const k of ['newton_iter', 'newton_eps', 'vars_logset', 'vars_preload'] as const) await api.setProjectProperty(k, pd[k]);
       await load();
       showToast('Проект создан');
       onClose();

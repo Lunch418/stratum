@@ -207,22 +207,27 @@ export interface EnvOptions {
   user: UserInfo; copyUser: boolean;
   /// «2D-редактор → Шаблоны»: файлы .vdr для рисунка и схемы нового имиджа
   templates: { image: string; scheme: string };
+  /// «Методы» и «Переменные» по умолчанию — свойства нового проекта
+  projectDefaults: ProjectDefaults;
 }
+export interface ProjectDefaults { lin_method: string; nl_method: string; newton_iter: number; newton_eps: number; vars_logset: number; vars_preload: number }
+const defaultProjectDefaults: ProjectDefaults = { lin_method: 'gauss', nl_method: 'newton', newton_iter: 50, newton_eps: 6, vars_logset: 0, vars_preload: 0 };
 export const defaultEnv: EnvOptions = {
   autosave: 30, pollMs: 40, circlePoints: 32, gridAuto: false, fontSize: 13, confirmClose: true,
   statusTicks: true, statusPerf: false, handCursor: true, syntax: true, editorFontSize: 13, wordWrap: false, minimap: false,
   user: { name: '', org: '', email: '', addr: '', phone: '', notes: '' }, copyUser: true,
   templates: { image: '', scheme: '' },
+  projectDefaults: defaultProjectDefaults,
 };
 export function loadEnv(): EnvOptions {
   try {
     const saved = JSON.parse(localStorage.getItem('env') ?? '{}') as Partial<EnvOptions>;
-    return { ...defaultEnv, ...saved, user: { ...defaultEnv.user, ...(saved.user ?? {}) }, templates: { ...defaultEnv.templates, ...(saved.templates ?? {}) } };
+    return { ...defaultEnv, ...saved, user: { ...defaultEnv.user, ...(saved.user ?? {}) }, templates: { ...defaultEnv.templates, ...(saved.templates ?? {}) }, projectDefaults: { ...defaultProjectDefaults, ...(saved.projectDefaults ?? {}) } };
   } catch { return defaultEnv; }
 }
 
 export function EnvOptionsDialog({ onClose }: { onClose: () => void }) {
-  const [tab, setTab] = useState<'calc' | '2d' | 'editor' | 'libs' | 'user' | 'view'>('calc');
+  const [tab, setTab] = useState<'calc' | '2d' | 'editor' | 'libs' | 'method' | 'vars' | 'user' | 'view'>('calc');
   const [env, setEnv] = useState<EnvOptions>(loadEnv);
   const theme = useStore(s => s.theme);
   const toggleTheme = useStore(s => s.toggleTheme);
@@ -237,6 +242,10 @@ export function EnvOptionsDialog({ onClose }: { onClose: () => void }) {
       <button type="button" className="small" onClick={() => setBrowse(k)}>Обзор…</button>
     </span></label>
   );
+  const pd = env.projectDefaults;
+  const setPd = (p: Partial<ProjectDefaults>) => setEnv(e => ({ ...e, projectDefaults: { ...e.projectDefaults, ...p } }));
+  const pdBit = (k: 'vars_logset' | 'vars_preload', b: number) => (pd[k] & b) !== 0;
+  const setPdBit = (k: 'vars_logset' | 'vars_preload', b: number, v: boolean) => setPd({ [k]: v ? pd[k] | b : pd[k] & ~b });
   const setUser = (p: Partial<UserInfo>) => setEnv(e => ({ ...e, user: { ...e.user, ...p } }));
   const userField = (label: string, k: keyof UserInfo) => (
     <label className="prop"><span>{label}</span><input type="text" value={env.user[k]} onChange={e => setUser({ [k]: e.target.value })} /></label>
@@ -250,7 +259,7 @@ export function EnvOptionsDialog({ onClose }: { onClose: () => void }) {
   return (
     <>
     <Frame title="Параметры среды" width={600} onClose={onClose} onSubmit={submit}>
-      <Tabs tabs={[['calc', 'Вычисления'], ['2d', '2D-редактор'], ['editor', 'Редактор'], ['libs', 'Библиотеки'], ['user', 'Пользователь'], ['view', 'Вид']]} value={tab} onChange={setTab} />
+      <Tabs tabs={[['calc', 'Вычисления'], ['2d', '2D-редактор'], ['editor', 'Редактор'], ['libs', 'Библиотеки'], ['method', 'Методы'], ['vars', 'Переменные'], ['user', 'Пользователь'], ['view', 'Вид']]} value={tab} onChange={setTab} />
       <div className="modal-body dialog-page">
         {tab === 'calc' && <fieldset><legend>Вычисления</legend>
           <Num label="Опрос окна модели, мс" value={env.pollMs} onChange={v => set({ pollMs: Math.max(10, v) })} />
@@ -273,6 +282,19 @@ export function EnvOptionsDialog({ onClose }: { onClose: () => void }) {
           <Check label="Переносить длинные строки" value={env.wordWrap} onChange={v => set({ wordWrap: v })} />
           <Check label="Мини-карта текста" value={env.minimap} onChange={v => set({ minimap: v })} />
           <div className="muted small">Цветовая схема текста следует теме среды («Вид»).</div>
+        </fieldset>}
+        {tab === 'method' && <fieldset><legend>По умолчанию для новых проектов</legend>
+          <label className="prop"><span>Линейные уравнения</span><select value={pd.lin_method} onChange={e => setPd({ lin_method: e.target.value })}><option value="gauss">Метод Гаусса</option><option value="lsq">Наименьшие квадраты</option></select></label>
+          <label className="prop"><span>Нелинейные уравнения</span><select value={pd.nl_method} onChange={e => setPd({ nl_method: e.target.value })}><option value="newton">Ньютон — Рафсон</option></select></label>
+          <Num label="Максимальное число итераций" value={pd.newton_iter} onChange={v => setPd({ newton_iter: Math.max(1, v) })} />
+          <Num label="Допустимая ошибка, 10⁻ⁿ" value={pd.newton_eps} onChange={v => setPd({ newton_eps: v })} />
+          <div className="muted small">Дифференциальные уравнения решаются методом Эйлера с шагом такта. Свои методы у проекта — «Параметры проекта → Методы».</div>
+        </fieldset>}
+        {tab === 'vars' && <fieldset><legend>Устанавливаемые переменные — для новых проектов</legend>
+          <Check label="Запоминать устанавливаемые переменные" value={pdBit('vars_logset', 1)} onChange={v => setPdBit('vars_logset', 1, v)} />
+          <Check label="Автоматически считывать при загрузке проекта" value={pdBit('vars_preload', 1)} onChange={v => setPdBit('vars_preload', 1, v)} />
+          <Check label="Автоматически записывать при закрытии проекта" value={pdBit('vars_preload', 2)} onChange={v => setPdBit('vars_preload', 2, v)} />
+          <Check label="Запоминать только до первого шага" value={pdBit('vars_logset', 2)} onChange={v => setPdBit('vars_logset', 2, v)} />
         </fieldset>}
         {tab === 'user' && <fieldset><legend>Ваши данные</legend>
           {userField('Имя', 'name')}{userField('Организация', 'org')}{userField('Почта', 'email')}{userField('Адрес', 'addr')}{userField('Телефон/факс', 'phone')}
