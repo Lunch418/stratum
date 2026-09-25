@@ -8,6 +8,10 @@ on:
     branches: [main]
   pull_request:
 
+# токен GITHUB_TOKEN — только чтение
+permissions:
+  contents: read
+
 jobs:
   core:
     strategy:
