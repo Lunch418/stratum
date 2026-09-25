@@ -9,19 +9,18 @@ import { Frame, Tabs } from './Options';
 
 type Tab = 'place' | 'pen' | 'brush' | 'text' | 'bmp' | 'group' | 'hyper' | 'vars' | 'points' | 'info';
 
-/// «Переменные» объекта: `a,b;x,y` — переменной a этого имиджа сопоставлена
-/// переменная (или псевдоним) x другого имиджа.
+/// «Переменные» объекта: `a,x;b,y` — переменной a этого имиджа сопоставлена
+/// переменная (или псевдоним) x другого имиджа, b — y (так в «Роботе»:
+/// `_HObject,_HPrev;out,in`).
 function parseVars(text: string): Map<string, string> {
-  const [names, targets] = text.split(';');
-  const a = (names ?? '').split(',').map(s => s.trim()), b = (targets ?? '').split(',').map(s => s.trim());
-  return new Map(a.map((n, i): [string, string] => [n.toLowerCase(), b[i] ?? '']).filter(([n]) => n));
+  return new Map(text.split(';').map(p => p.split(',').map(x => x.trim())).filter(p => p[0]).map((p): [string, string] => [p[0].toLowerCase(), p[1] ?? '']));
 }
 function VarsTab({ text, vars, onChange }: { text: string; vars: string[]; onChange: (t: string) => void }) {
   const map = parseVars(text);
   const [values, setValues] = useState<Record<string, string>>(() => Object.fromEntries(vars.map(v => [v, map.get(v.toLowerCase()) ?? ''])));
   const commit = (next: Record<string, string>) => {
     const pairs = Object.entries(next).filter(([, t]) => t.trim());
-    onChange(pairs.length ? pairs.map(p => p[0]).join(',') + ';' + pairs.map(p => p[1].trim()).join(',') : '');
+    onChange(pairs.map(p => p[0] + ',' + p[1].trim()).join(';'));
   };
   return <>
     <div className="muted small">Напротив переменных этого имиджа введите переменные (или псевдонимы) другого имиджа: связь, начатая и законченная на этом объекте, соединит их сама.</div>

@@ -9,6 +9,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, type ClassInfo } from '../api';
 import { classByName, useStore } from '../store';
 import { LinkDialog } from './LinkDialog';
+import { suggestPairs } from '../autolink';
 import type { LinkStyle } from '../api';
 
 export const DRAG_CLASS = 'application/x-stratum-class';
@@ -228,6 +229,12 @@ export function SchemeCanvas() {
     }
   }
 
+  function classOfHandle(h: number) {
+    if (!klass) return undefined;
+    if (h === SELF) return klass;
+    return classByName(project, klass.children.find(c => c.handle === h)?.class);
+  }
+
   function onMouseUp(e: React.MouseEvent) {
     if (padDrag && klass && padDrag.moved) {
       const pad = klass.pads.find(q => q.id === padDrag.id);
@@ -259,7 +266,12 @@ export function SchemeCanvas() {
       } else if (toPad !== null && toPad !== undefined && wire.from !== SELF) {
         setLinkEdit({ handle: 0, source: wire.from, target: SELF, pairs: [], pad: Number(toPad) });
       } else if (target !== null && target !== undefined && Number(target) !== wire.from) {
-        setLinkEdit({ handle: 0, source: wire.from, target: Number(target), pairs: [] });
+        const from = wire.from, to = Number(target);
+        // «Переменные» объектов рисунка: совпавшие переменные соединяются сами
+        suggestPairs(classOfHandle(from), classOfHandle(to)).then(pairs => {
+          setLinkEdit({ handle: 0, source: from, target: to, pairs });
+          if (pairs.length) showToast(`Соединено по «Переменным» объектов: ${pairs.length}`);
+        });
       }
     }
     setDrag(null); setPan(null); setWire(null);

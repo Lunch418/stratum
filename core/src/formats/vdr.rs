@@ -157,8 +157,9 @@ fn object_items(raw: &[u8]) -> Vec<(u16, Vec<u8>)> {
     items
 }
 
-/// Переменные объекта (закладка «Переменные»): элемент `0x0d`, строка вида
-/// `переменные имиджа;переменные или псевдонимы другого имиджа`.
+/// Переменные объекта (закладка «Переменные»): элемент `0x0d`, строка —
+/// пары `переменная имиджа,переменная или псевдоним другого имиджа` через `;`
+/// (в «Роботе» `_HObject,_HPrev;out,in` — связи `_HObject→_HPrev`, `out→in`).
 pub fn object_vars(raw: &[u8]) -> Option<String> {
     let (_, data) = object_items(raw).into_iter().find(|(id, _)| *id == 0x0d)?;
     let end = data.iter().position(|&b| b == 0).unwrap_or(data.len());
