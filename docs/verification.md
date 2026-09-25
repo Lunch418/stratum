@@ -138,6 +138,13 @@ python3 tools/verify_trajectory.py fixtures/PROJECTS/samples/GIST --ticks 50
   такта 20): 2d, api, DIALOG (`DialogBox`), Example.33, MENU (`Stop(1)`),
   Net, NUI, Ogre_3D, sclogo, TextAnalyser, VIDEO, WRITEAVI.
 
+`verify_trajectory.py` закрывает модальные окна оригинала Enter
+(`tools/wine_dialogs.py`: ввод значения, сообщение — «OK» со значением по
+умолчанию, как у ядра без пользователя), а `stratum instrument` копирует к
+проекту его файлы (меню `.mnu`, матрицы, тексты, вложенные папки). Так
+получены снимки Example.33 (окно «Задание начальных условий») и MENU (без
+`menu.mnu` оригинал останавливался окном ошибки).
+
 `sttdiff` сопоставляет экземпляры по имиджу, handle на схеме и номеру
 вхождения (у каждого шара свой `Engine#3`); `--all` печатает все расхождения.
 

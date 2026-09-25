@@ -677,6 +677,10 @@ fn cmd_instrument(args: &[String]) -> Result<(), String> {
         }
     }
     formats::native::export_stratum2000(dest, &loaded).map_err(|e| e.to_string())?;
+    // файлы модели рядом с проектом (меню .mnu, матрицы, тексты, картинки,
+    // вложенные папки) нужны оригиналу по относительным путям
+    let src_dir = if src.is_dir() { src.clone() } else { src.parent().map(PathBuf::from).unwrap_or_default() };
+    copy_resources(&src_dir, dest).map_err(|e| e.to_string())?;
     // без байт-кода корня оригинал не выполнит счётчик — проверяем
     let data = std::fs::read(std::fs::read_dir(dest).map_err(|e| e.to_string())?.flatten().map(|e| e.path())
         .find(|p| p.extension().is_some_and(|x| x.eq_ignore_ascii_case("cls")) && formats::cls::parse(&std::fs::read(p).unwrap_or_default(), "").is_ok_and(|c| lang::same_name(&c.name, &root)))
@@ -686,6 +690,26 @@ fn cmd_instrument(args: &[String]) -> Result<(), String> {
         return Err(format!("текст корневого имиджа {root} не компилируется — сверка невозможна"));
     }
     println!("подготовлено: {} имиджей, сохранение состояния на такте {} → {state}", loaded.own_classes, ticks);
+    Ok(())
+}
+
+/// Копирует в `dest` всё, кроме имиджей и файлов проекта, чего там ещё нет
+/// (имена сравниваются без регистра, как в Windows).
+fn copy_resources(src: &Path, dest: &Path) -> std::io::Result<()> {
+    let existing: Vec<String> = std::fs::read_dir(dest)?.flatten().map(|e| e.file_name().to_string_lossy().to_lowercase()).collect();
+    for entry in std::fs::read_dir(src)?.flatten() {
+        let path = entry.path();
+        let name = entry.file_name().to_string_lossy().to_lowercase();
+        if existing.contains(&name) {
+            continue;
+        }
+        if path.is_dir() {
+            std::fs::create_dir_all(dest.join(entry.file_name()))?;
+            copy_resources(&path, &dest.join(entry.file_name()))?;
+        } else if !(name.ends_with(".cls") || name.ends_with(".spj") || name.ends_with(".prj")) {
+            std::fs::copy(&path, dest.join(entry.file_name()))?;
+        }
+    }
     Ok(())
 }
 
