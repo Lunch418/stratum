@@ -1240,6 +1240,21 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
                 });
                 let Some((s3, cam)) = view else { return error("400 Bad Request", "объект — не проекция 3D") };
                 let Some(sp3) = gfx.spaces3d.get_mut(&s3) else { return error("404 Not Found", "нет 3D-пространства") };
+                // «Вставка → 3d → Создать новую / Дублировать камеру»: проекция переключается на неё
+                if field == "camera.new" || field == "camera.duplicate" {
+                    let mut c = match (field.as_str(), sp3.cameras.get(&cam)) {
+                        ("camera.duplicate", Some(c)) => crate::gfx::space3d::Camera { name: format!("{} копия", c.name), ..c.clone() },
+                        _ => crate::gfx::space3d::Camera { handle: 0, name: "Камера".into(), pos: [1000.0, 800.0, 500.0], target: [0.0; 3], up: [0.0, 0.0, 1.0], extent: 0.0, focus: 0.0, background: sp3.cameras.get(&cam).map(|c| c.background).unwrap_or(0xFFFFFF), flags: 0 },
+                    };
+                    c.handle = 0;
+                    let h = sp3.add_camera(c);
+                    if let Some(o) = gfx.window_space(&win).and_then(|w| gfx.space_mut(w)).and_then(|sp| sp.objects.get_mut(&handle)) {
+                        if let crate::gfx::Shape::View3d { camera, .. } = &mut o.shape {
+                            *camera = h;
+                        }
+                    }
+                    return json(format!("{{\"ok\":true,\"camera\":{h}}}"));
+                }
                 let xyz: Vec<f64> = value.split(',').filter_map(|p| p.trim().parse().ok()).collect();
                 let done = if let Some(m) = field.strip_prefix("material.") {
                     let h = m.parse().unwrap_or(0);

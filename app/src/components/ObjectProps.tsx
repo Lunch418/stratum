@@ -101,6 +101,10 @@ export function ObjectProps() {
                 <label className="prop"><span>Кадр</span><input type="number" className="mono" defaultValue={o.view3d.camera.extent} key={'x' + o.view3d.camera.extent} onBlur={e => set('camera.extent', e.target.value)} title="Половина ширины кадра; 0 — по сцене" /></label>
               </div>
             </> : <div className="muted small">Камеры нет.</div>}
+            <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+              <button className="small" onClick={() => set('camera.new', 1)}>Новая камера</button>
+              <button className="small" onClick={() => set('camera.duplicate', 1)} disabled={!o.view3d.camera}>Дублировать камеру</button>
+            </div>
           </details>
         )}
         {o.view3d && o.view3d.materials.length > 0 && (

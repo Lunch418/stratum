@@ -35,6 +35,12 @@ export function buildMenus(ctx: MenuContext): Menu[] {
   const tab = (t: typeof s.tab, label: string): MenuItem => ({ label, checked: s.tab === t, run: () => s.setTab(t) });
   const bottom = (t: typeof s.bottomTab, label: string): MenuItem => ({ label, checked: s.bottomTab === t, run: () => s.setBottomTab(t) });
   // инструмент рисования: переключить вкладку и выбрать инструмент в редакторе
+  // камера проекции 3D, выбранной в окне модели (Alt+щелчок)
+  const camera = (field: string) => {
+    const p = s.pickedObject;
+    if (!p) { s.setTab('model'); s.showToast('Выберите проекцию 3D в окне модели: Alt+щелчок'); return; }
+    api.objectSet(p.win, p.handle, field, 1).then(r => r.json()).then((j: { ok: boolean }) => s.showToast(j.ok ? 'Камера создана' : 'Выбранный объект — не проекция 3D'));
+  };
   const drawTool = (label: string, tool: string, hint?: string): MenuItem => ({ label, hint, disabled: noProject || lib, run: () => { if (s.tab !== 'picture' && s.tab !== 'icon') s.setTab('picture'); setTimeout(() => window.dispatchEvent(new CustomEvent('draw-tool', { detail: tool })), 50); } });
 
   return [
@@ -120,8 +126,8 @@ export function buildMenus(ctx: MenuContext): Menu[] {
         drawTool('Список', 'control:LISTBOX'),
       ] },
       { label: '3d', sub: [
-        { label: 'Создать новую камеру', disabled: true, why: 'CreateCamera3d в коде' },
-        { label: 'Дублировать камеру', disabled: true, why: 'CreateCamera3d в коде' },
+        { label: 'Создать новую камеру', run: () => camera('camera.new') },
+        { label: 'Дублировать камеру', run: () => camera('camera.duplicate') },
       ] },
       { sep: true },
       { label: 'OLE объект', disabled: true, why: 'OLE — технология Windows 98' },
