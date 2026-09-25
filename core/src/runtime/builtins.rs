@@ -194,7 +194,12 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
         }
 
         // ── преобразование типов ──────────────────────────────────────────
-        "float" => num(f(args, 0)),
+        // цвет — 32-битное целое со знаком: RgbEx(255,255,255,1) даёт
+        // отрицательное число (сверено в Wine, tools/verify/rgbex.txt)
+        "float" => match args.first() {
+            Some(Value::Color(c)) => num(*c as i64 as u32 as i32 as f64),
+            _ => num(f(args, 0)),
+        },
         "integer" => num(f(args, 0).trunc()),
         "handle" => Value::Handle(f(args, 0)),
         "string" => Value::Str(match args.first() {
@@ -212,12 +217,10 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
                 | ((f(args, 2) as u32 & 0xFF) << 16)) as f64,
         ),
         // RGBEx(r, g, b, flags): старший байт — прозрачность и прочие флаги
-        "rgbex" => Value::Color(
-            ((f(args, 0) as u32 & 0xFF)
-                | ((f(args, 1) as u32 & 0xFF) << 8)
-                | ((f(args, 2) as u32 & 0xFF) << 16)
-                | ((f(args, 3) as u32 & 0xFF) << 24)) as f64,
-        ),
+        // RgbEx(r, g, b, тип) у оригинала раскладывает байты не по справке:
+        // g — младший, b — второй, тип — третий, r — старший (сверено в
+        // Wine: RgbEx(1,2,3,0) = 0x01000302, tools/verify/rgbex.txt)
+        "rgbex" => Value::Color(rgbex(f(args, 0), f(args, 1), f(args, 2), f(args, 3))),
         "getrvalue" => num((f(args, 0) as u32 & 0xFF) as f64),
         "getgvalue" => num(((f(args, 0) as u32 >> 8) & 0xFF) as f64),
         "getbvalue" => num(((f(args, 0) as u32 >> 16) & 0xFF) as f64),
@@ -586,6 +589,12 @@ const RNG_SEEDED: u64 = 1 << 40;
 
 /// rand() библиотеки Borland C с состоянием в `Effects::rng`. Неинициализированный
 /// генератор — это srand(1) и один уже сделанный вызов, как в среде оригинала.
+/// Цвет RgbEx в раскладке оригинала (см. вызов `rgbex`).
+pub fn rgbex(a: f64, b: f64, c: f64, d: f64) -> f64 {
+    let byte = |x: f64| x as i64 as u32 & 0xFF;
+    (byte(b) | (byte(c) << 8) | (byte(d) << 16) | (byte(a) << 24)) as f64
+}
+
 fn borland_rand(fx: &mut Effects) -> u32 {
     let mut seed = if fx.rng & RNG_SEEDED == 0 { 22_695_478 } else { fx.rng as u32 };
     seed = seed.wrapping_mul(22_695_477).wrapping_add(1);

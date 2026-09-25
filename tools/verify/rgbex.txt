@@ -1,0 +1,7 @@
+# RgbEx на ходу и Float() цвета со старшим байтом
+r1_2_3_0 | s:String(trunc(Float(RgbEx(1,2,3,0))/65536)) + ":" + String(Float(RgbEx(1,2,3,0)) - trunc(Float(RgbEx(1,2,3,0))/65536)*65536)
+r1_2_3_1 | s:String(trunc(Float(RgbEx(1,2,3,1))/65536)) + ":" + String(Float(RgbEx(1,2,3,1)) - trunc(Float(RgbEx(1,2,3,1))/65536)*65536)
+r255_255_255_1 | s:String(trunc(Float(RgbEx(255,255,255,1))/65536)) + ":" + String(Float(RgbEx(255,255,255,1)) - trunc(Float(RgbEx(255,255,255,1))/65536)*65536)
+r1_2_3_2 | s:String(trunc(Float(RgbEx(1,2,3,2))/65536)) + ":" + String(Float(RgbEx(1,2,3,2)) - trunc(Float(RgbEx(1,2,3,2))/65536)*65536)
+r0_128_0_1 | s:String(trunc(Float(RgbEx(0,128,0,1))/65536)) + ":" + String(Float(RgbEx(0,128,0,1)) - trunc(Float(RgbEx(0,128,0,1))/65536)*65536)
+neg | Float(RgbEx(255,255,255,1)) < 0

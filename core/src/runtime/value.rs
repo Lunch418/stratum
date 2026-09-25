@@ -106,7 +106,24 @@ impl Value {
                 // цвет по умолчанию в .cls пишется как rgb(r,g,b); значение —
                 // COLORREF Windows: r + g·256 + b·65536 (сверено по снимку
                 // оригинала: rgb(255,0,0) = 255)
-                if let Some(inner) = t.to_ascii_lowercase().strip_prefix("rgb(").and_then(|x| x.strip_suffix(')').map(str::to_string)) {
+                let lower = t.to_ascii_lowercase();
+                // цвета, кроме rgb(…): Transparent — 0x1000000, rgbex(…) — как
+                // функция RgbEx, число и всё прочее — 0 (сверено в Wine,
+                // tools/verify_defaults.py)
+                if ty == ValueType::Color {
+                    if lower == "transparent" {
+                        return Value::Color(16_777_216.0);
+                    }
+                    if let Some(inner) = lower.strip_prefix("rgbex(").and_then(|x| x.strip_suffix(')')) {
+                        let c: Vec<f64> = inner.split(',').map(|x| x.trim().parse::<f64>().unwrap_or(0.0)).collect();
+                        let g = |i: usize| c.get(i).copied().unwrap_or(0.0);
+                        return Value::Color(super::builtins::rgbex(g(0), g(1), g(2), g(3)));
+                    }
+                    if !lower.starts_with("rgb(") {
+                        return Value::Color(0.0);
+                    }
+                }
+                if let Some(inner) = lower.strip_prefix("rgb(").and_then(|x| x.strip_suffix(')').map(str::to_string)) {
                     let c: Vec<f64> = inner.split(',').map(|x| x.trim().parse::<f64>().unwrap_or(0.0).clamp(0.0, 255.0)).collect();
                     let v = c.first().copied().unwrap_or(0.0) + c.get(1).copied().unwrap_or(0.0) * 256.0 + c.get(2).copied().unwrap_or(0.0) * 65536.0;
                     return match ty {
