@@ -166,7 +166,6 @@ label.check { display: flex; align-items: center; gap: 8px; cursor: pointer; tex
 #print-root .print-code { font: 9pt/1.35 var(--font-mono); white-space: pre-wrap; margin: 0; }
 #print-root .print-code .ln { color: #888; margin-right: 3ch; user-select: none; }
 #print-root.mono-print svg { filter: grayscale(1) contrast(1.2); }
-#print-root .scheme .pad-label { stroke: #fff; }
 #print-root .scheme .port, #print-root .scheme .hit { display: none; }
 .topbar .sep { width: 1px; height: 24px; background: var(--border); margin: 0 4px; }
 .menu-host { position: relative; }
@@ -239,7 +238,9 @@ table.vars input:focus { border-color: var(--accent); background: var(--bg-surfa
 .scheme .pad .pad-core { fill: var(--accent); cursor: move; }
 .scheme .pad:hover .pad-ring { stroke-width: 3; }
 .scheme .pad.selected .pad-ring { stroke-width: 3; filter: drop-shadow(0 0 3px var(--accent)); }
-.scheme .pad .pad-label { font-size: 11px; font-weight: 600; fill: var(--accent-ink, var(--accent)); font-family: var(--font-mono); pointer-events: none; paint-order: stroke; stroke: var(--bg-canvas); stroke-width: 3px; stroke-linejoin: round; }
+.scheme .pad .pad-label { pointer-events: none; }
+.scheme .pad .pad-label rect { fill: var(--bg-surface); stroke: var(--accent); stroke-width: 1; }
+.scheme .pad .pad-label text { font-size: 10.5px; font-weight: 600; fill: var(--accent-ink, var(--accent)); font-family: var(--font-mono); }
 .scheme.placing svg.canvas { cursor: copy; }
 .scheme .toolbar button.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 .scheme .hint { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); font-size: 12px; pointer-events: none; }

@@ -395,31 +395,6 @@ export function SchemeCanvas() {
             const a = wire.fromPad !== undefined ? padCenter(wire.fromPad) : centers.get(wire.from);
             return a && <path className="link drawing" d={`M ${a.x} ${a.y} L ${wire.x} ${wire.y}`} />;
           })()}
-          {layers.images && pads.map(p => {
-            const vars = padVars(p.id);
-            return (
-              <g key={'pad' + p.id} data-pad={p.id} className={`pad${selPad === p.id ? ' selected' : ''}`} transform={`translate(${p.x} ${p.y})`}
-                onMouseDown={e => {
-                  e.stopPropagation(); setMenu(null); setPadMenu(null);
-                  if (e.button !== 0) return;
-                  setSelPad(p.id); setSelNode(null); setSelLink(null); setSelSet(new Set());
-                  select(klass.name);
-                  if (!editable) return;
-                  const q = toScene(e);
-                  // от края площадки тянется связь, за середину — перемещение
-                  const r = Math.hypot(q.x - p.x - PAD / 2, q.y - p.y - PAD / 2);
-                  if (r > PAD * 0.3 || e.shiftKey) setWire({ from: SELF, fromPad: p.id, x: q.x, y: q.y });
-                  else setPadDrag({ id: p.id, dx: q.x - p.x, dy: q.y - p.y, moved: false });
-                }}
-                onContextMenu={e => { e.preventDefault(); e.stopPropagation(); if (editable) { setSelPad(p.id); setPadMenu({ x: e.clientX, y: e.clientY, id: p.id }); } }}
-                onDoubleClick={e => { e.stopPropagation(); setPadProps(p.id); }}>
-                <rect className="pad-ring" x={2} y={2} width={PAD - 4} height={PAD - 4} rx={PAD / 2} />
-                <rect className="pad-core" x={PAD / 2 - 5} y={PAD / 2 - 5} width={10} height={10} rx={2} transform={`rotate(45 ${PAD / 2} ${PAD / 2})`} />
-                {vars.length > 0 && <text className="pad-label" x={PAD / 2} y={PAD + 12} textAnchor="middle">{vars.slice(0, 3).join(', ')}{vars.length > 3 ? '…' : ''}</text>}
-                <title>{`Контактная площадка${vars.length ? ': ' + vars.join(', ') : ''}${editable ? ' — потяните от края к блоку, чтобы связать; за середину — переместить' : ''}`}</title>
-              </g>
-            );
-          })}
           {layers.images && nodes.map(c => {
             const { w, h, label } = nodeSize(c);
             const cls = classByName(project, c.class);
@@ -448,6 +423,38 @@ export function SchemeCanvas() {
                     <title>{v.name}: {v.type}{editable ? ' — потяните к другому блоку, чтобы связать' : ''}</title>
                   </circle>
                 ))}
+              </g>
+            );
+          })}
+          {layers.images && pads.map(p => {
+            const vars = padVars(p.id);
+            return (
+              <g key={'pad' + p.id} data-pad={p.id} className={`pad${selPad === p.id ? ' selected' : ''}`} transform={`translate(${p.x} ${p.y})`}
+                onMouseDown={e => {
+                  e.stopPropagation(); setMenu(null); setPadMenu(null);
+                  if (e.button !== 0) return;
+                  setSelPad(p.id); setSelNode(null); setSelLink(null); setSelSet(new Set());
+                  select(klass.name);
+                  if (!editable) return;
+                  const q = toScene(e);
+                  // от края площадки тянется связь, за середину — перемещение
+                  const r = Math.hypot(q.x - p.x - PAD / 2, q.y - p.y - PAD / 2);
+                  if (r > PAD * 0.3 || e.shiftKey) setWire({ from: SELF, fromPad: p.id, x: q.x, y: q.y });
+                  else setPadDrag({ id: p.id, dx: q.x - p.x, dy: q.y - p.y, moved: false });
+                }}
+                onContextMenu={e => { e.preventDefault(); e.stopPropagation(); if (editable) { setSelPad(p.id); setPadMenu({ x: e.clientX, y: e.clientY, id: p.id }); } }}
+                onDoubleClick={e => { e.stopPropagation(); setPadProps(p.id); }}>
+                <rect className="pad-ring" x={2} y={2} width={PAD - 4} height={PAD - 4} rx={PAD / 2} />
+                <rect className="pad-core" x={PAD / 2 - 5} y={PAD / 2 - 5} width={10} height={10} rx={2} transform={`rotate(45 ${PAD / 2} ${PAD / 2})`} />
+                {vars.length > 0 && (() => {
+                  const label = vars.slice(0, 3).join(', ') + (vars.length > 3 ? '…' : '');
+                  const w = label.length * 6.6 + 10;
+                  return <g className="pad-label">
+                    <rect x={PAD / 2 - w / 2} y={PAD + 2} width={w} height={15} rx={7.5} />
+                    <text x={PAD / 2} y={PAD + 13} textAnchor="middle">{label}</text>
+                  </g>;
+                })()}
+                <title>{`Контактная площадка${vars.length ? ': ' + vars.join(', ') : ''}${editable ? ' — потяните от края к блоку, чтобы связать; за середину — переместить' : ''}`}</title>
               </g>
             );
           })}
