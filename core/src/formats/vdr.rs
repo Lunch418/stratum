@@ -24,6 +24,8 @@ pub struct Picture {
     pub page: Option<Vec<u8>>,
     /// Гиперссылки объектов (закладка «Гипербаза»): handle объекта → ссылка.
     pub hypers: Vec<(u16, Hyper)>,
+    /// Приложения ломаных (стрелки и т. п.) как есть: handle → байты.
+    pub arrows: Vec<(u16, Vec<u8>)>,
 }
 
 /// Гиперссылка графического объекта. Хранится в блоке данных объекта
@@ -404,8 +406,14 @@ fn read_item(r: &mut Reader, ctx: &Ctx, id: u16, pic: &mut Picture) -> Result<()
             flags = r.u16()?;
             name = r.string()?;
         }
-        let body = match read_object(r, ctx, kind) {
-            Ok(k) => k,
+        let mut attachment = None;
+        let body = match read_object(r, ctx, kind, &mut attachment) {
+            Ok(k) => {
+                if let Some(extra) = attachment {
+                    pic.arrows.push((handle, extra));
+                }
+                k
+            }
             Err(e) => match end {
                 Some(_) => ObjectKind::Unknown { kind },
                 None => return Err(e),
@@ -450,7 +458,7 @@ fn read_item(r: &mut Reader, ctx: &Ctx, id: u16, pic: &mut Picture) -> Result<()
     Ok(())
 }
 
-fn read_object(r: &mut Reader, ctx: &Ctx, kind: u16) -> Result<ObjectKind> {
+fn read_object(r: &mut Reader, ctx: &Ctx, kind: u16, attachment: &mut Option<Vec<u8>>) -> Result<ObjectKind> {
     if matches!(kind, 3..=5) {
         let mut children = Vec::new();
         if r.peek_u16(r.pos) == Some(chunk::ZORDER) {
@@ -485,9 +493,29 @@ fn read_object(r: &mut Reader, ctx: &Ctx, kind: u16) -> Result<ObjectKind> {
             for _ in 0..n {
                 points.push((num(r, ctx)?, num(r, ctx)?));
             }
+            let mut extra = Vec::new();
             if ctx.wide {
-                let extra = r.u8()? as usize;
-                r.bytes(extra)?;
+                let n = r.u8()? as usize;
+                extra = r.bytes(n)?.to_vec();
+            }
+            // габарит в файле записан с запасом в единицу; оригинал при
+            // загрузке берёт его по точкам (панель L1 337 → 336, круг BALLS
+            // 31 → 30). Ломаная с приложением (стрелкой) хранит свой габарит.
+            let (x, y, w, h) = match points.first() {
+                Some(&(x0, y0)) if extra.is_empty() => {
+                    let (mut a, mut b, mut c, mut d) = (x0, y0, x0, y0);
+                    for &(px, py) in &points {
+                        a = a.min(px);
+                        b = b.min(py);
+                        c = c.max(px);
+                        d = d.max(py);
+                    }
+                    (a, b, c - a, d - b)
+                }
+                _ => (x, y, w, h),
+            };
+            if !extra.is_empty() {
+                *attachment = Some(extra);
             }
             ObjectKind::Polyline { x, y, w, h, pen, brush, points }
         }
@@ -688,7 +716,15 @@ pub fn write(pic: &Picture) -> Vec<u8> {
                             w.f64(*px);
                             w.f64(*py);
                         }
-                        w.u8(0);
+                        match pic.arrows.iter().find(|(h, _)| *h == o.handle) {
+                            Some((_, extra)) if extra.len() < 256 => {
+                                w.u8(extra.len() as u8);
+                                for b in extra {
+                                    w.u8(*b);
+                                }
+                            }
+                            _ => w.u8(0),
+                        }
                     }
                     ObjectKind::Bitmap { x, y, w: ww, h, src, dib, .. } => {
                         for v in [*x, *y, *ww, *h, src.0, src.1, src.2, src.3] {

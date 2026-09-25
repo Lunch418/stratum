@@ -1,0 +1,13 @@
+# Габарит ломаных из файла: панель и линии связей схемы L1 (71 — исключение, см. verification.md)
+@ fixtures/PROJECTS/samples/L1 New_Project_Class
+% Wait = 1
+! hs := OpenSchemeWindow("W1", "New_Project_Class", "")
+w1 | s:String(GetObjectWidth2d(hs, Handle(1))) + " " + String(GetObjectHeight2d(hs, Handle(1))) + " " + String(GetObjectOrg2dX(hs, Handle(1)))
+w53 | s:String(GetObjectWidth2d(hs, Handle(53))) + " " + String(GetObjectHeight2d(hs, Handle(53))) + " " + String(GetObjectOrg2dX(hs, Handle(53)))
+w54 | s:String(GetObjectWidth2d(hs, Handle(54))) + " " + String(GetObjectHeight2d(hs, Handle(54))) + " " + String(GetObjectOrg2dX(hs, Handle(54)))
+w55 | s:String(GetObjectWidth2d(hs, Handle(55))) + " " + String(GetObjectHeight2d(hs, Handle(55))) + " " + String(GetObjectOrg2dX(hs, Handle(55)))
+w68 | s:String(GetObjectWidth2d(hs, Handle(68))) + " " + String(GetObjectHeight2d(hs, Handle(68))) + " " + String(GetObjectOrg2dX(hs, Handle(68)))
+w69 | s:String(GetObjectWidth2d(hs, Handle(69))) + " " + String(GetObjectHeight2d(hs, Handle(69))) + " " + String(GetObjectOrg2dX(hs, Handle(69)))
+w70 | s:String(GetObjectWidth2d(hs, Handle(70))) + " " + String(GetObjectHeight2d(hs, Handle(70))) + " " + String(GetObjectOrg2dX(hs, Handle(70)))
+w71 | s:String(GetObjectWidth2d(hs, Handle(71))) + " " + String(GetObjectHeight2d(hs, Handle(71))) + " " + String(GetObjectOrg2dX(hs, Handle(71)))
+w102 | s:String(GetObjectWidth2d(hs, Handle(102))) + " " + String(GetObjectHeight2d(hs, Handle(102))) + " " + String(GetObjectOrg2dX(hs, Handle(102)))
