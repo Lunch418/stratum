@@ -37,17 +37,23 @@ class Answerer:
         except Exception:
             return
         enter = d.keysym_to_keycode(XK.string_to_keysym('Return'))
+        escape = d.keysym_to_keycode(XK.string_to_keysym('Escape'))
+        tries = {}
         while not self.stop.is_set():
             try:
                 for w in self.dialogs(d):
                     name = w.get_wm_name() or ''
+                    # окно, которое Enter не закрыл (выбор файла с пустым
+                    # именем), закрывается Escape — «Отмена»
+                    n = tries[w.id] = tries.get(w.id, 0) + 1
+                    key = enter if n <= 2 else escape
                     w.set_input_focus(X.RevertToParent, X.CurrentTime)
                     d.sync()
                     time.sleep(0.2)
-                    xtest.fake_input(d, X.KeyPress, enter)
-                    xtest.fake_input(d, X.KeyRelease, enter)
+                    xtest.fake_input(d, X.KeyPress, key)
+                    xtest.fake_input(d, X.KeyRelease, key)
                     d.sync()
-                    self.answered.append(name)
+                    self.answered.append(f'{name or hex(w.id)} ({"Enter" if key == enter else "Escape"})')
             except Exception:
                 pass
             self.stop.wait(0.5)

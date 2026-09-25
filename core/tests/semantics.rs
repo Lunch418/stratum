@@ -117,3 +117,17 @@ fn linked_defaults_follow_the_originals_order() {
     assert_eq!((x(5), x(6)), ("1".into(), "1".into()));
     assert_eq!((x(7), value(&sim, "p")), ("7".into(), "7".into()));
 }
+
+/// `_HObject`, связанный между имиджем и его детьми, равен номеру самого
+/// имиджа на схеме: служебные значения, как и умолчания, пишутся «дети,
+/// потом родитель» (сверено в Wine: DIALOG, кнопки NumberIn).
+#[test]
+fn linked_hobject_is_the_parents_handle() {
+    let btn = class("Btn", vec![var("_HObject", "HANDLE")], "", &[], &[]);
+    let boxc = class("Box", vec![var("_HObject", "HANDLE")], "", &[("Btn", "b1", 2), ("Btn", "b2", 4)], &[(2, 0, "_HObject", "_HObject"), (4, 0, "_HObject", "_HObject")]);
+    let main = class("Main", vec![], "", &[("Box", "B", 9)], &[]);
+    let sim = build(vec![main, boxc, btn]);
+    for i in 1..4 {
+        assert_eq!(sim.value(i, "_HObject").unwrap().to_string(), "#9");
+    }
+}

@@ -264,7 +264,20 @@ impl Simulation {
         sim.reset_to_defaults();
         // служебные переменные со свойствами объекта на схеме (в оригинале
         // заполняются по «Стоп» и попадают в снимок; у нас — всегда)
-        for i in 0..sim.instances.len() {
+        // связанные ячейки получают значение как связанные переменные по
+        // умолчанию: дети раньше родителя, последним пишет родитель
+        // (сверено в Wine: DIALOG, _HObject кнопок NumberIn — 9 и 16)
+        let depth = |mut i: usize| {
+            let mut d = 0;
+            while let Some(p) = sim.instances[i].parent {
+                d += 1;
+                i = p;
+            }
+            d
+        };
+        let mut order: Vec<usize> = (0..sim.instances.len()).collect();
+        order.sort_by_key(|&i| std::cmp::Reverse(depth(i)));
+        for i in order {
             let (handle, name, class) = (sim.instances[i].handle, sim.instances[i].name.clone(), sim.instances[i].class_name.clone());
             let pos = sim.instances[i].parent.and_then(|p| {
                 let parent_class = &project.classes[sim.instances[p].class_index_in(project)?];
