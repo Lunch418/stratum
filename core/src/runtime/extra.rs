@@ -67,7 +67,9 @@ fn string_list(fx: &mut Effects, items: Vec<String>) -> Value {
 fn resolve_path(fx: &Effects, name: &str) -> std::path::PathBuf {
     let name = name.replace('\\', "/");
     if name.len() > 2 && name.as_bytes()[1] == b':' {
-        return fx.gfx.project_dir.join(name[3..].trim_start_matches('/'));
+        // байт 1 — ASCII «:», поэтому срез с 2 не режет букву; «C:файл» без
+        // косой черты тоже относится к папке проекта
+        return fx.gfx.project_dir.join(name[2..].trim_start_matches('/'));
     }
     let p = std::path::Path::new(&name);
     if p.is_absolute() { p.to_path_buf() } else { fx.gfx.project_dir.join(p) }
@@ -96,6 +98,18 @@ fn normalize(p: &std::path::Path) -> std::path::PathBuf {
 /// ещё не сохранённый на диск, пишет только во временную папку. Отказ
 /// попадает в «Сообщения», функция возвращает неудачу.
 pub(crate) fn sandboxed(fx: &mut Effects, name: &str, write: bool) -> Option<std::path::PathBuf> {
+    sandbox_check(fx, name, write, true)
+}
+
+/// То же, но сама папка проекта или временная папка не годится: для
+/// `DeleteDir` и переименования — модель не может стереть или унести их
+/// целиком (`DeleteDir("")` удалял бы весь проект, `DeleteDir` временной
+/// папки — чужие файлы в ней).
+fn sandboxed_inside(fx: &mut Effects, name: &str) -> Option<std::path::PathBuf> {
+    sandbox_check(fx, name, true, false)
+}
+
+fn sandbox_check(fx: &mut Effects, name: &str, write: bool, root_itself: bool) -> Option<std::path::PathBuf> {
     let path = normalize(&resolve_path(fx, name));
     let mut roots = vec![normalize(&std::env::temp_dir())];
     if !fx.gfx.project_dir.as_os_str().is_empty() {
@@ -105,11 +119,40 @@ pub(crate) fn sandboxed(fx: &mut Effects, name: &str, write: bool) -> Option<std
         roots.extend(fx.gfx.library_dirs.iter().map(|d| normalize(d)));
         roots.extend(fx.gfx.library_dirs.iter().filter_map(|d| d.parent()).map(|d| normalize(&d.join("ICONS"))));
     }
-    if roots.iter().any(|r| path.starts_with(r)) {
+    // по записи пути и по настоящему месту на диске: символьная ссылка в
+    // папке проекта (например, из распакованного архива) не выводит наружу
+    let real_path = real(&path);
+    let real_roots: Vec<std::path::PathBuf> = roots.iter().map(|r| real(r).unwrap_or_else(|| r.clone())).collect();
+    let inside = roots
+        .iter()
+        .zip(&real_roots)
+        .any(|(r, rr)| path.starts_with(r) && real_path.as_ref().is_some_and(|p| p.starts_with(rr)));
+    // папка проекта может лежать во временной — поэтому сверка со всеми корнями
+    let is_root = roots.iter().zip(&real_roots).any(|(r, rr)| path == *r || real_path.as_ref() == Some(rr));
+    if inside && (root_itself || !is_root) {
         Some(path)
     } else {
         fx.log.push(format!("файл вне папки проекта — {}: {}", if write { "запись запрещена" } else { "чтение запрещено" }, path.display()));
         None
+    }
+}
+
+/// Настоящий путь: существующая часть — с раскрытыми символьными ссылками,
+/// ещё не созданный хвост дописывается как есть. Висящая ссылка (её цель не
+/// существует) — `None`: запись через неё создала бы файл где угодно.
+fn real(p: &std::path::Path) -> Option<std::path::PathBuf> {
+    let mut base = p;
+    let mut tail = Vec::new();
+    loop {
+        if base.symlink_metadata().is_ok() {
+            let mut out = std::fs::canonicalize(base).ok()?;
+            for part in tail.iter().rev() {
+                out.push(part);
+            }
+            return Some(out);
+        }
+        tail.push(base.file_name()?.to_os_string());
+        base = base.parent()?;
     }
 }
 
@@ -155,9 +198,9 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
 
         // ── файлы и папки ────────────────────────────────────────────────
         "createdir" => ok(sandboxed(fx, &s(args, 0), true).is_some_and(|p| std::fs::create_dir_all(p).is_ok())),
-        "deletedir" => ok(sandboxed(fx, &s(args, 0), true).is_some_and(|p| std::fs::remove_dir_all(p).is_ok())),
+        "deletedir" => ok(sandboxed_inside(fx, &s(args, 0)).is_some_and(|p| std::fs::remove_dir_all(p).is_ok())),
         "filerename" => {
-            let (a, b) = (sandboxed(fx, &s(args, 0), true), sandboxed(fx, &s(args, 1), true));
+            let (a, b) = (sandboxed_inside(fx, &s(args, 0)), sandboxed(fx, &s(args, 1), true));
             ok(matches!((&a, &b), (Some(a), Some(b)) if std::fs::rename(a, b).is_ok()))
         }
         "filecopy" => {
@@ -569,5 +612,61 @@ mod sandbox_tests {
         assert!(sandboxed(&mut fx, "/etc/passwd", false).is_none());
         assert!(fx.log.iter().any(|l| l.contains("запрещен")));
         let _ = std::fs::remove_dir_all(project.parent().unwrap());
+    }
+
+    fn scratch(tag: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("stratum-sandbox-{tag}-{}", std::process::id())).join("project");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn symlink_in_project_does_not_lead_outside() {
+        let project = scratch("link");
+        // «наружу» — папка вне временной и вне проекта: домашняя, если есть
+        let Some(outside) = std::env::var_os("HOME").map(std::path::PathBuf::from).filter(|h| h.is_dir() && !h.starts_with(std::env::temp_dir())) else { return };
+        std::os::unix::fs::symlink(&outside, project.join("out")).unwrap();
+        std::os::unix::fs::symlink(outside.join("stratum-no-such-file"), project.join("dangling")).unwrap();
+        let mut fx = Effects::default();
+        fx.gfx.project_dir = project.clone();
+        assert!(sandboxed(&mut fx, "out/.bashrc", true).is_none(), "запись через ссылку наружу");
+        assert!(sandboxed(&mut fx, "out/.bashrc", false).is_none(), "чтение через ссылку наружу");
+        assert!(sandboxed(&mut fx, "out/new/dir", true).is_none(), "новый путь за ссылкой");
+        assert!(sandboxed(&mut fx, "dangling", true).is_none(), "висящая ссылка");
+        // ссылка внутри проекта на папку проекта — можно
+        std::fs::create_dir_all(project.join("data")).unwrap();
+        std::os::unix::fs::symlink(project.join("data"), project.join("alias")).unwrap();
+        assert!(sandboxed(&mut fx, "alias/x.txt", true).is_some());
+        let _ = std::fs::remove_dir_all(project.parent().unwrap());
+    }
+
+    #[test]
+    fn model_cannot_delete_project_or_temp_folder_itself() {
+        let project = scratch("root");
+        std::fs::create_dir_all(project.join("sub")).unwrap();
+        let mut fx = Effects::default();
+        fx.gfx.project_dir = project.clone();
+        let tmp = std::env::temp_dir().display().to_string();
+        for name in ["", ".", "sub/..", tmp.as_str()] {
+            assert_eq!(call("DeleteDir", &[Value::Str(name.into())], &mut fx).unwrap().as_float(), 0.0, "DeleteDir({name:?})");
+        }
+        assert!(project.is_dir());
+        assert_eq!(call("FileRename", &[Value::Str("".into()), Value::Str("moved".into())], &mut fx).unwrap().as_float(), 0.0);
+        assert_ne!(call("DeleteDir", &[Value::Str("sub".into())], &mut fx).unwrap().as_float(), 0.0);
+        assert!(!project.join("sub").exists());
+        let _ = std::fs::remove_dir_all(project.parent().unwrap());
+    }
+
+    #[test]
+    fn drive_letter_before_non_ascii_does_not_panic() {
+        let mut fx = Effects::default();
+        fx.gfx.project_dir = std::env::temp_dir().join("stratum-drive");
+        // «C:» и сразу кириллица: срез по байту 3 попадал внутрь буквы
+        for name in ["C:Жx.txt", "C:ЖЖ", "D:\\Ж"] {
+            let _ = sandboxed(&mut fx, name, false);
+        }
+        assert!(sandboxed(&mut fx, "C:Жx.txt", true).is_some_and(|p| p.ends_with("Жx.txt")));
     }
 }
