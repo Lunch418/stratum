@@ -7,6 +7,7 @@ import { CodeEditor } from './components/CodeEditor';
 import { Hierarchy } from './components/Hierarchy';
 import { Inspector } from './components/Inspector';
 import { ModelView, handleSounds } from './components/ModelView';
+import { handleHyper } from './hyper';
 import { Messages } from './components/Messages';
 import { PathDialog } from './components/PathDialog';
 import { Graphs } from './components/Graphs';
@@ -88,7 +89,7 @@ export default function App() {
   useEffect(() => {
     let alive = true;
     const poll = async () => {
-      try { const f = await api.frame(); if (alive) { s.setFrame(f); handleSounds(f.sounds); } } catch { /* ядро недоступно */ }
+      try { const f = await api.frame(); if (alive) { s.setFrame(f); handleSounds(f.sounds); handleHyper(f.hyper); } } catch { /* ядро недоступно */ }
       if (alive) setTimeout(poll, s.tab === 'model' ? env.pollMs : 250);
     };
     poll();
@@ -205,6 +206,24 @@ export default function App() {
       {dialog === 'calcOrder' && <CalcOrderDialog onClose={() => setDialog(null)} />}
       {dialog === 'about' && <AboutDialog onClose={() => setDialog(null)} />}
       {dialog === 'print' && <PrintDialog onClose={() => setDialog(null)} />}
+      {s.hyperProject && (
+        <div className="modal-backdrop" onMouseDown={() => s.setHyperProject(null)}>
+          <form className="modal" style={{ width: 460 }} onMouseDown={e => e.stopPropagation()} onSubmit={e => {
+            e.preventDefault(); const p = s.hyperProject!; s.setHyperProject(null);
+            s.openProject(p).catch(err => s.say({ level: 'error', where: 'гипербаза', text: String(err) }));
+          }}>
+            <div className="panel-title">Гиперссылка: загрузить проект</div>
+            <div className="modal-body">
+              <div className="mono small" style={{ wordBreak: 'break-all' }}>{s.hyperProject}</div>
+              <div className="muted small" style={{ marginTop: 8 }}>{s.unsaved ? 'В текущем проекте есть несохранённые правки — они пропадут. ' : ''}Текущий проект будет закрыт.</div>
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="ghost" onClick={() => s.setHyperProject(null)}>Отмена</button>
+              <button type="submit" className="primary">Открыть проект</button>
+            </div>
+          </form>
+        </div>
+      )}
       {dialog === 'exportVdr' && s.project && s.selectedClass && (
         <FilePickDialog title={`Экспорт рисунка имиджа ${s.selectedClass} в VDR`} ext="vdr" onClose={() => setDialog(null)}
           save={(s.project.dir || '.').replace(/[\\/]+$/, '') + `/${s.selectedClass.replace(/[<>:"/\\|?*]/g, '_')}.vdr`}

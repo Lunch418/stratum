@@ -58,6 +58,9 @@ interface State {
   /// буфер обмена схемы: экземпляры (класс, имя, смещение)
   schemeClipboard: { class: string; name: string; x: number; y: number }[];
   setSchemeClipboard: (c: { class: string; name: string; x: number; y: number }[]) => void;
+  /// гиперссылка «загрузить новый проект» ждёт подтверждения
+  hyperProject: string | null;
+  setHyperProject: (p: string | null) => void;
   helpTopic: string | null;
   setHelpTopic: (t: string | null) => void;
   unsaved: boolean;
@@ -131,6 +134,8 @@ export const useStore = create<State>((set, get) => ({
   pickObject: pickedObject => set({ pickedObject }),
   schemeClipboard: [],
   setSchemeClipboard: schemeClipboard => set({ schemeClipboard }),
+  hyperProject: null,
+  setHyperProject: hyperProject => set({ hyperProject }),
   helpTopic: null,
   setHelpTopic: helpTopic => set({ helpTopic }),
   markUnsaved: () => set(s => ({ unsaved: true, project: s.project ? { ...s.project, canUndo: true, canRedo: false } : s.project })),

@@ -48,7 +48,7 @@ export function ModelView() {
       let div = root.querySelector<HTMLDivElement>(`[data-win="${w.id}"]`);
       if (!div) {
         div = document.createElement('div');
-        div.className = 'win'; div.dataset.win = String(w.id);
+        div.className = 'win'; div.dataset.win = String(w.id); div.dataset.name = w.name;
         div.innerHTML = `<div class="title"></div><div class="body"><div class="controls"></div></div>`;
         attach(div, w.name, () => setActive(w.name));
         root.appendChild(div);

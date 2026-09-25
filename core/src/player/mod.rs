@@ -92,6 +92,9 @@ pub struct Shared {
     resume_after_dialog: bool,
     /// Ответы на диалоги текущего (повторяемого) такта.
     dialog_answers: Vec<crate::runtime::Value>,
+    /// Гиперпереходы для страницы (одноразовая очередь кадра): эффект смены
+    /// страницы, запуск приложения, загрузка другого проекта.
+    hyper_events: Vec<crate::formats::vdr::Hyper>,
     pub traces: Vec<Trace>,
     pub next_trace: u32,
     pub running: bool,
@@ -437,6 +440,7 @@ pub fn serve_with(opts: Options, on_ready: impl FnOnce(u16, &str)) -> Result<(),
         halt: None,
         dialog: None,
         dialog_answers: Vec::new(),
+        hyper_events: Vec::new(),
         resume_after_dialog: false,
         traces: Vec::new(),
         next_trace: 1,
@@ -591,11 +595,17 @@ fn apply_event(s: &mut Shared, ev: Event) {
                             .and_then(|o| o.hyper.clone())
                     });
                     match jump {
-                        Some(h) if h.mode == 0 => {
+                        Some(mut h) if h.mode == 0 => {
                             // окно не указано — страница меняется в том же окне
-                            let win = if h.window.is_empty() { window.clone() } else { h.window };
-                            s.sim.effects.gfx.hyper_jump(&win, &h.target);
+                            if h.window.is_empty() {
+                                h.window = window.clone();
+                            }
+                            if s.sim.effects.gfx.hyper_jump(&h.window, &h.target) && !h.effect.is_empty() {
+                                s.hyper_events.push(h);
+                            }
                         }
+                        // запуск приложения и загрузка проекта решает страница
+                        Some(h) if h.mode == 1 || h.mode == 2 => s.hyper_events.push(h),
                         Some(h) if h.mode == 4 && h.target.eq_ignore_ascii_case("CM_PREVPAGE") => {
                             s.sim.effects.gfx.hyper_back();
                         }
@@ -906,6 +916,10 @@ fn frame_json(shared: &Arc<Mutex<Shared>>) -> String {
             controls.join(",")
         ));
     }
+    let hyper: Vec<String> = std::mem::take(&mut s.hyper_events)
+        .iter()
+        .map(|h| format!("{{\"mode\":{},\"target\":{},\"window\":{},\"effect\":{}}}", h.mode, json_string(&h.target), json_string(&h.window), json_string(&h.effect)))
+        .collect();
     let mut log: Vec<String> = s.sim.effects.log.iter().rev().take(8).map(|l| json_string(l)).collect();
     if let Some(e) = &s.error {
         log.insert(0, json_string(&format!("ошибка: {e}")));
@@ -948,7 +962,7 @@ fn frame_json(shared: &Arc<Mutex<Shared>>) -> String {
     unsupported.sort();
     let unsupported: Vec<String> = unsupported.iter().map(|(n, c)| format!("{{\"name\":{},\"count\":{c}}}", json_string(n))).collect();
     format!(
-        "{{\"tick\":{},\"running\":{},\"stopped\":{},\"canBack\":{},\"canHyperBack\":{},\"halt\":{},\"dialog\":{},\"unsupported\":[{}],\"windows\":[{}],\"sounds\":[{}],\"log\":[{}]}}",
+        "{{\"tick\":{},\"running\":{},\"stopped\":{},\"canBack\":{},\"canHyperBack\":{},\"halt\":{},\"dialog\":{},\"unsupported\":[{}],\"windows\":[{}],\"sounds\":[{}],\"hyper\":[{}],\"log\":[{}]}}",
         s.sim.tick_number(),
         s.running,
         s.sim.stopped,
@@ -959,6 +973,7 @@ fn frame_json(shared: &Arc<Mutex<Shared>>) -> String {
         unsupported.join(","),
         windows.join(","),
         sounds.join(","),
+        hyper.join(","),
         log.join(",")
     )
 }

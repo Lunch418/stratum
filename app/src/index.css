@@ -383,6 +383,18 @@ button.attention { border-color: var(--state-pause); }
 .search-opt { text-transform: none; letter-spacing: 0; display: flex; gap: 4px; align-items: center; font-weight: 500; }
 .search-where { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 6px 10px; border-bottom: 1px solid var(--border); font-size: 12px; background: var(--bg-surface); }
 .search-kind { min-width: 84px; font-size: 11px; }
+/* эффекты смены страницы гипербазы */
+.model .win.fx-fade .body { animation: hyper-fade .35s ease-out; }
+.model .win.fx-left .body { animation: hyper-left .35s ease-out; }
+.model .win.fx-right .body { animation: hyper-right .35s ease-out; }
+.model .win.fx-up .body { animation: hyper-up .35s ease-out; }
+.model .win.fx-down .body { animation: hyper-down .35s ease-out; }
+@keyframes hyper-fade { from { opacity: 0; } }
+@keyframes hyper-left { from { transform: translateX(40px); opacity: 0; } }
+@keyframes hyper-right { from { transform: translateX(-40px); opacity: 0; } }
+@keyframes hyper-up { from { transform: translateY(40px); opacity: 0; } }
+@keyframes hyper-down { from { transform: translateY(-40px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .model .win[class*="fx-"] .body { animation: none; } }
 .model-view { display: flex; flex-direction: column; height: 100%; }
 .model-view > .model { flex: 1; min-height: 0; height: auto; }
 .model-toolbar { display: flex; gap: 6px; align-items: center; padding: 4px 8px; border-bottom: 1px solid var(--border); background: var(--bg-surface); }

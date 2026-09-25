@@ -32,6 +32,8 @@ export interface Frame {
   unsupported?: { name: string; count: number }[];
   windows: { id: number; name: string; w: number; h: number; size?: string; style?: string; svg: string; controls: Control[] }[];
   sounds: { cmd: 'play' | 'stop'; file: string; loop: boolean }[];
+  /// гиперпереходы кадра: смена страницы с эффектом (0), запуск приложения (1), загрузка проекта (2)
+  hyper?: { mode: number; target: string; window: string; effect: string }[];
   log: string[];
 }
 export interface Trace { id: number; index: number; path: string; var: string; points: [number, number][] }
