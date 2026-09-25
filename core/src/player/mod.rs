@@ -600,7 +600,14 @@ fn apply_event(s: &mut Shared, ev: Event) {
                             if h.window.is_empty() {
                                 h.window = window.clone();
                             }
-                            if s.sim.effects.gfx.hyper_jump(&h.window, &h.target) && !h.effect.is_empty() {
+                            let jumped = s.sim.effects.gfx.hyper_jump(&h.window, &h.target);
+                            // «Объект» ссылки получает WM_HYPERJUMP (_Target, _Window)
+                            if jumped && !h.object.is_empty() {
+                                if let Err(e) = s.sim.hyperjump_message(&h.object, &h.target, &h.window) {
+                                    s.error = Some(e.message);
+                                }
+                            }
+                            if jumped && !h.effect.is_empty() {
                                 s.hyper_events.push(h);
                             }
                         }

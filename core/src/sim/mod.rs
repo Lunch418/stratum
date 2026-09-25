@@ -105,6 +105,7 @@ pub mod wm {
     pub const ALLKEYMESSAGE: u32 = 1537;
     pub const SPACEDONE: u32 = 1539;
     pub const CONTROLNOTIFY: u32 = 1544;
+    pub const HYPERJUMP: u32 = 1546;
     pub const SPACEINIT: u32 = 1540;
     /// Флаг регистрации: сообщение только когда мышь над объектом.
     pub const FLAG_OVER_OBJECT: u32 = 1;
@@ -806,6 +807,20 @@ impl Simulation {
             self.run_instance(r.instance)?;
         }
         Ok(())
+    }
+
+    /// Гипербаза: сообщение WM_HYPERJUMP имиджу из поля «Объект» ссылки
+    /// (путь от корня) с переменными `_Target` и `_Window`. Ложь — нет такого.
+    pub fn hyperjump_message(&mut self, object: &str, target: &str, window: &str) -> Result<bool, RuntimeError> {
+        if self.instances.is_empty() {
+            return Ok(false);
+        }
+        let Some(i) = self.resolve_path(0, object) else { return Ok(false) };
+        self.set_var(i, "msg", Value::Float(wm::HYPERJUMP as f64));
+        self.set_var(i, "_Target", Value::Str(target.to_string()));
+        self.set_var(i, "_Window", Value::Str(window.to_string()));
+        self.run_instance(i)?;
+        Ok(true)
     }
 
     /// Уведомление от контрола (кнопка нажата, текст изменён, выбор в
