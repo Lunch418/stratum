@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useWindowEvent } from './hooks';
 import { api } from './api';
 import { useStore } from './store';
@@ -30,6 +30,17 @@ export default function App() {
   const dialog = s.dialog;
   const setDialog = s.setDialog;
   const env = loadEnv();
+  // индикатор производительности: тактов в секунду по кадрам ядра
+  const perf = useRef<{ t: number; tick: number }>({ t: 0, tick: 0 });
+  const [tps, setTps] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => {
+      const f = useStore.getState().frame, now = performance.now(), tick = f?.tick ?? 0, p = perf.current;
+      setTps(f?.running && p.t ? Math.max(0, Math.round((tick - p.tick) * 1000 / (now - p.t))) : 0);
+      perf.current = { t: now, tick };
+    }, 1000);
+    return () => clearInterval(id);
+  }, []);
   const [layout, setLayout] = useState<{ left: number; right: number; bottom: number }>(() => {
     const def = { left: 260, right: 300, bottom: 160 };
     try { return { ...def, ...JSON.parse(localStorage.getItem('layout') ?? '{}') as Partial<typeof def> }; }
@@ -288,7 +299,8 @@ export default function App() {
       </div>
       <footer className="statusbar">
         <span className={`mode ${running ? 'run' : 'pause'}`}>{running ? 'Выполнение' : 'Пауза'}</span>
-        <span className="mono">такт {frame?.tick ?? 0}</span>
+        {env.statusTicks && <span className="mono">такт {frame?.tick ?? 0}</span>}
+        {env.statusPerf && <span className="mono" title="Тактов в секунду">{tps} т/с</span>}
         <span>{s.selectedClass ?? ''}</span>
         <span className="spacer" style={{ flex: 1 }} />
         <span>{s.project?.dir ?? ''}</span>

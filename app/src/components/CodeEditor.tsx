@@ -10,6 +10,7 @@ self.MonacoEnvironment = { getWorker: () => new EditorWorker() };
 loader.config({ monaco: monacoLib });
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api';
+import { loadEnv } from './Options';
 import { classByName, useStore } from '../store';
 import langData from '../lang-data.json';
 
@@ -107,6 +108,9 @@ function registerLanguage(monaco: Monaco) {
 }
 
 export function CodeEditor() {
+  // «Параметры среды → Редактор»: выделение синтаксиса, кегль, перенос, мини-карта
+  const [env, setEnv] = useState(loadEnv);
+  useEffect(() => { const on = () => setEnv(loadEnv()); window.addEventListener('env-changed', on); return () => window.removeEventListener('env-changed', on); }, []);
   const project = useStore(s => s.project);
   const selected = useStore(s => s.selectedClass);
   const theme = useStore(s => s.theme);
@@ -190,13 +194,13 @@ export function CodeEditor() {
       </div>
       <div style={{ flex: 1, minHeight: 0 }}>
         <Editor
-          language={LANG}
+          language={env.syntax ? LANG : 'plaintext'}
           theme={theme === 'dark' ? 'stratum-dark' : 'stratum-light'}
           value={text}
           beforeMount={registerLanguage}
           onMount={onMount}
           onChange={v => { setText(v ?? ''); setDirty(true); }}
-          options={{ fontFamily: 'JetBrains Mono, ui-monospace, monospace', fontSize: 13, minimap: { enabled: false }, tabSize: 2, scrollBeyondLastLine: false, wordBasedSuggestions: 'off', readOnly: klass.library }}
+          options={{ fontFamily: 'JetBrains Mono, ui-monospace, monospace', fontSize: env.editorFontSize, minimap: { enabled: env.minimap }, wordWrap: env.wordWrap ? 'on' : 'off', tabSize: 2, scrollBeyondLastLine: false, wordBasedSuggestions: 'off', readOnly: klass.library }}
         />
       </div>
     </div>

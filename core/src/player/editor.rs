@@ -202,7 +202,9 @@ pub fn apply(sp: &mut Space, op: &Json) -> Result<Handle, String> {
                         }
                         "ellipse" => {
                             let (cx, cy, rx, ry) = ((x0 + x1) / 2.0, (y0 + y1) / 2.0, (x1 - x0) / 2.0, (y1 - y0) / 2.0);
-                            (0..36).map(|k| { let t = k as f64 / 36.0 * std::f64::consts::TAU; (cx + rx * t.cos(), cy + ry * t.sin()) }).collect()
+                            // «Точек в окружности» из параметров среды
+                            let n = (op.num_or("n", 36.0) as usize).clamp(8, 360);
+                            (0..n).map(|k| { let t = k as f64 / n as f64 * std::f64::consts::TAU; (cx + rx * t.cos(), cy + ry * t.sin()) }).collect()
                         }
                         _ => {
                             // дуга: от угла start на sweep градусов внутри прямоугольника

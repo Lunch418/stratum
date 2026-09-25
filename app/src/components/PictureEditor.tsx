@@ -7,7 +7,7 @@ import { type ObjectProps } from '../api';
 import { ObjectDialog } from './ObjectDialog';
 import { classByName, useStore } from '../store';
 import { Icon } from './Icon';
-import { FilePickDialog } from './Options';
+import { FilePickDialog, loadEnv } from './Options';
 import { BitmapEditor } from './BitmapEditor';
 
 type Tool = 'select' | 'line' | 'polyline' | 'rect' | 'roundrect' | 'ellipse' | 'arc' | 'text' | 'points' | 'pan';
@@ -51,7 +51,8 @@ export function PictureEditor({ kind }: { kind: Kind }) {
   // диалог «Параметры объекта» (двойной щелчок по объекту или «Свойства…»)
   const [objDialog, setObjDialog] = useState<number | null>(null);
   const sheet = klass?.sheet;
-  const grid = sheet?.gridVisible ? { step: sheet.gridStep, origin: sheet.gridOrigin } : null;
+  // «Сетка автоматически включается» (параметры среды): сетка видна и без флага листа
+  const grid = sheet?.gridVisible ? { step: sheet.gridStep, origin: sheet.gridOrigin } : loadEnv().gridAuto ? { step: sheet?.gridStep ?? [10, 10] as [number, number], origin: sheet?.gridOrigin ?? [0, 0] as [number, number] } : null;
   const svgRef = useRef<SVGSVGElement>(null);
   const editable = !!klass && !klass.library;
 
@@ -214,7 +215,7 @@ export function PictureEditor({ kind }: { kind: Kind }) {
       const a = draft[0], b = snap(p);
       setDraft([]);
       if (Math.abs(a[0] - b[0]) < 1 && Math.abs(a[1] - b[1]) < 1) return;
-      const h = await op({ op: 'add', shape: tool, points: [a, b], pen: penJson(), brush: tool === 'line' ? undefined : brushJson() });
+      const h = await op({ op: 'add', shape: tool, points: [a, b], n: loadEnv().circlePoints, pen: penJson(), brush: tool === 'line' ? undefined : brushJson() });
       setSel([h]);
     }
   }
@@ -235,7 +236,7 @@ export function PictureEditor({ kind }: { kind: Kind }) {
   const k = view.k;
 
   return (
-    <div className="picture-editor" onWheel={onWheel}>
+    <div className={`picture-editor${loadEnv().handCursor && drag?.kind === 'move' ? ' moving' : ''}`} onWheel={onWheel}>
       <div className="draw-tools">
         {TOOLS.map(t => <button key={t.id} className={`small icon-only${tool === t.id ? ' active' : ''}`} title={t.hint} onClick={() => { setTool(t.id); setDraft([]); }} disabled={!editable && t.id !== 'select' && t.id !== 'pan'}><Icon name={t.id} /></button>)}
         <span className="sep" />

@@ -1,6 +1,8 @@
 // Диалоги проекта: «Создание проекта» (папка и корневой имидж) и
 // «Информация» (сводка: имиджи, экземпляры, связи, уравнения, функции).
 import { useEffect, useState } from 'react';
+import { loadEnv } from './Options';
+import { api } from '../api';
 import { useStore } from '../store';
 
 export function NewProjectDialog({ onClose }: { onClose: () => void }) {
@@ -19,6 +21,13 @@ export function NewProjectDialog({ onClose }: { onClose: () => void }) {
       const r = await fetch(`/api/new?root=${encodeURIComponent(root.trim() || 'Main')}${inMemory ? '' : '&dir=' + encodeURIComponent(dir.trim())}`, { method: 'POST' });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error ?? r.statusText);
+      // «Параметры среды → Пользователь»: данные автора в новый проект
+      const env = loadEnv();
+      if (env.copyUser) {
+        const u = env.user;
+        const props: [string, string][] = [['user_name', [u.name, u.org].filter(Boolean).join(', ')], ['user_email', u.email], ['user_addr', [u.addr, u.phone].filter(Boolean).join('; ')], ['info', u.notes]];
+        for (const [k, v] of props) if (v) await api.setProjectProperty(k, v);
+      }
       await load();
       showToast('Проект создан');
       onClose();

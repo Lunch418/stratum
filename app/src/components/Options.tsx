@@ -194,14 +194,32 @@ export function ProjectOptionsDialog({ onClose }: { onClose: () => void }) {
 }
 
 // ── Параметры среды ────────────────────────────────────────────────────────
-export interface EnvOptions { autosave: number; pollMs: number; circlePoints: number; gridAuto: boolean; fontSize: number; confirmClose: boolean }
-export const defaultEnv: EnvOptions = { autosave: 30, pollMs: 40, circlePoints: 32, gridAuto: false, fontSize: 13, confirmClose: true };
+export interface UserInfo { name: string; org: string; email: string; addr: string; phone: string; notes: string }
+export interface EnvOptions {
+  autosave: number; pollMs: number; circlePoints: number; gridAuto: boolean; fontSize: number; confirmClose: boolean;
+  /// «Параметры среды → Вычисления»: пройденные шаги и индикатор производительности в строке статуса
+  statusTicks: boolean; statusPerf: boolean;
+  /// «2D-редактор»: курсор-рука при перемещении объектов
+  handCursor: boolean;
+  /// «Редактор»: выделение синтаксиса, кегль, перенос строк, мини-карта
+  syntax: boolean; editorFontSize: number; wordWrap: boolean; minimap: boolean;
+  /// «Пользователь»: данные автора и копирование их в новый проект
+  user: UserInfo; copyUser: boolean;
+}
+export const defaultEnv: EnvOptions = {
+  autosave: 30, pollMs: 40, circlePoints: 32, gridAuto: false, fontSize: 13, confirmClose: true,
+  statusTicks: true, statusPerf: false, handCursor: true, syntax: true, editorFontSize: 13, wordWrap: false, minimap: false,
+  user: { name: '', org: '', email: '', addr: '', phone: '', notes: '' }, copyUser: true,
+};
 export function loadEnv(): EnvOptions {
-  try { return { ...defaultEnv, ...JSON.parse(localStorage.getItem('env') ?? '{}') }; } catch { return defaultEnv; }
+  try {
+    const saved = JSON.parse(localStorage.getItem('env') ?? '{}') as Partial<EnvOptions>;
+    return { ...defaultEnv, ...saved, user: { ...defaultEnv.user, ...(saved.user ?? {}) } };
+  } catch { return defaultEnv; }
 }
 
 export function EnvOptionsDialog({ onClose }: { onClose: () => void }) {
-  const [tab, setTab] = useState<'calc' | 'editor' | 'libs' | 'view'>('calc');
+  const [tab, setTab] = useState<'calc' | '2d' | 'editor' | 'libs' | 'user' | 'view'>('calc');
   const [env, setEnv] = useState<EnvOptions>(loadEnv);
   const theme = useStore(s => s.theme);
   const toggleTheme = useStore(s => s.toggleTheme);
@@ -209,6 +227,10 @@ export function EnvOptionsDialog({ onClose }: { onClose: () => void }) {
   const showToast = useStore(s => s.showToast);
   const libs = [...new Set((project?.classes ?? []).filter(c => c.library).map(c => c.source.replace(/[\\/][^\\/]*$/, '')))];
   const set = (p: Partial<EnvOptions>) => setEnv(e => ({ ...e, ...p }));
+  const setUser = (p: Partial<UserInfo>) => setEnv(e => ({ ...e, user: { ...e.user, ...p } }));
+  const userField = (label: string, k: keyof UserInfo) => (
+    <label className="prop"><span>{label}</span><input type="text" value={env.user[k]} onChange={e => setUser({ [k]: e.target.value })} /></label>
+  );
   function submit() {
     try { localStorage.setItem('env', JSON.stringify(env)); } catch { /* приватный режим */ }
     document.documentElement.style.setProperty('--font-size', env.fontSize + 'px');
@@ -217,18 +239,31 @@ export function EnvOptionsDialog({ onClose }: { onClose: () => void }) {
   }
   return (
     <Frame title="Параметры среды" width={600} onClose={onClose} onSubmit={submit}>
-      <Tabs tabs={[['calc', 'Вычисления'], ['editor', 'Редактор'], ['libs', 'Библиотеки'], ['view', 'Вид']]} value={tab} onChange={setTab} />
+      <Tabs tabs={[['calc', 'Вычисления'], ['2d', '2D-редактор'], ['editor', 'Редактор'], ['libs', 'Библиотеки'], ['user', 'Пользователь'], ['view', 'Вид']]} value={tab} onChange={setTab} />
       <div className="modal-body dialog-page">
         {tab === 'calc' && <fieldset><legend>Вычисления</legend>
           <Num label="Опрос окна модели, мс" value={env.pollMs} onChange={v => set({ pollMs: Math.max(10, v) })} />
           <Num label="Автосохранение проекта, с (0 — выключено)" value={env.autosave} onChange={v => set({ autosave: Math.max(0, v) })} />
+          <Check label="Пройденные шаги в строке статуса" value={env.statusTicks} onChange={v => set({ statusTicks: v })} />
+          <Check label="Индикатор производительности (тактов в секунду) в строке статуса" value={env.statusPerf} onChange={v => set({ statusPerf: v })} />
           <div className="muted small">Режим вычислений и обработка ошибок задаются на проект: «Параметры → Параметры проекта…».</div>
         </fieldset>}
-        {tab === 'editor' && <fieldset><legend>Двумерный редактор и текст</legend>
-          <Num label="Точек в окружности" value={env.circlePoints} onChange={v => set({ circlePoints: Math.max(8, v) })} />
-          <Check label="Сетка включается автоматически в новом рисунке" value={env.gridAuto} onChange={v => set({ gridAuto: v })} />
-          <Num label="Размер шрифта интерфейса" value={env.fontSize} onChange={v => set({ fontSize: Math.min(20, Math.max(10, v)) })} />
-          <Check label="Предупреждать о несохранённых правках при закрытии" value={env.confirmClose} onChange={v => set({ confirmClose: v })} />
+        {tab === '2d' && <fieldset><legend>Двумерный редактор</legend>
+          <Num label="Точек в окружности" value={env.circlePoints} onChange={v => set({ circlePoints: Math.min(360, Math.max(8, v)) })} />
+          <Check label="Сетка автоматически включается" value={env.gridAuto} onChange={v => set({ gridAuto: v })} />
+          <Check label="Курсор-рука при перемещении объектов" value={env.handCursor} onChange={v => set({ handCursor: v })} />
+        </fieldset>}
+        {tab === 'editor' && <fieldset><legend>Редактор текста</legend>
+          <Check label="Использовать редактор с выделением синтаксиса" value={env.syntax} onChange={v => set({ syntax: v })} />
+          <Num label="Кегль текста" value={env.editorFontSize} onChange={v => set({ editorFontSize: Math.min(28, Math.max(9, v)) })} />
+          <Check label="Переносить длинные строки" value={env.wordWrap} onChange={v => set({ wordWrap: v })} />
+          <Check label="Мини-карта текста" value={env.minimap} onChange={v => set({ minimap: v })} />
+          <div className="muted small">Цветовая схема текста следует теме среды («Вид»).</div>
+        </fieldset>}
+        {tab === 'user' && <fieldset><legend>Ваши данные</legend>
+          {userField('Имя', 'name')}{userField('Организация', 'org')}{userField('Почта', 'email')}{userField('Адрес', 'addr')}{userField('Телефон/факс', 'phone')}
+          <label className="prop" style={{ alignItems: 'start' }}><span>Примечания</span><textarea rows={3} value={env.user.notes} onChange={e => setUser({ notes: e.target.value })} /></label>
+          <Check label="Копировать атрибуты в создаваемый проект" value={env.copyUser} onChange={v => set({ copyUser: v })} />
         </fieldset>}
         {tab === 'libs' && <fieldset><legend>Библиотеки</legend>
           {libs.length ? libs.map(l => <div key={l} className="mono small">{l}</div>) : <div className="muted">Библиотеки не подключены.</div>}
@@ -236,6 +271,8 @@ export function EnvOptionsDialog({ onClose }: { onClose: () => void }) {
         </fieldset>}
         {tab === 'view' && <fieldset><legend>Вид</legend>
           <label className="prop"><span>Тема</span><button type="button" className="small" onClick={toggleTheme}>{theme === 'light' ? 'Светлая → тёмная' : 'Тёмная → светлая'}</button></label>
+          <Num label="Размер шрифта интерфейса" value={env.fontSize} onChange={v => set({ fontSize: Math.min(20, Math.max(10, v)) })} />
+          <Check label="Предупреждать о несохранённых правках при закрытии" value={env.confirmClose} onChange={v => set({ confirmClose: v })} />
           <label className="prop"><span>Раскладка панелей</span><button type="button" className="small" onClick={() => { try { localStorage.removeItem('layout'); } catch { /* */ } location.reload(); }}>Сбросить</button></label>
         </fieldset>}
       </div>

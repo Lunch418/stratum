@@ -343,6 +343,7 @@ button.attention { border-color: var(--state-pause); }
 .picture-editor .sel-box { fill: none; stroke: var(--accent); stroke-width: 1; stroke-dasharray: 4 3; pointer-events: none; }
 .picture-editor .handle { fill: var(--bg-surface); stroke: var(--accent); cursor: nwse-resize; }
 .picture-editor .handle.point { cursor: move; }
+.picture-editor.moving svg.canvas { cursor: grabbing; }
 .picture-editor .draft { fill: none; stroke: var(--accent); stroke-width: 1; stroke-dasharray: 3 3; pointer-events: none; }
 .draw-tools { display: flex; align-items: center; gap: 3px; padding: 4px 8px; border-bottom: 1px solid var(--border); background: var(--bg-surface); flex-wrap: nowrap; overflow: hidden; }
 .draw-tools input[type="number"] { width: 48px !important; padding: 3px 4px; }
