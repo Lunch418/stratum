@@ -1388,10 +1388,11 @@ mod tests {
 
     #[test]
     fn keeps_unknown_sheet_chunks_of_a_new_picture() {
-        // «Робот»: за известными чанками 3.x идут данные листа (0x03FD, 0x03FC)
+        // «Робот»: заголовок 3.x длиннее обычного; 0x03FD и 0x03FC за ним —
+        // это Z-порядок и объекты, а не данные листа
         let Some(data) = fixture("PROJECTS/samples/ROBOT/ROBOT3.VDR") else { return };
         let pic = parse(&data, "ROBOT3.VDR").unwrap();
-        assert!(!pic.extra.is_empty());
+        assert!(!pic.objects.is_empty() && !pic.spaces3d.is_empty());
         let back = parse(&write(&pic), "copy").unwrap();
         assert_eq!(back.extra, pic.extra);
         assert_eq!(back.objects.len(), pic.objects.len());
