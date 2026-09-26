@@ -8,6 +8,10 @@ use crate::formats::json::{self, Json};
 use crate::formats::{cls, vdr};
 use crate::gfx::{svg, Brush, Font, Handle, Object, Pen, Shape, Space, TextPart};
 
+/// Наибольшая сторона растра из редактора: без предела w×h×3 переполнял
+/// u32 (паника) или просил гигабайты памяти.
+const MAX_BITMAP: f64 = 16384.0;
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Kind {
     Image,
@@ -367,7 +371,7 @@ pub fn apply(sp: &mut Space, op: &Json) -> Result<Handle, String> {
         }
         // растр: новый пустой («Битовая карта») и запись пикселей из битового редактора
         "bitmap" => {
-            let (w, h) = (op.num_or("w", 32.0).max(1.0) as u32, op.num_or("h", 32.0).max(1.0) as u32);
+            let (w, h) = (op.num_or("w", 32.0).clamp(1.0, MAX_BITMAP) as u32, op.num_or("h", 32.0).clamp(1.0, MAX_BITMAP) as u32);
             let (x, y) = (op.num_or("x", 0.0), op.num_or("y", 0.0));
             let rgb = vec![255u8; (w * h * 3) as usize];
             let d = sp.add_dib(crate::gfx::Dib::new(crate::gfx::encode_bmp24(w, h, &rgb), Vec::new(), None));
@@ -378,9 +382,11 @@ pub fn apply(sp: &mut Space, op: &Json) -> Result<Handle, String> {
                 Some(Shape::Bitmap { dib, .. }) => *dib,
                 _ => return Err("объект — не растр".into()),
             };
-            let (w, h) = (op.num_or("w", 0.0) as u32, op.num_or("h", 0.0) as u32);
+            let (w, h) = (op.num_or("w", 0.0).clamp(0.0, MAX_BITMAP) as u32, op.num_or("h", 0.0).clamp(0.0, MAX_BITMAP) as u32);
             let hex = op.str_or("rgb", "");
-            if hex.len() != (w * h * 3 * 2) as usize {
+            // не-hex символы укоротили бы пиксели (паника при чтении), а
+            // не-ASCII — срез строки посреди буквы
+            if hex.len() != w as usize * h as usize * 6 || !hex.bytes().all(|b| b.is_ascii_hexdigit()) {
                 return Err("размер rgb не совпадает с w×h".into());
             }
             let rgb: Vec<u8> = (0..hex.len() / 2).filter_map(|i| u8::from_str_radix(&hex[i * 2..i * 2 + 2], 16).ok()).collect();
@@ -542,4 +548,30 @@ fn dib_get(sp: &mut Space, handle: Handle) -> Result<String, String> {
     let (w, h) = (d.width, d.height);
     let hex: String = d.pixels.as_deref().unwrap_or(&[]).iter().map(|b| format!("{b:02x}")).collect();
     Ok(format!("{{\"w\":{w},\"h\":{h},\"rgb\":\"{hex}\"}}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn op(text: &str) -> Json {
+        json::parse(text).unwrap()
+    }
+
+    #[test]
+    fn bitmap_ops_reject_bad_sizes_and_data() {
+        let mut sp = Space::new(1, "");
+        // огромный растр урезается до предела, а не переполняет u32
+        apply(&mut sp, &op(r#"{"op":"bitmap","w":1e12,"h":1}"#)).unwrap();
+        assert!(sp.objects.values().all(|o| o.w <= MAX_BITMAP && o.h <= MAX_BITMAP));
+        sp = Space::new(1, "");
+        let h = apply(&mut sp, &op(r#"{"op":"bitmap","w":2,"h":1}"#)).unwrap();
+        // не-hex и не-ASCII той же длины — отказ, не паника
+        for rgb in ["zzzzzzzzzzzz", "ЖЖЖЖЖЖ", "ffffff00000"] {
+            let text = format!(r#"{{"op":"dibset","handle":{h},"w":2,"h":1,"rgb":"{rgb}"}}"#);
+            assert!(apply(&mut sp, &op(&text)).is_err(), "{rgb}");
+        }
+        let text = format!(r#"{{"op":"dibset","handle":{h},"w":2,"h":1,"rgb":"ff000000ff00"}}"#);
+        assert!(apply(&mut sp, &op(&text)).is_ok());
+    }
 }

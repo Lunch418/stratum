@@ -26,10 +26,14 @@ impl Matrix {
         if max_i < min_i || max_j < min_j {
             return None;
         }
-        let cells = ((max_i - min_i + 1) * (max_j - min_j + 1)) as usize;
+        // границы из модели: разность и произведение могут переполниться
+        // (паника или «пустая» матрица с огромными индексами)
+        let side = |lo: i64, hi: i64| hi.checked_sub(lo).and_then(|d| d.checked_add(1));
+        let cells = side(min_i, max_i)?.checked_mul(side(min_j, max_j)?)?;
         if cells > 4_000_000 {
             return None;
         }
+        let cells = cells as usize;
         Some(Matrix { min_i, max_i, min_j, max_j, data: vec![0.0; cells] })
     }
 
@@ -332,6 +336,14 @@ impl Arrays {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn huge_bounds_do_not_overflow() {
+        assert!(Matrix::new(i64::MIN, i64::MAX, 0, 0).is_none());
+        assert!(Matrix::new(0, 1 << 32, 0, 1 << 32).is_none());
+        assert!(Matrix::new(-(1 << 62), 1 << 62, 1, 1).is_none());
+        assert_eq!(Matrix::new(1, 3, 1, 2).unwrap().data.len(), 6);
+    }
 
     #[test]
     fn matrix_indices_use_the_given_ranges() {
