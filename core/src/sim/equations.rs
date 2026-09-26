@@ -56,7 +56,7 @@ pub fn solve_step(jac: &[Vec<f64>], residual: &[f64]) -> Option<Vec<f64>> {
         a[i][i] += 1e-12;
     }
     for col in 0..n {
-        let pivot = (col..n).max_by(|&x, &y| a[x][col].abs().partial_cmp(&a[y][col].abs()).unwrap())?;
+        let pivot = (col..n).max_by(|&x, &y| crate::runtime::data::float_order(a[x][col].abs(), a[y][col].abs()))?;
         if a[pivot][col].abs() < 1e-18 {
             return None;
         }

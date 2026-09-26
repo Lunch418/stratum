@@ -21,6 +21,14 @@ pub struct Matrix {
     pub data: Vec<f64>,
 }
 
+/// Порядок чисел для сортировок: как `<`, а NaN — после всех чисел и равны
+/// между собой. `partial_cmp(..).unwrap_or(Equal)` с NaN — не порядок, и
+/// сортировка стандартной библиотеки на нём паникует, а `.unwrap()` —
+/// паника сразу; NaN в данных модели — обычное дело.
+pub(crate) fn float_order(a: f64, b: f64) -> std::cmp::Ordering {
+    a.partial_cmp(&b).unwrap_or_else(|| a.is_nan().cmp(&b.is_nan()))
+}
+
 impl Matrix {
     pub fn new(min_i: i64, max_i: i64, min_j: i64, max_j: i64) -> Option<Matrix> {
         if max_i < min_i || max_j < min_j {
@@ -162,7 +170,7 @@ pub fn determinant(m: &Matrix) -> f64 {
     let mut a: Vec<Vec<f64>> = (0..n).map(|i| (0..n).map(|j| m.at(i, j)).collect()).collect();
     let mut det = 1.0;
     for col in 0..n {
-        let pivot = (col..n).max_by(|&x, &y| a[x][col].abs().partial_cmp(&a[y][col].abs()).unwrap()).unwrap();
+        let pivot = (col..n).max_by(|&x, &y| float_order(a[x][col].abs(), a[y][col].abs())).unwrap();
         if a[pivot][col].abs() < 1e-300 {
             return 0.0;
         }
@@ -195,7 +203,7 @@ pub fn inverse(m: &Matrix) -> Option<Matrix> {
         })
         .collect();
     for col in 0..n {
-        let pivot = (col..n).max_by(|&x, &y| a[x][col].abs().partial_cmp(&a[y][col].abs()).unwrap())?;
+        let pivot = (col..n).max_by(|&x, &y| float_order(a[x][col].abs(), a[y][col].abs()))?;
         if a[pivot][col].abs() < 1e-300 {
             return None;
         }
@@ -230,7 +238,7 @@ pub fn sort(m: &mut Matrix, n: i64, kind: i64) -> bool {
         1 | 2 => {
             let Some(c) = (n >= m.min_j && n <= m.max_j).then(|| (n - m.min_j) as usize) else { return false };
             let mut order: Vec<usize> = (0..rows).collect();
-            order.sort_by(|&a, &b| m.at(a, c).partial_cmp(&m.at(b, c)).unwrap_or(std::cmp::Ordering::Equal));
+            order.sort_by(|&a, &b| float_order(m.at(a, c), m.at(b, c)));
             if kind == 2 {
                 order.reverse();
             }
@@ -242,7 +250,7 @@ pub fn sort(m: &mut Matrix, n: i64, kind: i64) -> bool {
         3 | 4 => {
             let Some(r) = (n >= m.min_i && n <= m.max_i).then(|| (n - m.min_i) as usize) else { return false };
             let mut order: Vec<usize> = (0..cols).collect();
-            order.sort_by(|&a, &b| m.at(r, a).partial_cmp(&m.at(r, b)).unwrap_or(std::cmp::Ordering::Equal));
+            order.sort_by(|&a, &b| float_order(m.at(r, a), m.at(r, b)));
             if kind == 4 {
                 order.reverse();
             }
@@ -335,6 +343,26 @@ impl Arrays {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn nan_in_matrix_does_not_panic() {
+        let mut m = Matrix::new(1, 20, 1, 2).unwrap();
+        for (k, v) in m.data.iter_mut().enumerate() {
+            *v = if k % 3 == 0 { f64::NAN } else { (k * 7 % 11) as f64 };
+        }
+        for kind in 1..=4 {
+            assert!(sort(&mut m.clone(), 1, kind));
+        }
+        let mut sq = Matrix::new(1, 2, 1, 2).unwrap();
+        sq.data = vec![f64::NAN, 1.0, 2.0, f64::NAN];
+        let _ = determinant(&sq);
+        let _ = inverse(&sq);
+        // обычные числа — прежний порядок
+        let mut col = Matrix::new(1, 3, 1, 1).unwrap();
+        col.data = vec![3.0, -0.0, 0.0];
+        assert!(sort(&mut col, 1, 1));
+        assert_eq!(col.data[2], 3.0);
+    }
 
     #[test]
     fn huge_bounds_do_not_overflow() {

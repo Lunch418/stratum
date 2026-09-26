@@ -540,10 +540,17 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
             boolean(fx.arrays.get_mut(f(args, 0) as u32).map(|a| {
                 a.sort_by(|x, y| {
                     let (vx, vy) = (x.get(&field), y.get(&field));
+                    // разные типы поля — числа, затем строки, затем без поля:
+                    // иначе сравнение нетранзитивно, и сортировка паникует
+                    let rank = |v: Option<&Value>| match v {
+                        Some(Value::Str(_)) => 1,
+                        Some(_) => 0,
+                        None => 2,
+                    };
                     let ord = match (vx, vy) {
                         (Some(Value::Str(p)), Some(Value::Str(q))) => p.cmp(q),
-                        (Some(p), Some(q)) => p.as_float().partial_cmp(&q.as_float()).unwrap_or(std::cmp::Ordering::Equal),
-                        _ => std::cmp::Ordering::Equal,
+                        (Some(p), Some(q)) if rank(Some(p)) == rank(Some(q)) => super::data::float_order(p.as_float(), q.as_float()),
+                        _ => rank(vx).cmp(&rank(vy)),
                     };
                     if desc { ord.reverse() } else { ord }
                 });

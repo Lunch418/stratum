@@ -791,7 +791,7 @@ pub fn render_view(sp: &Space3d, cam: &Camera, x: f64, y: f64, w: f64, h: f64, o
             }
         }
     }
-    drawn.sort_by(|a, b| b.depth.partial_cmp(&a.depth).unwrap_or(std::cmp::Ordering::Equal));
+    drawn.sort_by(|a, b| crate::runtime::data::float_order(b.depth, a.depth));
     let _ = writeln!(out, "<clipPath id=\"v3d{}\"><rect x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\"/></clipPath><g clip-path=\"url(#v3d{})\">", sp.handle, x, y, w, h, sp.handle);
     for d in drawn {
         out.push_str(&d.svg);
