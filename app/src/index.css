@@ -472,6 +472,8 @@ table.vars button.small.ghost { min-height: 20px; padding: 0 5px; }
 .scheme .toolbar button.small:hover { background: var(--bg-hover); color: var(--text-primary); }
 .scheme .toolbar button.active, .scheme .toolbar button.small.active { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .scheme .toolbar > span.muted { border-left: 1px solid var(--border-subtle); min-width: 52px; text-align: right; }
+.scheme .toolbar .zoom-select, .draw-tools .zoom-select { min-height: 22px; min-width: 0; width: 76px; padding: 0 4px; font-size: var(--fs-sm); font-family: var(--font-mono); border-color: transparent; background: transparent; }
+.scheme .toolbar .zoom-select:hover, .draw-tools .zoom-select:hover { border-color: var(--border); }
 .scheme .hint {
   position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); font-size: var(--fs-sm); pointer-events: none;
   background: var(--bg-raised); border: 1px solid var(--border-subtle); border-radius: 999px; padding: 4px 14px; box-shadow: var(--shadow-1); white-space: nowrap;
@@ -503,7 +505,11 @@ table.vars button.small.ghost { min-height: 20px; padding: 0 5px; }
 .model .win.active { outline: 2px solid var(--accent); outline-offset: 1px; }
 .model .win .controls { position: absolute; inset: 0; pointer-events: none; }
 .model .win .ctl { position: absolute; pointer-events: auto; box-sizing: border-box; font: 12px Arial, sans-serif; color: #000; }
-.model .win button.ctl { display: block; min-height: 0; background: #f0f0f0; border: 1px solid #606060; border-radius: 2px; padding: 0 4px; box-shadow: none; color: #000; font-weight: 400; transition: none; }
+.model .win .ctl { line-height: normal; }
+/* кнопка Windows: подпись в одну строку по центру, лишнее обрезается */
+.model .win button.ctl { display: block; min-height: 0; background: #f0f0f0; border: 1px solid #606060; border-radius: 2px; padding: 0 4px; box-shadow: none; color: #000; font-weight: 400; transition: none; white-space: nowrap; overflow: hidden; }
+.model .win button.ctl:disabled { opacity: 1; color: #8d8d8d; }
+.model .win button.ctl:focus-visible { outline: 1px dotted #000; outline-offset: -4px; }
 .model .win button.ctl:hover { background: #f0f0f0; border-color: #606060; }
 .model .win button.ctl:active { background: #d8d8d8; }
 .model .win label.ctl { display: flex; align-items: center; gap: 4px; white-space: nowrap; overflow: hidden; }

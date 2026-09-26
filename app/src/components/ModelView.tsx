@@ -206,14 +206,31 @@ function createControl(kind: string, win: string, c: Control): HTMLElement {
   return el;
 }
 
+// Подпись контрола как в Windows: «&» подчёркивает следующую букву
+// (клавиша-ускоритель), «&&» — сам знак амперсанда
+function setCaption(el: HTMLElement, text: string) {
+  if (el.dataset.caption === text) return;
+  el.dataset.caption = text;
+  el.textContent = '';
+  const parts = text.split('&&');
+  parts.forEach((part, i) => {
+    if (i) el.append('&');
+    const k = part.indexOf('&');
+    if (k < 0 || k === part.length - 1) { el.append(part.replace('&', '')); return; }
+    const u = document.createElement('u');
+    u.textContent = part[k + 1];
+    el.append(part.slice(0, k), u, part.slice(k + 2).replace(/&/g, ''));
+  });
+}
+
 function updateControl(el: HTMLElement, kind: string, c: Control) {
   const disabled = !c.enabled;
-  if (kind === 'button') { el.textContent = c.text; (el as HTMLButtonElement).disabled = disabled; }
+  if (kind === 'button') { setCaption(el, c.text); (el as HTMLButtonElement).disabled = disabled; }
   else if (kind === 'checkbox' || kind === 'radio') {
     const input = el.querySelector('input')!;
     if (document.activeElement !== input) input.checked = c.checked;
     input.disabled = disabled;
-    el.querySelector('span')!.textContent = c.text;
+    setCaption(el.querySelector('span')!, c.text);
   } else if (kind === 'edit' || kind === 'textarea') {
     const input = el as HTMLInputElement;
     if (document.activeElement !== input && input.value !== c.text) input.value = c.text;
