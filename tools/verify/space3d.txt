@@ -1,0 +1,13 @@
+# Номера трёхмерных пространств: свой счётчик или общий с окнами
+@ fixtures/PROJECTS/samples/BALLS WorkSpace
+% Wait = 1
+! hs := OpenSchemeWindow("W1", "WorkSpace", "")
+! a := CreateSpace3d(~hs)
+! b := CreateSpace3d(~hs)
+! hs2 := OpenSchemeWindow("W2", "WorkSpace", "")
+! c := CreateSpace3d(~hs2)
+hs | Float(hs)
+a | Float(a)
+b | Float(b)
+hs2 | Float(hs2)
+c | Float(c)

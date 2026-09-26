@@ -58,6 +58,9 @@ def probes(path):
         if line.startswith('>'):
             out.append((None, line[1:].strip()))
             continue
+        if line.startswith('+'):
+            FILES.append(ROOT / line[1:].strip())
+            continue
         if line.startswith('@'):
             folder, name = line[1:].split()
             EXTRA_CLASSES.append((ROOT / folder, name))
@@ -95,6 +98,8 @@ def write_class(dir, name, vars, text, children=()):
 
 # Свойства проекта для проб: строка `% MathMode = 3` в файле проб
 PROPERTIES = []
+# Файлы для модели (`+ путь`): кладутся в C:\verify\ — рядом с out.txt
+FILES = []
 # Готовые имиджи из родных проектов: строка `@ папка Имя`
 EXTRA_CLASSES = []
 # Операторы первого такта (`! оператор`) и задержка проб в тактах (`% Wait = N`)
@@ -158,6 +163,8 @@ def run_core(items, work):
     native_project(proj, model_text(items, r'C:\verify\out.txt'))
     # диск C: модели ядро отображает в папку проекта — папка должна быть
     (proj / 'verify').mkdir(exist_ok=True)
+    for f in FILES:
+        shutil.copy(f, proj / 'verify' / f.name)
     subprocess.run([str(CORE), 'run', str(proj), '--ticks', str(WAIT + 2)], capture_output=True, text=True)
     # диск C: модели ядро отображает в папку проекта
     return parse(proj / 'verify' / 'out.txt')
@@ -176,6 +183,8 @@ def run_original(items, work, timeout=60, compiler=False):
     d = subprocess.run([sys.executable, str(ROOT / 'tools' / 'disasm.py'), str(WORK / 'Main.cls')], capture_output=True, text=True)
     if d.returncode:
         sys.exit('модель не скомпилирована нашим компилятором (оригинал её тоже не примет): проверьте пробы\n' + r.stderr)
+    for f in FILES:
+        shutil.copy(f, WORK / f.name)
     if compiler:
         (WORK / 'probe.mdl').write_bytes(text.replace('\n', '\r\n').encode('cp1251'))
     out = WORK / 'out.txt'

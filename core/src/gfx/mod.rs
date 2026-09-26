@@ -406,6 +406,11 @@ impl Space {
                     h, 0.0, 0.0, 0.0, 0.0,
                     Shape::Group { children: children.iter().map(|c| *c as Handle).collect() },
                 ),
+                // номер пространства — пока номер инструмента в файле;
+                // `Gfx::bind_views` заменяет его настоящим
+                ObjectKind::View3d { x, y, w, h: hh, space, camera } => {
+                    Object::new(h, *x, *y, *w, *hh, Shape::View3d { space: *space as Handle, camera: *camera as Handle })
+                }
                 ObjectKind::Unknown { .. } => Object::new(h, 0.0, 0.0, 0.0, 0.0, Shape::Unknown),
             };
             obj.name = o.name.clone();
@@ -998,6 +1003,38 @@ impl Gfx {
 
     pub fn window_space(&self, name: &str) -> Option<Handle> {
         self.windows.get(&name.to_lowercase()).copied()
+    }
+
+    /// Трёхмерные пространства рисунка: создаются раньше листа, номера — из
+    /// общего с листами счётчика (сверено в Wine: T80 и EDS_IND,
+    /// tools/verify/load3d.txt). Возвращает «номер в файле → номер».
+    pub fn create_spaces3d(&mut self, pic: &Picture) -> BTreeMap<Handle, Handle> {
+        let mut map = BTreeMap::new();
+        for data in &pic.spaces3d {
+            let h = self.create_space3d(0);
+            if let Some(sp) = self.spaces3d.get_mut(&h) {
+                sp.load(data);
+            }
+            map.insert(data.handle as Handle, h);
+        }
+        map
+    }
+
+    /// Проекции листа `sp` — на созданные пространства; лист становится
+    /// их владельцем.
+    pub fn bind_views(&mut self, sp: Handle, map: &BTreeMap<Handle, Handle>) {
+        for h in map.values() {
+            if let Some(s3) = self.spaces3d.get_mut(h) {
+                s3.owner = sp;
+            }
+        }
+        if let Some(space) = self.spaces.get_mut(&sp) {
+            for o in space.objects.values_mut() {
+                if let Shape::View3d { space, .. } = &mut o.shape {
+                    *space = map.get(space).copied().unwrap_or(0);
+                }
+            }
+        }
     }
 
     pub fn create_space3d(&mut self, owner: Handle) -> Handle {

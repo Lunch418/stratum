@@ -32,6 +32,61 @@ pub struct Picture {
     pub extra: Vec<u8>,
     /// Приложения ломаных (стрелки и т. п.) как есть: handle → байты.
     pub arrows: Vec<(u16, Vec<u8>)>,
+    /// Трёхмерные пространства (инструмент `3D` в чанке 1012).
+    pub spaces3d: Vec<Space3dData>,
+}
+
+/// Трёхмерное пространство из рисунка: инструмент с сигнатурой `3D`
+/// (`u16 0x4433`, [3.x: `u32 размер`], `u16 handle`), внутри — чанки 1021
+/// (порядок объектов верхнего уровня), 1020 (объекты) и в 3.x 1024
+/// (материалы). Записи объектов — как у 2D: 2.x `u16 тип, u16 handle,
+/// u16 флаги, str имя`; 3.x `u16 тип, u16 размер, u16 0, u16 handle,
+/// u16 флаги`, имя — блок `0xCD` в конце.
+#[derive(Debug, Clone, Default)]
+pub struct Space3dData {
+    pub handle: u16,
+    pub zorder: Vec<u16>,
+    pub objects: Vec<Object3dData>,
+    /// 3.x: чанк материалов как есть (пишется обратно).
+    pub materials: Option<Vec<u8>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Object3dData {
+    pub handle: u16,
+    pub name: String,
+    pub flags: u16,
+    pub kind: Object3dKind,
+}
+
+#[derive(Debug, Clone)]
+pub enum Object3dKind {
+    /// Тип 10: `u16 материал?, u16 n, n × (f64 x, y, z), u16 m, m ×
+    /// примитив, 16 × f64 матрица (строками, перенос в четвёртой), u16`.
+    Mesh {
+        material: u16,
+        points: Vec<[f64; 3]>,
+        prims: Vec<Prim3dData>,
+        matrix: [f64; 16],
+        tail: u16,
+    },
+    /// Тип 11: 200 байт — см. `Camera3dData`.
+    Camera(Vec<u8>),
+    /// Тип 12: 88 байт.
+    Light(Vec<u8>),
+    /// Типы 3–5: вложенный чанк 1021 — дочерние объекты.
+    Group { kind: u16, children: Vec<u16> },
+}
+
+/// Примитив: `u16 n, u16 k, u16 флаги, u32 цвет, n × u16 номер точки,
+/// n·k × (f64 u, f64 v)` — текстурные координаты.
+#[derive(Debug, Clone)]
+pub struct Prim3dData {
+    pub layers: u16,
+    pub flags: u16,
+    pub color: u32,
+    pub idx: Vec<u16>,
+    pub uv: Vec<f64>,
 }
 
 /// Гиперссылка графического объекта. Хранится в блоке данных объекта
@@ -259,7 +314,17 @@ pub enum ObjectKind {
     Group {
         children: Vec<u16>,
     },
-    /// Тип, который ещё не разобран (3D-проекции и т. п.).
+    /// Тип 24: проекция трёхмерного пространства — `num x,y,w,h,
+    /// u16 пространство (номер инструмента 3D), u16 камера`.
+    View3d {
+        x: f64,
+        y: f64,
+        w: f64,
+        h: f64,
+        space: u16,
+        camera: u16,
+    },
+    /// Тип, который ещё не разобран.
     Unknown {
         kind: u16,
     },
@@ -364,12 +429,14 @@ pub fn parse(data: &[u8], path: &str) -> Result<Picture> {
     let mut pic = Picture { version, ..Default::default() };
 
     let mut total = 0usize;
+    let mut header_end = None;
     let tools_at = if ctx.sized {
         r.u16()?;
         total = r.u32()? as usize;
         None
     } else {
-        r.u32()?;
+        // размер заголовка — без двух последних байт (как и `tools_at`)
+        header_end = Some(start + r.u32()? as usize + 2);
         // смещение считается от сигнатуры, а не от начала блока
         Some(start + r.u32()? as usize)
     };
@@ -384,6 +451,11 @@ pub fn parse(data: &[u8], path: &str) -> Result<Picture> {
         r.bytes(8)?;
         r.u32()?;
         r.u16()?;
+        // заголовок бывает длиннее (у рисунков с 3D — ещё прямоугольник и
+        // сетка): чанки начинаются по его размеру из первого поля
+        if let Some(end) = header_end.filter(|e| *e > r.pos && *e < r.data.len()) {
+            r.pos = end;
+        }
     }
 
     loop {
@@ -482,7 +554,9 @@ fn read_item(r: &mut Reader, ctx: &Ctx, id: u16, pic: &mut Picture) -> Result<()
     let at = r.pos;
     let kind = r.u16()?;
     // размер записи — u16; у растров (103/104) он не помещается, там u32
-    let end = if ctx.sized {
+    let end = if ctx.sized && kind == SPACE3D {
+        None
+    } else if ctx.sized {
         if matches!(kind, 103 | 104) {
             Some(at + r.u32()? as usize)
         } else {
@@ -539,6 +613,16 @@ fn read_item(r: &mut Reader, ctx: &Ctx, id: u16, pic: &mut Picture) -> Result<()
             r.pos = end;
         }
         pic.objects.push(Object { handle, name, flags, kind: body });
+    } else if kind == SPACE3D {
+        // трёхмерное пространство: после типа [u32 размер] и один u16 —
+        // номер инструмента, на него ссылаются проекции (объекты типа 24)
+        let end = if ctx.sized { Some(at + r.u32()? as usize) } else { None };
+        let handle = r.u16()?;
+        let space = read_space3d(r, ctx, handle, end)?;
+        pic.spaces3d.push(space);
+        if let Some(end) = end {
+            r.pos = end;
+        }
     } else {
         if ctx.sized && !matches!(kind, 103 | 104) {
             r.u16()?;
@@ -554,6 +638,140 @@ fn read_item(r: &mut Reader, ctx: &Ctx, id: u16, pic: &mut Picture) -> Result<()
         }
     }
     Ok(())
+}
+
+/// Тип инструмента «трёхмерное пространство»: байты `3D`.
+pub const SPACE3D: u16 = 0x4433;
+
+fn read_space3d(r: &mut Reader, ctx: &Ctx, handle: u16, end: Option<usize>) -> Result<Space3dData> {
+    let mut sp = Space3dData { handle, ..Default::default() };
+    loop {
+        if end.is_some_and(|e| r.pos + 2 > e) {
+            break;
+        }
+        let Some(id) = r.peek_u16(r.pos) else { break };
+        let at = r.pos;
+        match id {
+            chunk::ZORDER | chunk::OBJECTS | 1024 => {}
+            _ => break,
+        }
+        r.u16()?;
+        let size = if ctx.sized { Some(r.u32()? as usize) } else { None };
+        let count = r.u16()?;
+        r.u16()?;
+        r.u16()?;
+        match id {
+            chunk::ZORDER => {
+                for _ in 0..count {
+                    sp.zorder.push(r.u16()?);
+                }
+            }
+            chunk::OBJECTS => {
+                if count > 0 {
+                    r.u8()?;
+                    r.u16()?;
+                }
+                for _ in 0..count {
+                    sp.objects.push(read_object3d(r, ctx)?);
+                }
+            }
+            _ => {
+                // материалы: разобраны только настолько, чтобы сохранить
+                let Some(size) = size else { return r.err("материалы 3D без размера не разобраны") };
+                sp.materials = Some(r.data[at..at + size].to_vec());
+            }
+        }
+        if let Some(size) = size {
+            r.pos = at + size;
+        }
+    }
+    Ok(sp)
+}
+
+fn read_object3d(r: &mut Reader, ctx: &Ctx) -> Result<Object3dData> {
+    let at = r.pos;
+    let kind = r.u16()?;
+    let (end, handle, flags, mut name);
+    if ctx.sized {
+        // «u16 размер, u16 0» — это u32 размер: у тел бывает больше 64 КБ
+        end = Some(at + r.u32()? as usize);
+        handle = r.u16()?;
+        flags = r.u16()?;
+        name = String::new();
+    } else {
+        end = None;
+        handle = r.u16()?;
+        flags = r.u16()?;
+        name = r.string()?;
+    }
+    let body = match kind {
+        10 => {
+            let material = r.u16()?;
+            let n = r.u16()? as usize;
+            let mut points = Vec::with_capacity(n);
+            for _ in 0..n {
+                points.push([r.f64()?, r.f64()?, r.f64()?]);
+            }
+            let m = r.u16()? as usize;
+            let mut prims = Vec::with_capacity(m);
+            for _ in 0..m {
+                let k = r.u16()? as usize;
+                let layers = r.u16()?;
+                let flags = r.u16()?;
+                let color = r.u32()?;
+                let mut idx = Vec::with_capacity(k);
+                for _ in 0..k {
+                    idx.push(r.u16()?);
+                }
+                let mut uv = Vec::with_capacity(2 * k * layers as usize);
+                for _ in 0..2 * k * layers as usize {
+                    uv.push(r.f64()?);
+                }
+                prims.push(Prim3dData { layers, flags, color, idx, uv });
+            }
+            let mut matrix = [0.0; 16];
+            for v in matrix.iter_mut() {
+                *v = r.f64()?;
+            }
+            let tail = r.u16()?;
+            Object3dKind::Mesh { material, points, prims, matrix, tail }
+        }
+        11 => Object3dKind::Camera(r.bytes(200)?),
+        12 => Object3dKind::Light(r.bytes(88)?),
+        3..=5 => {
+            if r.peek_u16(r.pos) != Some(chunk::ZORDER) {
+                return r.err("у 3D-группы нет списка объектов");
+            }
+            r.u16()?;
+            if ctx.sized {
+                r.u32()?;
+            }
+            let n = r.u16()?;
+            r.u16()?;
+            r.u16()?;
+            let mut children = Vec::with_capacity(n as usize);
+            for _ in 0..n {
+                children.push(r.u16()?);
+            }
+            Object3dKind::Group { kind, children }
+        }
+        other => return r.err(format!("3D-объект типа {other} не разобран")),
+    };
+    if let Some(end) = end {
+        while r.pos + 6 <= end {
+            let tag = r.u16()?;
+            let n = r.u32()? as usize;
+            if n < 6 || r.pos + n - 6 > end {
+                break;
+            }
+            let data = r.bytes(n - 6)?;
+            if tag == 0xCD {
+                name = super::cp1251::decode(&data);
+            }
+        }
+        r.pos = end;
+    }
+    Ok(Object3dData { handle, name, flags, kind: body })
 }
 
 fn read_object(r: &mut Reader, ctx: &Ctx, kind: u16, attachment: &mut Option<Vec<u8>>) -> Result<ObjectKind> {
@@ -636,6 +854,7 @@ fn read_object(r: &mut Reader, ctx: &Ctx, kind: u16, attachment: &mut Option<Vec
             r.bytes(10)?;
             ObjectKind::Control { x, y, w, h, class, caption, style }
         }
+        24 => ObjectKind::View3d { x, y, w, h, space: r.u16()?, camera: r.u16()? },
         other => return r.err(format!("объект типа {other} не разобран")),
     })
 }
@@ -786,6 +1005,7 @@ pub fn write(pic: &Picture) -> Vec<u8> {
                 ObjectKind::Text { .. } => 23,
                 ObjectKind::Control { .. } => 26,
                 ObjectKind::Group { .. } => 3,
+                ObjectKind::View3d { .. } => 24,
                 ObjectKind::Unknown { kind } => *kind,
             };
             record(w, kind, false, |w| {
@@ -848,6 +1068,13 @@ pub fn write(pic: &Picture) -> Vec<u8> {
                         w.u32(*style);
                         w.bytes(&[0u8; 10]);
                     }
+                    ObjectKind::View3d { x, y, w: ww, h, space, camera } => {
+                        for v in [*x, *y, *ww, *h] {
+                            w.f64(v);
+                        }
+                        w.u16(*space);
+                        w.u16(*camera);
+                    }
                     ObjectKind::Unknown { .. } => {}
                 }
                 if !o.name.is_empty() {
@@ -890,6 +1117,81 @@ pub fn write(pic: &Picture) -> Vec<u8> {
                 w.u16(b.hatch);
                 w.u16(b.rop);
                 w.u16(b.dib);
+            });
+        }
+    });
+    chunk(&mut w, 1012, pic.spaces3d.len(), |w| {
+        for sp in &pic.spaces3d {
+            record(w, SPACE3D, true, |w| {
+                w.u16(sp.handle);
+                chunk(w, chunk::ZORDER, sp.zorder.len(), |w| {
+                    for z in &sp.zorder {
+                        w.u16(*z);
+                    }
+                });
+                chunk(w, chunk::OBJECTS, sp.objects.len(), |w| {
+                    for o in &sp.objects {
+                        let kind = match &o.kind {
+                            Object3dKind::Mesh { .. } => 10,
+                            Object3dKind::Camera(_) => 11,
+                            Object3dKind::Light(_) => 12,
+                            Object3dKind::Group { kind, .. } => *kind,
+                        };
+                        // размер записи — u32: у тел бывает больше 64 КБ
+                        record(w, kind, true, |w| {
+                            w.u16(o.handle);
+                            w.u16(o.flags);
+                            match &o.kind {
+                                Object3dKind::Mesh { material, points, prims, matrix, tail } => {
+                                    w.u16(*material);
+                                    w.u16(points.len() as u16);
+                                    for p in points {
+                                        for v in p {
+                                            w.f64(*v);
+                                        }
+                                    }
+                                    w.u16(prims.len() as u16);
+                                    for p in prims {
+                                        w.u16(p.idx.len() as u16);
+                                        w.u16(p.layers);
+                                        w.u16(p.flags);
+                                        w.u32(p.color);
+                                        for i in &p.idx {
+                                            w.u16(*i);
+                                        }
+                                        for v in &p.uv {
+                                            w.f64(*v);
+                                        }
+                                    }
+                                    for v in matrix {
+                                        w.f64(*v);
+                                    }
+                                    w.u16(*tail);
+                                }
+                                Object3dKind::Camera(b) | Object3dKind::Light(b) => w.bytes(b),
+                                Object3dKind::Group { children, .. } => {
+                                    w.u16(chunk::ZORDER);
+                                    w.u32(14 + children.len() as u32 * 2);
+                                    w.u16(children.len() as u16);
+                                    w.u16(children.len() as u16);
+                                    w.u16(10);
+                                    for c in children {
+                                        w.u16(*c);
+                                    }
+                                }
+                            }
+                            if !o.name.is_empty() {
+                                let bytes = super::cp1251::encode(&o.name);
+                                w.u16(0xCD);
+                                w.u32(bytes.len() as u32 + 6);
+                                w.bytes(&bytes);
+                            }
+                        });
+                    }
+                });
+                if let Some(m) = &sp.materials {
+                    w.bytes(m);
+                }
             });
         }
     });

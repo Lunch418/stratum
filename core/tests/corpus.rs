@@ -206,6 +206,8 @@ fn same_picture(a: &stratum_core::formats::vdr::Picture, b: &stratum_core::forma
             (ObjectKind::Text { x: a1, y: a2, w: a3, h: a4, text: t1 }, ObjectKind::Text { x: c1, y: c2, w: c3, h: c4, text: t2 }) => (a1, a2, a3, a4, t1) == (c1, c2, c3, c4, t2),
             (ObjectKind::Control { class: k1, caption: c1, style: s1, .. }, ObjectKind::Control { class: k2, caption: c2, style: s2, .. }) => (k1, c1, s1) == (k2, c2, s2),
             (ObjectKind::Group { children: g1 }, ObjectKind::Group { children: g2 }) => g1 == g2,
+            (ObjectKind::View3d { x: a1, y: a2, w: a3, h: a4, space: s1, camera: c1 }, ObjectKind::View3d { x: b1, y: b2, w: b3, h: b4, space: s2, camera: c2 }) =>
+                (a1, a2, a3, a4, s1, c1) == (b1, b2, b3, b4, s2, c2),
             (ObjectKind::Unknown { .. }, ObjectKind::Unknown { .. }) => true,
             _ => false,
         };
@@ -357,4 +359,25 @@ fn every_sample_project_survives_import_export() {
     }
     assert!(count >= 40, "проверено только {count} проектов");
     assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
+
+/// Трёхмерное пространство в рисунке: проекция (тип 24) и инструмент `3D`
+/// с объектами, камерой и группой (EDS_IND, номера сверены в Wine,
+/// tools/verify/load3d.txt).
+#[test]
+fn space3d_in_a_picture_is_read() {
+    use stratum_core::formats::vdr::{self, Object3dKind, ObjectKind};
+    let Some(root) = fixtures() else { return };
+    let data = std::fs::read(root.join("PROJECTS/samples/EDS_IND/3D_PICT.VDR")).unwrap();
+    let pic = vdr::parse(&data, "3D_PICT.VDR").unwrap();
+    let view = pic.objects.iter().find(|o| o.handle == 1).unwrap();
+    assert!(matches!(view.kind, ObjectKind::View3d { camera: 10, .. }), "{:?}", view.kind);
+    assert_eq!(pic.spaces3d.len(), 1);
+    let sp = &pic.spaces3d[0];
+    let named = |n: &str| sp.objects.iter().find(|o| o.name == n).map(|o| o.handle);
+    assert_eq!((named("pol"), named("ramka"), named("ramka_tok"), named("Sc Default Camera")), (Some(1), Some(2), Some(11), Some(10)));
+    assert!(sp.objects.iter().any(|o| matches!(&o.kind, Object3dKind::Group { children, .. } if children == &vec![3, 2])));
+    // запись в 3.0 и повторное чтение сохраняют пространство
+    let back = vdr::parse(&vdr::write(&pic), "again").unwrap();
+    assert_eq!(back.spaces3d[0].objects.len(), sp.objects.len());
 }

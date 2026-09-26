@@ -41,13 +41,17 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
         "loadspacewindow" => {
             let window = s(args, 0);
             let file = s(args, 1);
+            let pic = if file.is_empty() { None } else { gfx.load_picture_file(&file) };
+            // трёхмерные пространства рисунка получают номера раньше листа
+            let map = pic.as_ref().filter(|_| gfx.window_space(&window).is_none()).map(|p| gfx.create_spaces3d(p)).unwrap_or_default();
             let sp = gfx.open_window(&window);
             if let Some(space) = gfx.space_mut(sp) {
                 space.source_file = file.clone();
             }
             if !file.is_empty() {
-                if let Some(pic) = gfx.load_picture_file(&file) {
+                if let Some(pic) = pic {
                     gfx.space_mut(sp).unwrap().load(&pic);
+                    gfx.bind_views(sp, &map);
                     gfx.resolve_dibs(sp);
                     gfx.fit_client(sp);
                 }
@@ -177,7 +181,7 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
             Shape::Bitmap { masked: true, .. } => 22.0,
             Shape::Text { .. } => 23.0,
             Shape::Control { .. } => 26.0,
-            Shape::View3d { .. } => 27.0,
+            Shape::View3d { .. } => 24.0,
             Shape::Unknown => 0.0,
         }).unwrap_or(0.0)),
         "getobjectorg2dx" => num(object(gfx, args).map(|o| o.x).unwrap_or(0.0)),
@@ -1112,14 +1116,17 @@ fn open_scheme_window(gfx: &mut Gfx, window: &str, class: &str) -> Handle {
     if gfx.window_space(&window).is_some() {
         gfx.close_window(&window);
     }
+    let pic = if class.is_empty() { None } else { gfx.pictures.get(&class.to_lowercase()).cloned() };
+    let map = pic.as_ref().map(|p| gfx.create_spaces3d(p)).unwrap_or_default();
     let sp = gfx.open_window(&window);
     if let Some(space) = gfx.space_mut(sp) {
         space.source_class = class.clone();
     }
     if !class.is_empty() {
         gfx.hyper_current.insert(window.clone(), class.clone());
-        if let Some(pic) = gfx.pictures.get(&class.to_lowercase()).cloned() {
+        if let Some(pic) = pic {
             gfx.space_mut(sp).unwrap().load(&pic);
+            gfx.bind_views(sp, &map);
             embed_children(gfx, sp, &class);
             gfx.resolve_dibs(sp);
             gfx.fit_client(sp);

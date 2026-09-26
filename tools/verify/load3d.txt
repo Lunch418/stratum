@@ -1,0 +1,22 @@
+# LoadSpaceWindow с трёхмерным пространством в рисунке: номера листов,
+# GetSpace3d, объекты по имени, камера
+@ fixtures/PROJECTS/samples/BALLS WorkSpace
+% Wait = 1
++ fixtures/PROJECTS/samples/EDS_IND/3D_PICT.VDR
++ fixtures/PROJECTS/samples/T80/TANK.VDR
+! hs := OpenSchemeWindow("W1", "WorkSpace", "")
+! h2 := LoadSpaceWindow("W3", "C:\verify\3D_PICT.VDR", "")
+! a := CreateSpace3d(~hs)
+! h4 := LoadSpaceWindow("W4", "C:\verify\TANK.VDR", "")
+hs | Float(hs)
+h2 | Float(h2)
+a | Float(a)
+h4 | Float(h4)
+pol | Float(GetObject2dByName(Handle(Float(h2)-1), #0, "pol"))
+ramka | Float(GetObject2dByName(Handle(Float(h2)-1), #0, "ramka"))
+tok | Float(GetObject2dByName(Handle(Float(h2)-1), #0, "ramka_tok"))
+camn | Float(GetObject2dByName(Handle(Float(h2)-1), #0, "Sc Default Camera"))
+pol2 | Float(GetObject2dByName(Handle(Float(h2)+1), #0, "pol"))
+view | GetObjectType2d(h2, #1)
+vx | GetObjectOrg2dX(h2, #1)
+vw | GetObjectWidth2d(h2, #1)

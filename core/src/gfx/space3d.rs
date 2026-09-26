@@ -67,6 +67,99 @@ pub struct Space3d {
     pub stack: Vec<Mat4>,
     /// Материалы: дескриптор → (имя, основной цвет).
     pub materials: BTreeMap<Handle, (String, u32)>,
+    /// Параметры камер из рисунка (`_CameraProc3d` читает и пишет их).
+    pub camera_params: BTreeMap<Handle, CameraParams>,
+    /// Группы 3D-объектов из рисунка.
+    pub groups: BTreeMap<Handle, Group3d>,
+    /// Источники света из рисунка: номер → (имя, 88 байт записи как есть).
+    pub lights: BTreeMap<Handle, (String, Vec<u8>)>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Group3d {
+    pub handle: Handle,
+    pub name: String,
+    pub children: Vec<Handle>,
+}
+
+/// Камера в рисунке (запись типа 11, 200 байт): `u16, u16`, положение,
+/// направление, «верх» (по 3 × f64), фокус, дальняя и ближняя плоскости,
+/// размер кадра (3 × f64), смещение (2 × f64), 2 × f64, `u32` дымка,
+/// имя способа отрисовки (32 байта), `u16` тип отрисовки, `u8` флаги,
+/// `u8` перспектива, `u32` фон. Соответствие полям `po…` имиджа Camera3d
+/// сверено по снимку T80.
+#[derive(Debug, Clone, Default)]
+pub struct CameraParams {
+    pub head: (u16, u16),
+    pub org: Vec3,
+    pub dir: Vec3,
+    pub up: Vec3,
+    pub focus: f64,
+    pub far_clip: f64,
+    pub near_clip: f64,
+    pub extent: Vec3,
+    pub offset: [f64; 2],
+    pub extra: [f64; 2],
+    pub haze: u32,
+    pub render_name: String,
+    pub render_type: u16,
+    pub flags: u8,
+    pub perspective: u8,
+    pub background: u32,
+}
+
+impl CameraParams {
+    pub fn parse(b: &[u8]) -> Option<Self> {
+        if b.len() < 200 {
+            return None;
+        }
+        let f = |o: usize| f64::from_le_bytes(b[o..o + 8].try_into().unwrap());
+        let u16_at = |o: usize| u16::from_le_bytes([b[o], b[o + 1]]);
+        let u32_at = |o: usize| u32::from_le_bytes(b[o..o + 4].try_into().unwrap());
+        let name_end = b[160..192].iter().position(|&c| c == 0).unwrap_or(32);
+        Some(CameraParams {
+            head: (u16_at(0), u16_at(2)),
+            org: [f(4), f(12), f(20)],
+            dir: [f(28), f(36), f(44)],
+            up: [f(52), f(60), f(68)],
+            focus: f(76),
+            far_clip: f(84),
+            near_clip: f(92),
+            extent: [f(100), f(108), f(116)],
+            offset: [f(124), f(132)],
+            extra: [f(140), f(148)],
+            haze: u32_at(156),
+            render_name: crate::formats::cp1251::decode(&b[160..160 + name_end]),
+            render_type: u16_at(192),
+            flags: b[194],
+            perspective: b[195],
+            background: u32_at(196),
+        })
+    }
+
+    pub fn write(&self) -> Vec<u8> {
+        let mut b = Vec::with_capacity(200);
+        b.extend_from_slice(&self.head.0.to_le_bytes());
+        b.extend_from_slice(&self.head.1.to_le_bytes());
+        for v in self.org.iter().chain(&self.dir).chain(&self.up) {
+            b.extend_from_slice(&v.to_le_bytes());
+        }
+        for v in [self.focus, self.far_clip, self.near_clip] {
+            b.extend_from_slice(&v.to_le_bytes());
+        }
+        for v in self.extent.iter().chain(&self.offset).chain(&self.extra) {
+            b.extend_from_slice(&v.to_le_bytes());
+        }
+        b.extend_from_slice(&self.haze.to_le_bytes());
+        let mut name = crate::formats::cp1251::encode(&self.render_name);
+        name.resize(32, 0);
+        b.extend_from_slice(&name);
+        b.extend_from_slice(&self.render_type.to_le_bytes());
+        b.push(self.flags);
+        b.push(self.perspective);
+        b.extend_from_slice(&self.background.to_le_bytes());
+        b
+    }
 }
 
 // ── векторная арифметика ──────────────────────────────────────────────
@@ -180,7 +273,19 @@ pub fn inverse(m: &Mat4) -> Mat4 {
 
 impl Space3d {
     pub fn new(handle: Handle, owner: Handle) -> Self {
-        Space3d { handle, owner, objects: BTreeMap::new(), cameras: BTreeMap::new(), next: 1, crd: IDENTITY, stack: Vec::new(), materials: BTreeMap::new() }
+        Space3d {
+            handle,
+            owner,
+            objects: BTreeMap::new(),
+            cameras: BTreeMap::new(),
+            next: 1,
+            crd: IDENTITY,
+            stack: Vec::new(),
+            materials: BTreeMap::new(),
+            camera_params: BTreeMap::new(),
+            groups: BTreeMap::new(),
+            lights: BTreeMap::new(),
+        }
     }
 
     fn alloc(&mut self) -> Handle {
@@ -213,6 +318,47 @@ impl Space3d {
             .find(|o| o.name.eq_ignore_ascii_case(name))
             .map(|o| o.handle)
             .or_else(|| self.cameras.values().find(|c| c.name.eq_ignore_ascii_case(name)).map(|c| c.handle))
+            .or_else(|| self.groups.values().find(|g| g.name.eq_ignore_ascii_case(name)).map(|g| g.handle))
+    }
+
+    /// Пространство из рисунка: объекты, камеры, группы и свет с номерами
+    /// из файла; новые номера — после наибольшего.
+    pub fn load(&mut self, data: &crate::formats::vdr::Space3dData) {
+        use crate::formats::vdr::Object3dKind;
+        for o in &data.objects {
+            let h = o.handle as Handle;
+            self.next = self.next.max(h + 1);
+            match &o.kind {
+                Object3dKind::Mesh { points, prims, matrix, .. } => {
+                    let mut m = IDENTITY;
+                    for (i, v) in matrix.iter().enumerate() {
+                        m[i / 4][i % 4] = *v;
+                    }
+                    let prims = prims
+                        .iter()
+                        .map(|p| Prim { flags: p.flags as u32, color: p.color, idx: p.idx.iter().map(|i| *i as usize).collect() })
+                        .collect();
+                    let color = prims_color(&o.kind);
+                    self.objects.insert(h, Object3d { handle: h, name: o.name.clone(), points: points.clone(), prims, matrix: m, color, visible: true });
+                }
+                Object3dKind::Camera(raw) => {
+                    let params = CameraParams::parse(raw).unwrap_or_default();
+                    let mut cam = Camera::looking_from(params.org);
+                    cam.handle = h;
+                    cam.name = o.name.clone();
+                    cam.target = params.dir;
+                    cam.background = params.background;
+                    self.cameras.insert(h, cam);
+                    self.camera_params.insert(h, params);
+                }
+                Object3dKind::Light(raw) => {
+                    self.lights.insert(h, (o.name.clone(), raw.clone()));
+                }
+                Object3dKind::Group { children, .. } => {
+                    self.groups.insert(h, Group3d { handle: h, name: o.name.clone(), children: children.iter().map(|c| *c as Handle).collect() });
+                }
+            }
+        }
     }
 
     pub fn set_name(&mut self, h: Handle, name: &str) -> bool {
@@ -352,6 +498,13 @@ impl Camera {
 
 fn quad(o: &mut Object3d, color: u32, a: usize, b: usize, c: usize, d: usize) {
     o.prims.push(Prim { flags: PRIM_POLYGON, color, idx: vec![a, b, c, d] });
+}
+
+fn prims_color(kind: &crate::formats::vdr::Object3dKind) -> u32 {
+    match kind {
+        crate::formats::vdr::Object3dKind::Mesh { prims, .. } => prims.first().map(|p| p.color).unwrap_or(0xC0C0C0),
+        _ => 0xC0C0C0,
+    }
 }
 
 pub fn empty(color: u32) -> Object3d {
