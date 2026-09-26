@@ -39,7 +39,8 @@ export function PictureEditor({ kind }: { kind: Kind }) {
   const [state, setState] = useState<State | null>(null);
   const [tool, setTool] = useState<Tool>('select');
   const [sel, setSel] = useState<number[]>([]);
-  const [view, setView] = useState({ x: 40, y: 40, k: 1 });
+  // иконка 32×32 в натуральную величину едва видна — открываем её крупно, по пикселям
+  const [view, setView] = useState(() => kind === 'icon' ? { x: 40, y: 40, k: 8 } : { x: 40, y: 40, k: 1 });
   const [pen, setPen] = useState({ color: '#000000', width: 1 });
   const [fill, setFill] = useState<{ color: string; on: boolean }>({ color: '#ffffff', on: false });
   const [draft, setDraft] = useState<[number, number][]>([]);
