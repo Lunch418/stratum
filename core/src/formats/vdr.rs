@@ -723,23 +723,31 @@ fn read_object3d(r: &mut Reader, ctx: &Ctx) -> Result<Object3dData> {
         10 => {
             let material = r.u16()?;
             let n = r.u16()? as usize;
-            let mut points = Vec::with_capacity(n);
+            // ёмкость — не больше, чем может уместиться в оставшихся байтах:
+            // счётчики из файла (2·k·layers — до 8·10⁹) иначе просили
+            // десятки гигабайт, и процесс падал, не дойдя до конца данных
+            let room = |r: &Reader, each: usize| r.data.len().saturating_sub(r.pos) / each;
+            let mut points = Vec::with_capacity(n.min(room(r, 24)));
             for _ in 0..n {
                 points.push([r.f64()?, r.f64()?, r.f64()?]);
             }
             let m = r.u16()? as usize;
-            let mut prims = Vec::with_capacity(m);
+            let mut prims = Vec::with_capacity(m.min(room(r, 10)));
             for _ in 0..m {
                 let k = r.u16()? as usize;
                 let layers = r.u16()?;
                 let flags = r.u16()?;
                 let color = r.u32()?;
-                let mut idx = Vec::with_capacity(k);
+                let mut idx = Vec::with_capacity(k.min(room(r, 2)));
                 for _ in 0..k {
                     idx.push(r.u16()?);
                 }
-                let mut uv = Vec::with_capacity(2 * k * layers as usize);
-                for _ in 0..2 * k * layers as usize {
+                let uv_len = 2 * k * layers as usize;
+                if uv_len > room(r, 8) {
+                    return r.err("координаты текстуры 3D за концом данных");
+                }
+                let mut uv = Vec::with_capacity(uv_len);
+                for _ in 0..uv_len {
                     uv.push(r.f64()?);
                 }
                 prims.push(Prim3dData { layers, flags, color, idx, uv });
@@ -1342,6 +1350,25 @@ impl Picture {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn mesh_counters_beyond_data_do_not_allocate() {
+        // тело: тип 10, размер, номер, флаги, материал, 0 точек, 1 примитив
+        // с k = 0xFFFF вершинами и 0xFFFF слоями текстуры — и конец данных
+        let mut d = Vec::new();
+        for v in [10u16] {
+            d.extend_from_slice(&v.to_le_bytes());
+        }
+        d.extend_from_slice(&1000u32.to_le_bytes());
+        for v in [1u16, 0, 0, 0, 1, 0xFFFF, 0xFFFF, 0] {
+            d.extend_from_slice(&v.to_le_bytes());
+        }
+        d.extend_from_slice(&0u32.to_le_bytes());
+        // номера вершин на месте — дальше просили бы 2·k·слоёв = 8,6·10⁹ f64
+        d.extend_from_slice(&vec![0u8; 2 * 0xFFFF + 64]);
+        let ctx = Ctx { sized: true, wide: true };
+        assert!(read_object3d(&mut Reader::new(&d, "x.vdr"), &ctx).is_err());
+    }
 
     #[test]
     fn chunk_shorter_than_its_header_does_not_loop() {

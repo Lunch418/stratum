@@ -110,6 +110,15 @@ fn picture(data: &[u8], name: &str) {
         sp.load(&pic);
         let _ = svg::render(&sp);
         let _ = vdr::write(&pic);
+        // трёхмерные пространства рисунка: загрузка, привязка проекций и
+        // рендер окна с ними, как у окна модели
+        let mut gfx = gfx::Gfx::new();
+        let map = gfx.create_spaces3d(&pic);
+        gfx.spaces.insert(1000, sp);
+        gfx.bind_views(1000, &map);
+        if let Some(sp) = gfx.space(1000) {
+            let _ = svg::render_in(sp, Some(&gfx));
+        }
     }
 }
 
