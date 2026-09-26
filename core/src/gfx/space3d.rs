@@ -300,9 +300,14 @@ impl Space3d {
         }
     }
 
+    /// Новый номер — наименьший свободный среди тел, камер, групп и света
+    /// (сверено в Wine: в ROBOT3.VDR заняты 1, 10, 11 — MakeBar3d даёт 2,
+    /// tools/verify/material3d.txt).
     fn alloc(&mut self) -> Handle {
-        let h = self.next;
-        self.next += 1;
+        let h = (1..)
+            .find(|h| !self.objects.contains_key(h) && !self.cameras.contains_key(h) && !self.groups.contains_key(h) && !self.lights.contains_key(h))
+            .unwrap_or(self.next);
+        self.next = self.next.max(h + 1);
         h
     }
 
@@ -369,6 +374,30 @@ impl Space3d {
                 Object3dKind::Group { children, .. } => {
                     self.groups.insert(h, Group3d { handle: h, name: o.name.clone(), children: children.iter().map(|c| *c as Handle).collect() });
                 }
+            }
+        }
+        // материалы (3.x, чанк 1024): номер — по порядку, имя — строка
+        // перед 20 последними байтами записи
+        if let Some(raw) = &data.materials {
+            let mut at = 15usize;
+            let mut n = 1;
+            while at + 6 <= raw.len() {
+                let size = u32::from_le_bytes([raw[at + 2], raw[at + 3], raw[at + 4], raw[at + 5]]) as usize;
+                if size < 6 || at + size > raw.len() {
+                    break;
+                }
+                let rec = &raw[at..at + size];
+                let name = (1..64usize)
+                    .filter(|l| rec.len() >= 22 + l)
+                    .find(|&l| {
+                        let p = rec.len() - 20 - l - 2;
+                        u16::from_le_bytes([rec[p], rec[p + 1]]) as usize == l
+                    })
+                    .map(|l| crate::formats::cp1251::decode(&rec[rec.len() - 20 - l..rec.len() - 20]))
+                    .unwrap_or_default();
+                self.materials.insert(n, (name, 0xFFFFFF));
+                n += 1;
+                at += size;
             }
         }
     }

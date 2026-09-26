@@ -1,0 +1,18 @@
+# Материалы 3D: номер материала из рисунка по имени, номер нового
+# материала и нового объекта (свои счётчики у материалов и объектов?)
+@ fixtures/PROJECTS/samples/BALLS WorkSpace
+% Wait = 1
++ fixtures/PROJECTS/samples/ROBOT/ROBOT3.VDR
+! hs := OpenSchemeWindow("W1", "WorkSpace", "")
+! h2 := LoadSpaceWindow("W3", "C:\verify\ROBOT3.VDR", "")
+! s3 := Handle(Float(~h2) - 1)
+! m1 := GetMaterialByName3d(~s3, "construct")
+! m2 := CreateMaterial3d(~s3, "new", "", Rgb(255,255,255), Rgb(255,255,255), Rgb(255,255,255), Rgb(255,255,255), 0, 0, 0)
+! m3 := CreateMaterial3d(~s3, "new2", "", Rgb(255,255,255), Rgb(255,255,255), Rgb(255,255,255), Rgb(255,255,255), 0, 0, 0)
+! o1 := MakeBar3d(~s3, Rgb(1,2,3), 10, 10, 10)
+! g1 := CreateGroup2d(~s3, ~o1)
+m1 | Float(m1)
+m2 | Float(m2)
+m3 | Float(m3)
+o1 | Float(o1)
+g1 | Float(g1)

@@ -512,7 +512,8 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx, ms: &mut Matrices, output
             let name = s(args, 1);
             let diffuse = f(args, 4) as u32;
             handle(sp3(gfx, args, 0).map(|s3| {
-                let h = s3.alloc_public();
+                // у материалов своя нумерация (сверено в Wine, material3d.txt)
+                let h = (1..).find(|h| !s3.materials.contains_key(h)).unwrap_or(1);
                 s3.materials.insert(h, (name, diffuse));
                 h
             }).unwrap_or(0))
