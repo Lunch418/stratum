@@ -668,6 +668,9 @@ fn read_space3d(r: &mut Reader, ctx: &Ctx, handle: u16, end: Option<usize>) -> R
         }
         r.u16()?;
         let size = if ctx.sized { Some(r.u32()? as usize) } else { None };
+        if size.is_some_and(|s| s < 12) {
+            return r.err("чанк 3D короче своего заголовка");
+        }
         let count = r.u16()?;
         r.u16()?;
         r.u16()?;
@@ -689,7 +692,8 @@ fn read_space3d(r: &mut Reader, ctx: &Ctx, handle: u16, end: Option<usize>) -> R
             _ => {
                 // материалы: разобраны только настолько, чтобы сохранить
                 let Some(size) = size else { return r.err("материалы 3D без размера не разобраны") };
-                sp.materials = Some(r.data[at..at + size].to_vec());
+                let Some(bytes) = r.data.get(at..at + size) else { return r.err("чанк материалов 3D за концом данных") };
+                sp.materials = Some(bytes.to_vec());
             }
         }
         if let Some(size) = size {
