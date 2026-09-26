@@ -818,7 +818,7 @@ fn reply(stream: &mut TcpStream, status: &str, mime: &str, body: &[u8], set_cook
     let cookie = set_cookie.map(|c| format!("Set-Cookie: {c}\r\n")).unwrap_or_default();
     // страница IDE: скрипты только свои (Monaco — из воркеров blob:), шрифты Google
     let csp = if mime.starts_with("text/html") {
-        "Content-Security-Policy: default-src 'self'; script-src 'self' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'\r\n"
+        "Content-Security-Policy: default-src 'self'; script-src 'self' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'\r\n"
     } else {
         ""
     };
