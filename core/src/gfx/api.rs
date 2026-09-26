@@ -101,8 +101,10 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
         "closewindow" => ok(gfx.close_window(&s(args, 0))),
         "getclientwidth" => num(window_space(gfx, &s(args, 0)).map(|sp| sp.client.0).unwrap_or(0.0)),
         "getclientheight" => num(window_space(gfx, &s(args, 0)).map(|sp| sp.client.1).unwrap_or(0.0)),
+        // размеры и положение окна — целые пиксели, дробь отбрасывается;
+        // начало листа — округление вниз (сверено в Wine, intsize.txt)
         "setclientsize" => {
-            let (w, hh) = (f(args, 1), f(args, 2));
+            let (w, hh) = (f(args, 1).trunc(), f(args, 2).trunc());
             ok(window_space_mut(gfx, &s(args, 0)).map(|sp| sp.client = (w, hh)).is_some())
         }
         "showwindow" => {
@@ -110,12 +112,12 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
             ok(window_space_mut(gfx, &s(args, 0)).map(|sp| sp.visible = mode != 0.0).is_some())
         }
         "setwindoworg" => {
-            let org = (f(args, 1), f(args, 2));
+            let org = (f(args, 1).trunc(), f(args, 2).trunc());
             ok(window_space_mut(gfx, &s(args, 0)).map(|sp| sp.org = org).is_some())
         }
         // SetWindowPos(окно, x, y, ширина, высота): размеры — всего окна
         "setwindowpos" => {
-            let (org, size) = ((f(args, 1), f(args, 2)), (f(args, 3), f(args, 4)));
+            let (org, size) = ((f(args, 1).trunc(), f(args, 2).trunc()), (f(args, 3).trunc(), f(args, 4).trunc()));
             ok(window_space_mut(gfx, &s(args, 0)).map(|sp| {
                 sp.org = org;
                 sp.client = ((size.0 - WINDOW_FRAME.0).max(0.0), (size.1 - WINDOW_FRAME.1).max(0.0));
@@ -143,7 +145,7 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
         "getspaceorgx" | "getspaceorg2dx" => num(gfx.space(h(args, 0)).map(|sp| sp.origin.0).unwrap_or(0.0)),
         "getspaceorgy" | "getspaceorg2dy" => num(gfx.space(h(args, 0)).map(|sp| sp.origin.1).unwrap_or(0.0)),
         "setspaceorg2d" => {
-            let (x, y) = (f(args, 1), f(args, 2));
+            let (x, y) = (f(args, 1).floor(), f(args, 2).floor());
             ok(gfx.space_mut(h(args, 0)).map(|sp| sp.origin = (x, y)).is_some())
         }
         "setscalespace2d" => {
@@ -860,7 +862,7 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
         "iswindowvisible" => ok(gfx.window_space(&s(args, 0)).and_then(|h| gfx.space(h)).is_some_and(|sp| sp.visible)),
         "isiconic" => num(0.0),
         "setwindowsize" => {
-            let (w, hh) = (f(args, 1), f(args, 2));
+            let (w, hh) = (f(args, 1).trunc(), f(args, 2).trunc());
             ok(window_space_mut(gfx, &s(args, 0)).map(|sp| sp.client = (w, hh)).is_some())
         }
         "getprojectprop" => Value::Str(String::new()),

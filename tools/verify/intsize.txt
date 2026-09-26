@@ -1,0 +1,21 @@
+# Дробные размеры и положение окна и листа: округляет ли оригинал
+@ fixtures/PROJECTS/samples/BALLS WorkSpace
+% Wait = 1
+! hs := OpenSchemeWindow("W1", "WorkSpace", "")
+! r1 := SetClientSize("W1", 300.7, 200.3)
+! r2 := SetWindowOrg("W1", 10.6, 20.4)
+! r3 := SetSpaceOrg2d(~hs, 5.7, 6.2)
+w | GetClientWidth("W1")
+h | GetClientHeight("W1")
+ww | GetWindowWidth("W1")
+ox | GetWindowOrgX("W1")
+oy | GetWindowOrgY("W1")
+sx | GetSpaceOrg2dx(hs)
+sy | GetSpaceOrg2dy(hs)
+! hs2 := OpenSchemeWindow("W2", "WorkSpace", "")
+! r4 := SetSpaceOrg2d(~hs2, -5.7, -6.2)
+! r5 := SetWindowOrg("W2", -10.6, -20.4)
+nx | GetSpaceOrg2dx(hs2)
+ny | GetSpaceOrg2dy(hs2)
+nox | GetWindowOrgX("W2")
+noy | GetWindowOrgY("W2")

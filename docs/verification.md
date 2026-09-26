@@ -83,6 +83,7 @@ python3 tools/verify_original.py tools/verify/math.txt --compiler
 | `totop.txt` | `ObjectToTop2d`/`ObjectToBottom2d` для группы и объекта | 7 из 7 |
 | `ed.txt` | `Ed` — единичная функция | 5 из 5 |
 | `mcreate.txt` | номера матриц `MCreate`: 0, отрицательный, удаление и переиспользование | 9 из 9 |
+| `intsize.txt` | дробные размеры и положение окна и листа | 11 из 11 |
 | `hittest.txt` | `GetObjectFromPoint2d`: отрезок и его окрестность, ломаная с заливкой и без, группа, перекрытие | 27 из 27 |
 
 Директивы файла проб: `% Ключ = число` — свойство проекта; `! оператор` —
@@ -150,7 +151,7 @@ python3 tools/verify_trajectory.py fixtures/PROJECTS/samples/GIST --ticks 50
   ROBOT2 403/25, T80 217/19, Osc3d 155/18, IRONCLAD 229/17;
 - после закрытия модальных окон и копирования файлов: DIALOG (1 такт)
   441/0, MENU 986/26, VIDEO 114/0, WRITEAVI 278/60, Example.33 282/158;
-  с трёхмерными пространствами из рисунков: T80 235/1, EDS_IND 859/57,
+  с трёхмерными пространствами из рисунков: T80 235/1, EDS_IND 887/29,
   ANATOMY 476/24, CHOPPER.3D 74/2, IRONCLAD 243/3, ENGINE 329/40, ROBOT2
   412/16, MENU 1004/8, ROBOT 2614/1, Trigger 3239/0, SMO2 3463/105, Surf3d 283/19;
 - без снимка: sclogo (оригинал падает под Wine), NUI и TextAnalyser (внешние
@@ -228,6 +229,7 @@ python3 tools/verify_trajectory.py fixtures/PROJECTS/samples/GIST --ticks 50
 | `MCreate(0, …)` брал новый отрицательный номер по счётчику, отрицательный номер тоже давал новую | 0 — наименьший свободный отрицательный (удалённые переиспользуются), любой другой номер — сам он, прежняя матрица заменяется | Wine, `mcreate.txt`; Trigger 3239 из 3239 вместо 3072, ROBOT 2597 из 2615, SMO2 3463 из 3568 |
 | 3D-группа начиналась в начале мира, `SelectLocalCrd3d` группы не работал | система координат группы — как у первого объекта при создании (у пустой — мировая); `SelectLocalCrd3d` берёт её | Wine, `group3d_base.txt`; ROBOT 2614 из 2615 |
 | `EnableControl2d` всегда давал 1 | как `EnableWindow`: 1, если элемент был отключён | Wine, `enable.txt` |
+| дробные размеры окна, его положение и начало листа хранились как есть | окно — целые пиксели, дробь отбрасывается (`SetClientSize`, `SetWindowOrg`, `SetWindowPos`); начало листа — округление вниз | Wine, `intsize.txt`; EDS_IND 887 из 916 |
 
 ## Чего ещё нет
 
