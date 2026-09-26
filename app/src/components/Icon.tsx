@@ -34,6 +34,8 @@ const PATHS: Record<string, string> = {
   search: 'M7 2.5a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9zM10.5 10.5l3 3',
   stop: 'M3.5 3.5h9v9h-9z',
   close: 'M4 4l8 8M12 4l-8 8',
+  folder: 'M1.5 3.5h4.5l1.5 1.5h7v8h-13z',
+  project: 'M4 4.5h8v7H4zM1.5 8H4M12 8h2.5',
   bitmap: 'M2.5 2.5h11v11h-11zM2.5 10l3-3 3 3 2-2 3 3M10.5 5.5h.01',
   pencil: 'M3 13l1-4 7-7 3 3-7 7zM10 3l3 3',
   eraser: 'M2.5 10.5l6-6 4 4-6 6h-4zM6 14.5h8',

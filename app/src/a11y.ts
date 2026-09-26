@@ -31,8 +31,10 @@ function prepare(backdrop: HTMLElement) {
   // autoFocus диалога уже сработал — не перебиваем его
   if (modal.contains(document.activeElement)) return;
   const list = focusables(modal);
-  const field = list.find(el => el.matches('input, select, textarea') && !el.closest('.panel-title'));
-  const target = field ?? modal.querySelector<HTMLElement>('.modal-actions button[type="submit"], .modal-actions .primary') ?? list[0];
+  // первое поле ввода, если диалог с него начинается; иначе — главная кнопка
+  const first = list.find(el => !el.closest('.panel-title, .tabs'));
+  const field = first?.matches('input[type="text"], input[type="number"], input[type="search"], input:not([type]), textarea') ? first : undefined;
+  const target = field ??modal.querySelector<HTMLElement>('.modal-actions button[type="submit"], .modal-actions .primary') ?? list[0];
   target?.focus({ preventScroll: true });
 }
 

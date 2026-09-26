@@ -580,7 +580,12 @@ table.vars button.small.ghost { min-height: 20px; padding: 0 5px; }
 .modal > .panel-title button.small.ghost.icon-only { width: 28px; min-height: 28px; color: var(--text-muted); }
 .modal > .tabs { background: transparent; padding: 0 var(--sp-5); }
 .modal.open-dialog { width: min(760px, 94vw); }
+.tree.browse { height: 260px; overflow: auto; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--bg-surface); }
+.browse .tree-row svg.kind { color: var(--text-muted); flex: none; }
+.browse .tree-row.project svg.kind { color: var(--accent); }
 .browse .tree-row.project .name { font-weight: 600; }
+.browse .tree-row button.small.ghost { margin-left: auto; min-height: 20px; opacity: 0; }
+.browse .tree-row:hover button.small.ghost, .browse .tree-row button.small.ghost:focus-visible { opacity: 1; }
 .modal-body { padding: var(--sp-6); overflow: auto; min-height: 0; }
 .modal-body input { width: 100%; }
 .modal-body input[type="checkbox"], .modal-body input[type="radio"] { width: auto; flex: none; margin: 0; }

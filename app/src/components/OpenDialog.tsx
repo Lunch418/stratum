@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { useStore } from '../store';
+import { Icon } from './Icon';
 
 interface Entry { name: string; path: string; kind: 'dir' | 'project' | 'file' }
 
@@ -46,7 +47,7 @@ export function OpenDialog({ onClose, required }: { onClose: () => void; require
         <div className="modal-body" style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 12 }}>
           <div>
             <div className="panel-title" style={{ padding: '0 0 4px', border: 0 }}>Недавние</div>
-            {!recent.length && <div className="muted small">пока пусто</div>}
+            {!recent.length && <div className="muted small">Открытые проекты появятся здесь.</div>}
             {recent.map(p => (
               <div key={p} className="tree-row" title={p} onClick={() => open(p)} style={{ padding: '3px 4px' }}>
                 <span className="name">{p.split('/').filter(Boolean).pop()}</span>
@@ -56,15 +57,15 @@ export function OpenDialog({ onClose, required }: { onClose: () => void; require
           </div>
           <div style={{ minWidth: 0 }}>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 }}>
-              <button type="button" className="small" onClick={() => listing?.parent && setDir(listing.parent)} disabled={!listing?.parent} title="Вверх">↑</button>
+              <button type="button" className="small icon-only" onClick={() => listing?.parent && setDir(listing.parent)} disabled={!listing?.parent} title="На уровень выше" aria-label="На уровень выше"><Icon name="up" /></button>
               <span className="mono small" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }} title={listing?.dir}>{listing?.dir ?? '…'}</span>
             </div>
-            <div className="tree browse" style={{ height: 260, overflow: 'auto', border: '1px solid var(--border)', borderRadius: 4 }}>
+            <div className="tree browse">
               {listing?.entries.map(e => (
                 <div key={e.path} className={`tree-row ${e.kind}`} title={e.path}
                   onClick={() => e.kind === 'dir' ? setDir(e.path) : setPath(e.path)}
                   onDoubleClick={() => e.kind === 'dir' ? setDir(e.path) : open(e.path)}>
-                  <span className="twisty">{e.kind === 'dir' ? '▸' : e.kind === 'project' ? '■' : '·'}</span>
+                  <Icon className="kind" name={e.kind === 'dir' ? 'folder' : e.kind === 'project' ? 'project' : 'file'} />
                   <span className="name">{e.name}</span>
                   {e.kind === 'project' && <button type="button" className="small ghost" onClick={ev => { ev.stopPropagation(); open(e.path); }}>Открыть</button>}
                 </div>
