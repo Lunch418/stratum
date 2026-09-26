@@ -342,6 +342,20 @@ label.check input { flex: none; margin: 0; }
 .list .row { display: flex; gap: var(--sp-4); padding: 5px 10px; border-bottom: 1px solid var(--border-subtle); }
 .list .row:last-child { border-bottom: 0; }
 .list .row.selected { background: var(--accent-soft); color: var(--accent-ink); }
+/* список выбора имиджа: имя — колонкой, описание — приглушённо, группы липнут к верху */
+.choose-list { height: 340px; margin-top: var(--sp-4); border: 1px solid var(--border); border-radius: var(--r-md); background: var(--bg-surface); }
+.choose-list .row { align-items: center; cursor: pointer; min-height: 30px; padding: 3px 10px; }
+.choose-list .row:hover:not(.selected) { background: var(--bg-hover); }
+.choose-list .row img { flex: none; image-rendering: pixelated; border-radius: 2px; box-shadow: 0 0 0 1px var(--border-subtle); }
+.choose-list .row .name { flex: none; width: 36%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.choose-list .row .desc { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.choose-list .row.selected .desc { color: inherit; opacity: .8; }
+.list-group {
+  position: sticky; top: 0; z-index: 1; display: flex; gap: var(--sp-3); align-items: baseline; padding: 5px 10px;
+  font-size: var(--fs-xs); font-weight: 600; color: var(--text-secondary); background: var(--bg-sunken); border-bottom: 1px solid var(--border-subtle);
+}
+.list-group span { font-family: var(--font-mono); font-weight: 400; color: var(--text-muted); }
+.modal > .panel-title > .muted { font-family: var(--font-ui); font-size: var(--fs-sm); font-weight: 400; }
 .about-name { font-size: var(--fs-xl); font-weight: 700; letter-spacing: -0.02em; }
 
 /* печать: страница собирается в #print-root (диалог «Печать»), остальное скрыто */

@@ -15,6 +15,15 @@ export function ChooseClassDialog({ onClose }: { onClose: () => void }) {
     return (project?.classes ?? []).filter(c => !f || c.name.toLowerCase().includes(f) || c.description.toLowerCase().includes(f)).slice(0, 400);
   }, [project, filter]);
   const own = list.filter(c => !c.library), libs = list.filter(c => c.library);
+  // ↑/↓ в поле фильтра ходят по списку, Enter вставляет выбранный
+  const order = [...own, ...libs];
+  const move = (d: number) => {
+    if (!order.length) return;
+    const i = order.findIndex(c => c.name === picked);
+    const next = order[Math.max(0, Math.min(order.length - 1, i < 0 ? 0 : i + d))].name;
+    setPicked(next);
+    requestAnimationFrame(() => document.querySelector(`.choose-list [data-name="${CSS.escape(next)}"]`)?.scrollIntoView({ block: 'nearest' }));
+  };
 
   async function insert(name: string) {
     const s = useStore.getState();
@@ -29,25 +38,26 @@ export function ChooseClassDialog({ onClose }: { onClose: () => void }) {
   }
 
   const row = (c: typeof list[number]) => (
-    <div key={c.name} className={`row${picked === c.name ? ' selected' : ''}`} style={{ cursor: 'pointer', alignItems: 'center' }}
+    <div key={c.name} data-name={c.name} className={`row${picked === c.name ? ' selected' : ''}`} role="option" aria-selected={picked === c.name}
       onClick={() => setPicked(c.name)} onDoubleClick={() => insert(c.name)}>
       <img src={api.iconUrl(c.name)} width={20} height={20} alt="" />
-      <span>{c.name}</span>
-      {c.description && <span className="muted small" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.description.split('\n')[0]}</span>}
+      <span className="name">{c.name}</span>
+      {c.description && <span className="muted small desc">{c.description.split('\n')[0]}</span>}
     </div>
   );
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>
       <form className="modal" style={{ width: 'min(560px, 94vw)' }} onMouseDown={e => e.stopPropagation()} onSubmit={e => { e.preventDefault(); if (picked) insert(picked); }}>
-        <div className="panel-title">Выбор имиджа{scheme ? ` · на схему ${scheme.name}` : ''}</div>
+        <div className="panel-title">Выбор имиджа{scheme && <span className="muted">на схему {scheme.name}</span>}</div>
         <div className="modal-body">
-          <input autoFocus type="search" placeholder="имя или описание" value={filter} onChange={e => setFilter(e.target.value)} />
-          <div className="scroll list" style={{ height: 340, border: '1px solid var(--border)', borderRadius: 6, marginTop: 8 }}>
-            {own.length > 0 && <div className="muted small" style={{ padding: '6px 10px' }}>Имиджи проекта</div>}
+          <input autoFocus type="search" placeholder="Имя или описание имиджа" aria-label="Фильтр имиджей" value={filter} onChange={e => setFilter(e.target.value)}
+            onKeyDown={e => { if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); move(e.key === 'ArrowDown' ? 1 : -1); } }} />
+          <div className="scroll list choose-list" role="listbox" aria-label="Имиджи">
+            {own.length > 0 && <div className="list-group">Имиджи проекта <span>{own.length}</span></div>}
             {own.map(row)}
-            {libs.length > 0 && <div className="muted small" style={{ padding: '6px 10px' }}>Библиотеки</div>}
+            {libs.length > 0 && <div className="list-group">Библиотеки <span>{libs.length}</span></div>}
             {libs.map(row)}
-            {!list.length && <div className="muted" style={{ padding: 10 }}>Ничего не найдено.</div>}
+            {!list.length && <div className="empty">Нет имиджей с таким именем или описанием.</div>}
           </div>
         </div>
         <div className="modal-actions">
