@@ -144,7 +144,9 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
         // ── пространство ──────────────────────────────────────────────────
         "getspaceorgx" | "getspaceorg2dx" => num(gfx.space(h(args, 0)).map(|sp| sp.origin.0).unwrap_or(0.0)),
         "getspaceorgy" | "getspaceorg2dy" => num(gfx.space(h(args, 0)).map(|sp| sp.origin.1).unwrap_or(0.0)),
-        "setspaceorg2d" => {
+        // SetSpaceOrg — прежнее имя (EDS_IND: окна графиков сдвигаются по
+        // объекту-рамке, снимок оригинала)
+        "setspaceorg2d" | "setspaceorg" => {
             let (x, y) = (f(args, 1).floor(), f(args, 2).floor());
             ok(gfx.space_mut(h(args, 0)).map(|sp| sp.origin = (x, y)).is_some())
         }
@@ -891,7 +893,7 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
 
         // ── принимаем без действия: градиенты, движок, строка состояния, звук ──
         "setbrushpoints2d" | "setbrushcolors2d" | "setspacerenderengine2d" | "setstatustext" | "setlogstring2d"
-        | "videodialog" | "setspaceorg" => ok(true),
+        | "videodialog" => ok(true),
         "system" => num(0.0),
 
         _ => return None,
