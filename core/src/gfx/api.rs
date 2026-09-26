@@ -60,6 +60,13 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
         // файл .vdr; пустая строка — пустое окно (сверено в Wine: L3, LGSpaceEx)
         "createwindowex" => {
             let (window, source) = (s(args, 0), s(args, 2));
+            // окно с таким именем уже есть — оно и возвращается, без
+            // изменений, но номер листа всё равно расходуется (сверено в
+            // Wine, tools/verify/reopen.txt)
+            if let Some(existing) = gfx.window_space(&window) {
+                gfx.next_space = gfx.next_space.max(1) + 1;
+                return Some(handle(existing));
+            }
             let sp = if source.to_lowercase().ends_with(".vdr") {
                 let sp = gfx.open_window(&window);
                 if let Some(pic) = gfx.load_picture_file(&source) {
@@ -1100,6 +1107,11 @@ pub fn insert_objects(sp: &mut Space, pic: &super::Picture) -> (Vec<Handle>, Vec
 fn open_scheme_window(gfx: &mut Gfx, window: &str, class: &str) -> Handle {
     let window = window.to_string();
     let class = class.to_string();
+    // OpenSchemeWindow на уже открытое окно пересоздаёт лист: новый
+    // дескриптор, прежние объекты пропадают (сверено в Wine, reopen.txt)
+    if gfx.window_space(&window).is_some() {
+        gfx.close_window(&window);
+    }
     let sp = gfx.open_window(&window);
     if let Some(space) = gfx.space_mut(sp) {
         space.source_class = class.clone();

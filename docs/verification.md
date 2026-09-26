@@ -72,6 +72,7 @@ python3 tools/verify_original.py tools/verify/math.txt --compiler
 | `polysize.txt` | габарит ломаных, прочитанных из файла: панель и линии связей L1 | 8 из 9 |
 | `embedorder.txt` | номера объектов рисунков детей и обёрток в окне схемы L1 | 26 из 26 |
 | `rgbex.txt` | раскладка байтов `RgbEx` и знак `Float()` у цвета | 6 из 6 |
+| `reopen.txt` | повторные `OpenSchemeWindow` и `CreateWindowEx` с тем же именем окна | 6 из 6 |
 | `hittest.txt` | `GetObjectFromPoint2d`: отрезок и его окрестность, ломаная с заливкой и без, группа, перекрытие | 27 из 27 |
 
 Директивы файла проб: `% Ключ = число` — свойство проекта; `! оператор` —
@@ -138,8 +139,9 @@ python3 tools/verify_trajectory.py fixtures/PROJECTS/samples/GIST --ticks 50
   ROBOT2 403/25, T80 217/19, Osc3d 155/18, IRONCLAD 229/17;
 - после закрытия модальных окон и копирования файлов: DIALOG (1 такт)
   441/0, MENU 986/26, VIDEO 114/0, WRITEAVI 278/60, Example.33 282/158;
-  EDS_IND с файлом `3D_PICT.VDR` рядом — 700/216 (у ядра нет трёхмерного
-  пространства из .vdr);
+  EDS_IND с файлом `3D_PICT.VDR` рядом — 700/216, T80 156/80, ANATOMY
+  314/186: оригинал теперь находит файлы рисунков с трёхмерными
+  пространствами, а у ядра трёхмерного пространства из .vdr нет;
 - без снимка: sclogo (оригинал падает под Wine), NUI и TextAnalyser (внешние
   библиотеки), Ogre_3D, а 2d, api, Net — не проекты.
 
@@ -204,6 +206,7 @@ python3 tools/verify_trajectory.py fixtures/PROJECTS/samples/GIST --ticks 50
 | `FileLoadDialog`/`FileSaveDialog` без пользователя возвращали фильтр | имя по умолчанию (третий аргумент), пустое — пустая строка, как «Отмена» | Wine, VIDEO |
 | `RgbEx(r,g,b,тип)` по справке: r, g, b, тип от младшего байта | у оригинала g — младший байт, b, тип, r — старший: `RgbEx(1,2,3,0)` = 0x01000302; `Float()` цвета — 32-битное со знаком | Wine, `rgbex.txt` |
 | цвет по умолчанию `Transparent`, `rgbex(…)` читался как 0, число — числом | `Transparent` = 0x1000000, `rgbex(…)` — как функция, число и прочее у цвета — 0 | Wine, `verify_defaults.py` (18 из 18); L3 771 из 774 |
+| повторный `CreateWindowEx`/`OpenSchemeWindow` с тем же именем заново загружал рисунок в тот же лист | `CreateWindowEx` возвращает уже открытое окно без изменений (номер листа всё равно расходуется), `OpenSchemeWindow` пересоздаёт лист с новым номером | Wine, `reopen.txt`; L4: 1165 из 1165 вместо 1096 |
 
 ## Чего ещё нет
 

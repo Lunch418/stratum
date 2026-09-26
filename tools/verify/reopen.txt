@@ -1,0 +1,19 @@
+# Повторное открытие окна с тем же именем: пересоздаётся ли лист
+@ fixtures/PROJECTS/samples/BALLS WorkSpace
+% Wait = 1
+! hs := OpenSchemeWindow("W1", "WorkSpace", "")
+! hp := CreatePen2d(~hs, 0, 1, Rgb(0,0,0), 13)
+! hl := CreatePolyLine2d(~hs, ~hp, #0, 0, 0, 10, 10)
+! h2 := OpenSchemeWindow("W1", "WorkSpace", "")
+! h3 := CreateWindowEx("W1", "", "WorkSpace", 0, 0, 100, 100, "")
+! hw := CreateWindowEx("W2", "", "WorkSpace", 0, 0, 100, 100, "")
+! hp2 := CreatePen2d(~hw, 0, 1, Rgb(0,0,0), 13)
+! hl2 := CreatePolyLine2d(~hw, ~hp2, #0, 0, 0, 10, 10)
+! h4 := CreateWindowEx("W2", "", "WorkSpace", 0, 0, 100, 100, "")
+! h5 := OpenSchemeWindow("W2", "WorkSpace", "")
+same2 | Float(h2) - Float(hs)
+same3 | Float(h3) - Float(hs)
+same4 | Float(h4) - Float(hw)
+same5 | Float(h5) - Float(hw)
+line1 | GetObjectType2d(hs, hl)
+line2 | GetObjectType2d(hw, hl2)
