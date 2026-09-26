@@ -79,16 +79,15 @@ impl Matrix {
 #[derive(Debug, Default, Clone)]
 pub struct Matrices {
     pub items: BTreeMap<i64, Matrix>,
-    next_temp: i64,
 }
 
 impl Matrices {
-    /// Создаёт матрицу; неположительный номер даёт новый временный.
+    /// Создаёт матрицу; номер 0 даёт новую временную.
     pub fn create(&mut self, q: i64, m: Matrix) -> i64 {
-        let q = if q > 0 { q } else {
-            self.next_temp -= 1;
-            self.next_temp
-        };
+        // 0 — наименьший свободный отрицательный номер (-1, -2…, удалённые
+        // переиспользуются), любой другой — сам этот номер, прежняя матрица
+        // заменяется (сверено в Wine, tools/verify/mcreate.txt)
+        let q = if q != 0 { q } else { (1..).map(|k: i64| -k).find(|k| !self.items.contains_key(k)).unwrap_or(-1) };
         self.items.insert(q, m);
         q
     }
@@ -371,8 +370,13 @@ mod tests {
     #[test]
     fn temporary_matrices_get_negative_numbers() {
         let mut ms = Matrices::default();
+        // как у оригинала (tools/verify/mcreate.txt): 0 — наименьший
+        // свободный отрицательный, другой номер — сам этот номер
         assert_eq!(ms.create(0, Matrix::new(0, 0, 0, 0).unwrap()), -1);
-        assert_eq!(ms.create(-5, Matrix::new(0, 0, 0, 0).unwrap()), -2);
+        assert_eq!(ms.create(0, Matrix::new(0, 0, 0, 0).unwrap()), -2);
+        assert_eq!(ms.create(-5, Matrix::new(0, 0, 0, 0).unwrap()), -5);
+        ms.items.remove(&-1);
+        assert_eq!(ms.create(0, Matrix::new(0, 0, 0, 0).unwrap()), -1);
     }
 
     #[test]

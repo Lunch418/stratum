@@ -168,7 +168,8 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
         "rad" => num(f(args, 0).to_radians()),
         "deg" => num(f(args, 0).to_degrees()),
         // единичная функция и дельта-функция
-        "ed" => boolean(f(args, 0) != 0.0),
+        // единичная функция: 1 только для положительных (справка, Wine: ed.txt)
+        "ed" => boolean(f(args, 0) > 0.0),
         "delta" => boolean(f(args, 0) == 0.0),
         "limit" => {
             let (x, lo, hi) = (f(args, 0), f(args, 1), f(args, 2));
