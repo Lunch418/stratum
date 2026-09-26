@@ -418,7 +418,8 @@ label.check input { flex: none; margin: 0; }
 .filter input { width: 100%; }
 
 /* ── таблицы ────────────────────────────────────────────────────────────── */
-table.vars { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); table-layout: fixed; }
+table.vars { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+.right-top table.vars { table-layout: fixed; }
 table.vars th {
   text-align: left; font-weight: 500; color: var(--text-muted); padding: 5px 8px; border-bottom: 1px solid var(--border);
   font-size: var(--fs-xs); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: var(--bg-surface);
@@ -620,7 +621,7 @@ table.vars button.small.ghost { min-height: 20px; padding: 0 5px; }
 .palette .list { max-height: 50vh; overflow: auto; padding: var(--sp-2); }
 .palette .row { display: flex; align-items: center; gap: 10px; min-height: 30px; padding: 0 10px; border-radius: var(--r-sm); cursor: pointer; border: 0; }
 .palette .row.active { background: var(--accent-soft); color: var(--accent-ink); }
-.palette .row .group { font-size: var(--fs-xs); min-width: 84px; }
+.palette .row .group { font-size: var(--fs-xs); flex: none; width: 112px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-muted); }
 .palette .row .title { flex: 1; }
 .palette .row .hint { font-size: var(--fs-xs); font-family: var(--font-mono); }
 
@@ -731,3 +732,10 @@ table.vars button.small.ghost { min-height: 20px; padding: 0 5px; }
 .right-top table.vars thead th:nth-child(2) { width: 76px; }
 .right-top table.vars thead th:nth-child(5) { width: 26px; }
 .right-top table.vars td:first-child { white-space: nowrap; }
+
+/* узкое окно: полоса заголовка переносится в два ряда — разделитель там лишний */
+@media (max-width: 1360px) {
+  .topbar .sep { display: none; }
+  .topbar .brand-accent { display: none; }
+  .menubar .menu-title { padding: 0 7px; }
+}
