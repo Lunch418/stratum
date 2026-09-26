@@ -293,6 +293,11 @@ pub fn load(dir: &Path) -> std::io::Result<Result<LoadedProject, FormatError>> {
     let mut classes = Vec::new();
     for entry in root.get("classes").and_then(Json::as_array).into_iter().flatten() {
         let stem = entry.str_or("file", "");
+        // имя файла имиджа, а не путь: «../../…» из чужого project.json
+        // читал бы файлы вне папки проекта
+        if stem.is_empty() || stem.contains(['/', '\\', ':']) || stem.starts_with('.') {
+            return Ok(Err(fail(format!("недопустимое имя файла имиджа «{stem}»"))));
+        }
         match load_class(&classes_dir, &stem)? {
             Ok(c) => classes.push(c),
             Err(e) => return Ok(Err(e)),
@@ -304,7 +309,11 @@ pub fn load(dir: &Path) -> std::io::Result<Result<LoadedProject, FormatError>> {
         .and_then(Json::as_array)
         .into_iter()
         .flatten()
-        .filter_map(|l| l.as_str().map(PathBuf::from))
+        .filter_map(|l| l.as_str().filter(|l| !l.contains(':')).map(PathBuf::from))
+        // только папки внутри проекта, как их и пишет save: библиотека
+        // расширяет песочницу модели на чтение, и «/» или «../..» из чужого
+        // project.json открывали бы модели весь диск
+        .filter(|d| d.components().all(|c| matches!(c, std::path::Component::Normal(_) | std::path::Component::CurDir)))
         .collect();
 
     let mut state = None;
@@ -597,6 +606,35 @@ mod tests {
         assert_eq!(back.sheet, cls.sheet);
         assert_eq!(back.links[1].pad, 4);
         assert_eq!(back.pads, cls.pads);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn foreign_project_json_cannot_point_outside_the_project() {
+        let dir = std::env::temp_dir().join(format!("stratum-native-paths-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let project = LoadedProject {
+            dir: dir.clone(),
+            project: Project { root: "Main".into(), ..Default::default() },
+            classes: vec![Class { name: "Main".into(), version: 0x3003, ..Default::default() }],
+            own_classes: 1,
+            state: None,
+            library_dirs: vec![dir.join("lib")],
+        };
+        save(&dir, &project).unwrap();
+        let json_path = dir.join(PROJECT_FILE);
+        let text = std::fs::read_to_string(&json_path).unwrap();
+        // библиотеки: наружу — отбрасываются, внутри проекта — остаются
+        let hostile = text.replace("\"lib\"", "\"lib\", \"/\", \"../..\", \"C:/\", \"sub/../..\"");
+        assert_ne!(hostile, text, "в project.json нет библиотеки lib");
+        std::fs::write(&json_path, &hostile).unwrap();
+        let loaded = load(&dir).unwrap().unwrap();
+        assert_eq!(loaded.library_dirs, vec![PathBuf::from("lib")]);
+        // имя файла имиджа с путём — ошибка
+        let hostile = text.replace("\"file\": \"Main\"", "\"file\": \"../../etc/x\"");
+        assert_ne!(hostile, text, "в project.json нет имиджа Main");
+        std::fs::write(&json_path, &hostile).unwrap();
+        assert!(load(&dir).unwrap().is_err());
         let _ = std::fs::remove_dir_all(&dir);
     }
 
