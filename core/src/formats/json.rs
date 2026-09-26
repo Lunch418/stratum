@@ -184,7 +184,7 @@ pub fn object(pairs: Vec<(&str, Json)>) -> Json {
 
 pub fn parse(text: &str) -> Result<Json, String> {
     let chars: Vec<char> = text.chars().collect();
-    let mut p = Parser { c: &chars, i: 0 };
+    let mut p = Parser { c: &chars, i: 0, depth: 0 };
     p.ws();
     let v = p.value()?;
     p.ws();
@@ -197,7 +197,12 @@ pub fn parse(text: &str) -> Result<Json, String> {
 struct Parser<'a> {
     c: &'a [char],
     i: usize,
+    /// Вложенность массивов и объектов: `project.json` чужого проекта вида
+    /// «[[[[…» переполнил бы стек рекурсивного разбора и уронил процесс.
+    depth: usize,
 }
+
+const MAX_DEPTH: usize = 256;
 
 impl Parser<'_> {
     fn err(&self, msg: &str) -> String {
@@ -216,8 +221,13 @@ impl Parser<'_> {
 
     fn value(&mut self) -> Result<Json, String> {
         match self.peek() {
-            Some('{') => self.object(),
-            Some('[') => self.array(),
+            Some('{' | '[') if self.depth >= MAX_DEPTH => Err(self.err("слишком глубокая вложенность")),
+            Some(open @ ('{' | '[')) => {
+                self.depth += 1;
+                let v = if open == '{' { self.object() } else { self.array() };
+                self.depth -= 1;
+                v
+            }
             Some('"') => Ok(Json::Str(self.string()?)),
             Some('t') => self.literal("true", Json::Bool(true)),
             Some('f') => self.literal("false", Json::Bool(false)),
@@ -270,7 +280,9 @@ impl Parser<'_> {
                             // суррогатные пары
                             if (0xD800..0xDC00).contains(&code) && self.c.get(self.i) == Some(&'\\') && self.c.get(self.i + 1) == Some(&'u') {
                                 let hex2: String = self.c.get(self.i + 2..self.i + 6).ok_or_else(|| self.err("обрыв в \\u"))?.iter().collect();
-                                if let Ok(low) = u32::from_str_radix(&hex2, 16) {
+                                // вторая половина — только 0xDC00..0xDFFF, иначе
+                                // вычитание ниже уходит в минус (паника)
+                                if let Some(low) = u32::from_str_radix(&hex2, 16).ok().filter(|l| (0xDC00..0xE000).contains(l)) {
                                     self.i += 6;
                                     let full = 0x10000 + ((code - 0xD800) << 10) + (low - 0xDC00);
                                     out.push(char::from_u32(full).unwrap_or('\u{fffd}'));
@@ -340,6 +352,17 @@ impl Parser<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn hostile_input_is_an_error_not_a_crash() {
+        let deep = format!("{}{}", "[".repeat(100_000), "]".repeat(100_000));
+        assert!(parse(&deep).unwrap_err().contains("вложенность"));
+        assert!(parse(&"{\"a\":".repeat(100_000)).is_err());
+        assert!(parse(&format!("{}1{}", "[".repeat(100), "]".repeat(100))).is_ok());
+        // высокая половина суррогата и за ней не низкая: раньше — переполнение
+        assert!(matches!(parse(r#""\uD800A""#).unwrap(), Json::Str(s) if s == "\u{fffd}A"));
+        assert!(matches!(parse(r#""😀""#).unwrap(), Json::Str(s) if s == "😀"));
+    }
 
     #[test]
     fn round_trip() {
