@@ -142,8 +142,9 @@ export function Inspector() {
             </table>
           </>
         )}
-        <div className="panel-title">Переменные</div>
-        <table className="vars">
+        <div className="panel-title">Переменные <span className="spacer" /><span className="muted">{vars.length}</span></div>
+        {!vars.length && <div className="empty">У имиджа нет переменных. Объявите их в тексте имиджа — они появятся здесь и станут портами на схеме.</div>}
+        {vars.length > 0 && <table className="vars">
           <thead><tr><th>Имя</th><th>Тип</th><th>По умолчанию</th><th>{instance !== null ? 'Сейчас' : 'Описание'}</th>{instance !== null && <th></th>}</tr></thead>
           <tbody>
             {vars.map((v, i) => (
@@ -171,7 +172,7 @@ export function Inspector() {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table>}
       </div>
     </>
   );

@@ -517,6 +517,9 @@ table.vars button.small.ghost { min-height: 20px; padding: 0 5px; }
 .model .win label.ctl { display: flex; align-items: center; gap: 4px; white-space: nowrap; overflow: hidden; }
 .model .win input.ctl, .model .win textarea.ctl, .model .win select.ctl { min-height: 0; background: #fff; border: 1px solid #7a7a7a; border-radius: 0; padding: 0 3px; color: #000; box-shadow: none; transition: none; }
 .model .win input.ctl:focus, .model .win textarea.ctl:focus, .model .win select.ctl:focus { border-color: #000; box-shadow: none; }
+/* недоступное поле Windows: серый фон, текст читается */
+.model .win input.ctl:disabled, .model .win textarea.ctl:disabled, .model .win select.ctl:disabled { opacity: 1; background: #f0f0f0; color: #6d6d6d; }
+.model .win label.ctl input:disabled { opacity: 1; }
 /* скрываемые полосы: «Вид → Строка состояния», «Вид → Панель инструментов» */
 .ide.no-statusbar { grid-template-rows: auto 1fr; }
 .ide.no-statusbar > .statusbar { display: none; }

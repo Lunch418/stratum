@@ -34,7 +34,7 @@ function prepare(backdrop: HTMLElement) {
   // первое поле ввода, если диалог с него начинается; иначе — главная кнопка
   const first = list.find(el => !el.closest('.panel-title, .tabs'));
   const field = first?.matches('input[type="text"], input[type="number"], input[type="search"], input:not([type]), textarea') ? first : undefined;
-  const target = field ??modal.querySelector<HTMLElement>('.modal-actions button[type="submit"], .modal-actions .primary') ?? list[0];
+  const target = field ??modal.querySelector<HTMLElement>('.modal-actions button[type="submit"], .modal-actions .primary') ?? [...modal.querySelectorAll<HTMLElement>('.modal-actions button')].pop() ?? list[0];
   target?.focus({ preventScroll: true });
 }
 
