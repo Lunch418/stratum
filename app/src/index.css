@@ -660,6 +660,9 @@ table.vars button.small.ghost { min-height: 20px; padding: 0 5px; }
 .halt.error { background: var(--state-error-soft); color: var(--state-error); box-shadow: inset 3px 0 0 var(--state-error); }
 .halt.math, .halt.warning { background: var(--state-warn-soft); color: var(--text-primary); box-shadow: inset 3px 0 0 var(--state-pause); }
 .halt .spacer { flex: 1; }
+.halt-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.halt-text b { font-weight: 600; margin-right: var(--sp-2); }
+.halt-line { font-family: var(--font-mono); font-size: var(--fs-xs); margin-left: var(--sp-4); padding: 0 6px; border-radius: 999px; background: color-mix(in srgb, currentColor 12%, transparent); }
 .halt button { color: var(--text-primary); }
 .line-error { background: var(--state-error-soft); }
 .line-halt { background: var(--accent-soft); }
@@ -809,4 +812,19 @@ table.vars button.small.ghost { min-height: 20px; padding: 0 5px; }
   .topbar .brand { font-size: 0; gap: 0; margin-right: var(--sp-2); }
   .topbar > .spacer { flex: 0 0 0; }
   .topbar-actions { margin-left: auto; }
+}
+
+/* старый WebKitGTK без color-mix(): те же места — готовыми токенами, без смешения */
+@supports not (color: color-mix(in srgb, red, blue)) {
+  button:hover { background-color: var(--bg-raised); }
+  .chip { background: var(--bg-sunken); box-shadow: inset 0 0 0 1px var(--border); }
+  .transport > button.primary:hover, .transport > button.primary.paused:hover { filter: brightness(.92); }
+  [data-theme="dark"] .transport > button.primary:hover, [data-theme="dark"] .transport > button.primary.paused:hover { filter: brightness(1.1); }
+  .statusbar .mode.run::before { box-shadow: none; }
+  .scheme .node.selected rect.box { fill: var(--bg-raised); }
+  .model { background-image: radial-gradient(var(--border-strong) 1px, transparent 1.2px); }
+  .model .win.active .title { background: var(--accent-softer); }
+  .help-body a { text-decoration-color: var(--accent-soft); }
+  .halt-line { background: var(--bg-hover); }
+  .legend-floating { background: var(--bg-canvas); }
 }

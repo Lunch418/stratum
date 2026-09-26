@@ -286,7 +286,7 @@ export default function App() {
           </div>
           {frame?.halt && (
             <div className={`halt ${frame.halt.kind}`}>
-              <span>{frame.halt.kind === 'error' ? 'Ошибка' : frame.halt.kind === 'warning' ? 'Предупреждение' : frame.halt.kind === 'math' ? 'Математическая ошибка' : 'Остановлено'}: {frame.halt.message}{frame.halt.line ? ` (строка ${frame.halt.line})` : ''}</span>
+              <span className="halt-text" role="status"><b>{frame.halt.kind === 'error' ? 'Ошибка' : frame.halt.kind === 'warning' ? 'Предупреждение' : frame.halt.kind === 'math' ? 'Математическая ошибка' : 'Остановлено'}</b> {frame.halt.message}{frame.halt.line ? <span className="halt-line">строка {frame.halt.line}</span> : null}</span>
               <span className="spacer" />
               {frame.halt.class && <button className="small" onClick={() => { s.select(frame.halt!.class, frame.halt!.instance); s.setTab('code'); }}>К коду</button>}
               {frame.halt.kind === 'error' && <button className="small" onClick={() => api.event('type=back')} disabled={!frame.canBack}>Такт назад</button>}
