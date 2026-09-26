@@ -1,0 +1,18 @@
+# EnableControl2d возвращает, был ли элемент отключён (как EnableWindow)
+@ fixtures/PROJECTS/samples/BALLS WorkSpace
+% Wait = 1
++ fixtures/library/CONTROLS.LIB/NUMBERIN.VDR
+! hs := LoadSpaceWindow("W3", "C:\verify\NUMBERIN.VDR", "")
+! e1 := EnableControl2d(~hs, #2, 1)
+! e2 := EnableControl2d(~hs, #2, 0)
+! e3 := EnableControl2d(~hs, #2, 0)
+! e4 := EnableControl2d(~hs, #2, 1)
+! e5 := EnableControl2d(~hs, #2, 5)
+! e6 := EnableControl2d(~hs, #999, 1)
+t | GetObjectType2d(hs, #2)
+e1 | e1
+e2 | e2
+e3 | e3
+e4 | e4
+e5 | e5
+e6 | e6

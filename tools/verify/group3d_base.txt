@@ -1,0 +1,32 @@
+# Начало 3D-группы: мир или первый объект; SelectLocalCrd3d группы
+@ fixtures/PROJECTS/samples/BALLS WorkSpace
+% Wait = 1
++ fixtures/PROJECTS/samples/ROBOT/ROBOT3.VDR
+! hs := OpenSchemeWindow("W1", "WorkSpace", "")
+! h2 := LoadSpaceWindow("W3", "C:\verify\ROBOT3.VDR", "")
+! s3 := Handle(Float(~h2) - 1)
+! o1 := MakeBar3d(~s3, Rgb(1,2,3), 10, 10, 10)
+! o2 := MakeBar3d(~s3, Rgb(1,2,3), 10, 10, 10)
+! r0 := SetObjectBase3d(~s3, ~o1, 100, 20, 30)
+! r1 := SetObjectBase3d(~s3, ~o2, 5, 6, 7)
+! g1 := CreateGroup2d(~s3, ~o1, ~o2)
+! g2 := CreateGroup2d(~s3)
+! r2 := AddGroupItem2d(~s3, ~g2, ~o2)
+! q := GetObjectBase3d(~s3, ~g1, xg, yg, zg)
+! q2 := GetObjectBase3d(~s3, ~g2, x2, y2, z2)
+! p := PushCrdSystem3d(~s3)
+! l := SelectLocalCrd3d(~s3, ~o1)
+! q3 := GetObjectBase3d(~s3, ~o2, x3, y3, z3)
+! q4 := GetObjectBase3d(~s3, ~g1, x4, y4, z4)
+! pp := PopCrdSystem3d(~s3)
+xg | xg
+yg | yg
+zg | zg
+x2 | x2
+y2 | y2
+z2 | z2
+x3 | x3
+y3 | y3
+z3 | z3
+x4 | x4
+z4 | z4

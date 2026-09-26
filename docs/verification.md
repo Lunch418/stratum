@@ -77,6 +77,8 @@ python3 tools/verify_original.py tools/verify/math.txt --compiler
 | `load3d_v3.txt` | то же для рисунка 3.x с длинным заголовком (ROBOT3.VDR) | 5 из 5 |
 | `material3d.txt` | номера материалов и новых 3D-тел рядом с объектами из рисунка; группа в 3D | 5 из 5 |
 | `group3d.txt` | группы на 3D-пространстве: создание, состав, перенос и поворот группы, типы 3D-объектов | 29 из 29 |
+| `group3d_base.txt` | система координат новой 3D-группы, `SelectLocalCrd3d` группы | 11 из 11 |
+| `enable.txt` | что возвращает `EnableControl2d` | 7 из 7 |
 | `space3d.txt` | номера `CreateSpace3d` — общий счётчик с листами | 5 из 5 |
 | `totop.txt` | `ObjectToTop2d`/`ObjectToBottom2d` для группы и объекта | 7 из 7 |
 | `ed.txt` | `Ed` — единичная функция | 5 из 5 |
@@ -150,7 +152,7 @@ python3 tools/verify_trajectory.py fixtures/PROJECTS/samples/GIST --ticks 50
   441/0, MENU 986/26, VIDEO 114/0, WRITEAVI 278/60, Example.33 282/158;
   с трёхмерными пространствами из рисунков: T80 235/1, EDS_IND 859/57,
   ANATOMY 476/24, CHOPPER.3D 74/2, IRONCLAD 243/3, ENGINE 329/40, ROBOT2
-  412/16, MENU 1004/8, ROBOT 2597/18, Trigger 3239/0, SMO2 3463/105, Surf3d 283/19;
+  412/16, MENU 1004/8, ROBOT 2614/1, Trigger 3239/0, SMO2 3463/105, Surf3d 283/19;
 - без снимка: sclogo (оригинал падает под Wine), NUI и TextAnalyser (внешние
   библиотеки), Ogre_3D, а 2d, api, Net — не проекты.
 
@@ -224,6 +226,8 @@ python3 tools/verify_trajectory.py fixtures/PROJECTS/samples/GIST --ticks 50
 | `CreateGroup2d` и прочие функции групп на трёхмерном пространстве ничего не делали | 3D-группа: номер — наименьший свободный, начало — в начале мира; поворот и перенос группы двигают все её тела; `GetObjectType2d` 3D-объектов: группа 5, тело 10, камера 11, свет 12 | Wine, `group3d.txt`; ROBOT 2572 из 2615 вместо 2394 |
 | `Ed(x)` давал 1 для любого ненулевого | 1 только для положительных, как в справке | Wine, `ed.txt` |
 | `MCreate(0, …)` брал новый отрицательный номер по счётчику, отрицательный номер тоже давал новую | 0 — наименьший свободный отрицательный (удалённые переиспользуются), любой другой номер — сам он, прежняя матрица заменяется | Wine, `mcreate.txt`; Trigger 3239 из 3239 вместо 3072, ROBOT 2597 из 2615, SMO2 3463 из 3568 |
+| 3D-группа начиналась в начале мира, `SelectLocalCrd3d` группы не работал | система координат группы — как у первого объекта при создании (у пустой — мировая); `SelectLocalCrd3d` берёт её | Wine, `group3d_base.txt`; ROBOT 2614 из 2615 |
+| `EnableControl2d` всегда давал 1 | как `EnableWindow`: 1, если элемент был отключён | Wine, `enable.txt` |
 
 ## Чего ещё нет
 

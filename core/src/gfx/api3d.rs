@@ -272,7 +272,7 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx, ms: &mut Matrices, output
         "selectlocalcrd3d" => {
             let obj = f(args, 1);
             ok(sp3(gfx, args, 0).map(|s| {
-                s.crd = if obj <= 0.0 { IDENTITY } else { s.objects.get(&(obj as Handle)).map(|o| o.matrix).unwrap_or(IDENTITY) };
+                s.crd = if obj <= 0.0 { IDENTITY } else { s.matrix_of(obj as Handle).unwrap_or(IDENTITY) };
             }).is_some())
         }
 

@@ -522,9 +522,18 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
             Shape::Control { text, .. } => Some(text.clone()),
             _ => None,
         }).unwrap_or_default()),
+        // как EnableWindow: 1, если элемент был отключён (сверено в Wine,
+        // tools/verify/enable.txt)
         "enablecontrol2d" => {
             let e = f(args, 2) != 0.0;
-            ok(object_mut(gfx, args).map(|o| if let Shape::Control { enabled, .. } = &mut o.shape { *enabled = e }).is_some())
+            ok(object_mut(gfx, args).is_some_and(|o| match &mut o.shape {
+                Shape::Control { enabled, .. } => {
+                    let was_disabled = !*enabled;
+                    *enabled = e;
+                    was_disabled
+                }
+                _ => false,
+            }))
         }
         "checkdlgbutton2d" => {
             let c = f(args, 2) != 0.0;

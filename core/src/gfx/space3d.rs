@@ -417,11 +417,13 @@ impl Space3d {
         false
     }
 
-    /// Новая группа из объектов `items` (сверено в Wine, group3d.txt:
-    /// номер — наименьший свободный, начало группы — в начале мира).
+    /// Новая группа из объектов `items` (сверено в Wine, group3d.txt,
+    /// group3d_base.txt: номер — наименьший свободный, система координат
+    /// группы — как у первого объекта при создании, у пустой — мировая).
     pub fn add_group(&mut self, items: Vec<Handle>) -> Handle {
         let h = self.alloc();
-        self.groups.insert(h, Group3d { handle: h, name: String::new(), children: items, matrix: IDENTITY });
+        let matrix = items.first().and_then(|i| self.matrix_of(*i)).unwrap_or(IDENTITY);
+        self.groups.insert(h, Group3d { handle: h, name: String::new(), children: items, matrix });
         h
     }
 
@@ -445,7 +447,7 @@ impl Space3d {
     }
 
     /// Матрица объекта: тела, камеры не в счёт, группы — своя.
-    fn matrix_of(&self, h: Handle) -> Option<Mat4> {
+    pub fn matrix_of(&self, h: Handle) -> Option<Mat4> {
         self.objects.get(&h).map(|o| o.matrix).or_else(|| self.groups.get(&h).map(|g| g.matrix))
     }
 
