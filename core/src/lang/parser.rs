@@ -38,7 +38,7 @@ const KEYWORDS: &[&str] = &[
 
 pub fn parse(src: &str) -> Result<Model, ParseError> {
     let tokens = tokenize(src)?;
-    let mut p = Parser { tokens, pos: 0, is_function: false };
+    let mut p = Parser { tokens, pos: 0, is_function: false, depth: 0 };
     let body = p.block(&[])?;
     p.expect_eof()?;
     let mut model = Model { is_function: p.is_function, declarations: Vec::new(), body };
@@ -70,7 +70,13 @@ struct Parser {
     tokens: Vec<Token>,
     pos: usize,
     is_function: bool,
+    /// Вложенность операторов и выражений: разбор рекурсивный, и текст из
+    /// чужого файла вида «((((…» переполнил бы стек и уронил процесс.
+    depth: usize,
 }
+
+/// Больше, чем бывает в настоящих текстах, и далеко до конца стека потока.
+const MAX_DEPTH: usize = 200;
 
 impl Parser {
     fn peek(&self) -> &Tok {
@@ -164,7 +170,21 @@ impl Parser {
         }
     }
 
+    fn nested<T>(&mut self, f: impl FnOnce(&mut Self) -> Result<T, ParseError>) -> Result<T, ParseError> {
+        if self.depth >= MAX_DEPTH {
+            return self.error("слишком глубокая вложенность");
+        }
+        self.depth += 1;
+        let result = f(self);
+        self.depth -= 1;
+        result
+    }
+
     fn statement(&mut self, out: &mut Vec<Stmt>) -> Result<(), ParseError> {
+        self.nested(|p| p.statement_inner(out))
+    }
+
+    fn statement_inner(&mut self, out: &mut Vec<Stmt>) -> Result<(), ParseError> {
         if self.word_is("if") {
             self.advance();
             let condition = self.parenthesized()?;
@@ -384,6 +404,10 @@ impl Parser {
     }
 
     fn unary(&mut self) -> Result<Expr, ParseError> {
+        self.nested(Self::unary_inner)
+    }
+
+    fn unary_inner(&mut self) -> Result<Expr, ParseError> {
         if self.eat_op("-") {
             return Ok(Expr::Unary(UnOp::Neg, Box::new(self.unary()?)));
         }
@@ -557,6 +581,17 @@ mod tests {
         let Stmt::Switch { arms, default } = &m_body[0] else { panic!() };
         assert_eq!(arms.len(), 2);
         assert!(default.is_empty());
+    }
+
+    #[test]
+    fn deep_nesting_is_an_error_not_a_crash() {
+        for (open, close) in [("(", ")"), ("-", ""), ("if (1) ", " endif")] {
+            let text = format!("x := {}1{}", open.repeat(100_000), close.repeat(100_000));
+            let e = parse(&text).unwrap_err();
+            assert!(e.message.contains("вложенность"), "{e}");
+        }
+        // обычная вложенность разбирается
+        assert!(parse(&format!("x := {}1{}", "(".repeat(50), ")".repeat(50))).is_ok());
     }
 
     #[test]

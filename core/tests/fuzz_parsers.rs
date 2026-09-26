@@ -206,3 +206,66 @@ fn crafted_bitmaps_do_not_panic() {
     assert!(gfx::decode_bmp(&big).is_none());
 }
 
+/// Текст имиджа из чужого файла с огромной вложенностью скобок: разбор
+/// должен вернуть ошибку, а не переполнить стек (это роняет процесс).
+#[test]
+fn deeply_nested_text_does_not_overflow_stack() {
+    for depth in [150usize, 1_000, 100_000] {
+        for (open, close) in [("(", ")"), ("-", ""), ("if (1) ", " endif")] {
+            let text = format!("x := {}1{}", open.repeat(depth), close.repeat(depth));
+            let _ = std::thread::Builder::new()
+                // как у потоков сервера IDE (по умолчанию 2 МБ)
+                .stack_size(2 << 20)
+                .spawn(move || {
+                    let _ = stratum_core::lang::parse(&text);
+                })
+                .unwrap()
+                .join();
+        }
+    }
+}
+
+/// Группа, входящая сама в себя (прямо или через другую группу), — порча
+/// файла; рендер не должен уходить в бесконечную рекурсию (переполнение
+/// стека не ловится и роняет весь процесс IDE).
+#[test]
+fn cyclic_groups_do_not_recurse_forever() {
+    use stratum_core::formats::vdr::{Object, ObjectKind, Picture};
+    let group = |handle: u16, children: Vec<u16>| Object { handle, name: String::new(), flags: 0, kind: ObjectKind::Group { children } };
+    let line = Object { handle: 3, name: String::new(), flags: 0, kind: ObjectKind::Polyline { x: 0.0, y: 0.0, w: 10.0, h: 10.0, pen: 0, brush: 0, points: vec![(0.0, 0.0), (10.0, 10.0)] } };
+    let pic = Picture { version: 0x0300, objects: vec![group(1, vec![2, 3]), group(2, vec![1]), group(4, vec![4]), line], zorder: vec![1, 2, 3, 4], ..Default::default() };
+    let mut sp = Space::new(1, "x");
+    sp.load(&pic);
+    let _ = svg::render(&sp);
+    let _ = vdr::write(&pic);
+}
+
+/// Наибольшая допустимая вложенность проходит и дальше разбора: сборка
+/// модели и такт на стеке потока сервера.
+#[test]
+fn deepest_allowed_text_builds_and_runs() {
+    use stratum_core::formats::{Class, LoadedProject, Project};
+    let text = format!("x := {}1{}\ny := {}2", "(".repeat(195), ")".repeat(195), "-".repeat(195));
+    std::thread::Builder::new()
+        .stack_size(2 << 20)
+        .spawn(move || {
+            assert!(stratum_core::lang::parse(&text).is_ok());
+            let root = Class { name: "Main".into(), version: 0x3003, text, ..Default::default() };
+            let project = LoadedProject {
+                dir: PathBuf::new(),
+                project: Project { root: "Main".into(), ..Default::default() },
+                classes: vec![root],
+                own_classes: 1,
+                state: None,
+                library_dirs: Vec::new(),
+            };
+            if let Ok(mut sim) = stratum_core::sim::Simulation::build(&project) {
+                let _ = sim.step();
+                let _ = sim.clone();
+            }
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}
+
