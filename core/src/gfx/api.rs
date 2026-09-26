@@ -210,8 +210,22 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
         "getshowobject2d" => ok(object(gfx, args).is_some_and(|o| o.visible)),
         "showobject2d" => ok(object_mut(gfx, args).map(|o| o.visible = true).is_some() || super::api3d::set_visible(gfx, h(args, 0), h(args, 1), true)),
         "deleteobject2d" => ok(gfx.space_mut(h(args, 0)).is_some_and(|sp| sp.delete_object(h(args, 1))) || super::api3d::delete(gfx, h(args, 0), h(args, 1))),
-        "objecttotop2d" => ok(gfx.space_mut(h(args, 0)).map(|sp| sp.to_top(h(args, 1))).is_some()),
-        "objecttobottom2d" => ok(gfx.space_mut(h(args, 0)).map(|sp| sp.to_bottom(h(args, 1))).is_some()),
+        // группа места в Z-порядке не имеет: «наверх» для неё ничего не
+        // делает и даёт 0, «вниз» — ничего не делает и даёт 1 (сверено в
+        // Wine, tools/verify/totop.txt)
+        "objecttotop2d" => ok(gfx.space_mut(h(args, 0)).is_some_and(|sp| {
+            if sp.objects.get(&h(args, 1)).is_some_and(|o| o.is_group()) {
+                return false;
+            }
+            sp.to_top(h(args, 1));
+            true
+        })),
+        "objecttobottom2d" => ok(gfx.space_mut(h(args, 0)).is_some_and(|sp| {
+            if !sp.objects.get(&h(args, 1)).is_some_and(|o| o.is_group()) {
+                sp.to_bottom(h(args, 1));
+            }
+            true
+        })),
         // место в плоском Z-списке простых объектов; у группы места нет — 0
         // (сверено в Wine, tools/verify/zorder.txt)
         "getzorder2d" => num(gfx.space(h(args, 0))

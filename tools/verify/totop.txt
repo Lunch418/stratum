@@ -1,0 +1,20 @@
+# ObjectToTop2d / ObjectToBottom2d: что возвращают для группы и объекта
+@ fixtures/PROJECTS/samples/BALLS WorkSpace
+% Wait = 1
+! hs := OpenSchemeWindow("W1", "WorkSpace", "")
+! hp := CreatePen2d(~hs, 0, 1, Rgb(0,0,0), 13)
+! a := CreatePolyLine2d(~hs, ~hp, #0, 0, 0, 10, 10)
+! b := CreatePolyLine2d(~hs, ~hp, #0, 0, 0, 20, 20)
+! c := CreatePolyLine2d(~hs, ~hp, #0, 0, 0, 30, 30)
+! g := CreateGroup2d(~hs, ~a, ~b)
+! r1 := ObjectToTop2d(~hs, ~g)
+! r2 := ObjectToTop2d(~hs, ~c)
+! r3 := ObjectToBottom2d(~hs, ~g)
+! r4 := ObjectToBottom2d(~hs, ~c)
+r1 | r1
+r2 | r2
+r3 | r3
+r4 | r4
+za | GetZOrder2d(hs, a)
+zb | GetZOrder2d(hs, b)
+zc | GetZOrder2d(hs, c)

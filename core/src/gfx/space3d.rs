@@ -109,6 +109,18 @@ pub struct CameraParams {
 }
 
 impl CameraParams {
+    /// Параметры камеры, созданной на ходу.
+    pub fn from_camera(c: &Camera) -> Self {
+        CameraParams { org: c.pos, dir: c.target, up: c.up, focus: c.focus, extent: [c.extent, c.extent, 1.0], offset: [0.5, 0.5], background: c.background, render_name: "Zbuffer".into(), ..Default::default() }
+    }
+
+    /// Положение, направление и фон — в камеру, по которой рисуется проекция.
+    pub fn apply_to(&self, c: &mut Camera) {
+        c.pos = self.org;
+        c.target = self.dir;
+        c.background = self.background;
+    }
+
     pub fn parse(b: &[u8]) -> Option<Self> {
         if b.len() < 200 {
             return None;

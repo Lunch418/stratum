@@ -1023,6 +1023,60 @@ fn message_matches(registered: u32, msg: u32) -> bool {
 }
 
 /// Объект `wanted` (или группа с ним) находится под мышью.
+/// Поле параметров камеры, связанное с переменной `po…` имиджа Camera3d.
+enum CamField {
+    Num(fn(&crate::gfx::space3d::CameraParams) -> f64, fn(&mut crate::gfx::space3d::CameraParams, f64)),
+    Color(fn(&crate::gfx::space3d::CameraParams) -> u32, fn(&mut crate::gfx::space3d::CameraParams, u32)),
+    Name,
+}
+
+impl CamField {
+    fn get(&self, p: &crate::gfx::space3d::CameraParams) -> Value {
+        match self {
+            CamField::Num(g, _) => Value::Float(g(p)),
+            CamField::Color(g, _) => Value::Color(g(p) as f64),
+            CamField::Name => Value::Str(p.render_name.clone()),
+        }
+    }
+    fn set(&self, p: &mut crate::gfx::space3d::CameraParams, v: &Value) {
+        match self {
+            CamField::Num(_, s) => s(p, v.as_float()),
+            CamField::Color(_, s) => s(p, v.as_float() as i64 as u32),
+            CamField::Name => p.render_name = v.as_string(),
+        }
+    }
+}
+
+/// Переменные имиджа Camera3d и поля камеры (сверено по снимку T80).
+fn camera_fields() -> Vec<(&'static str, CamField)> {
+    use CamField::*;
+    vec![
+        ("poorgx", Num(|p| p.org[0], |p, v| p.org[0] = v)),
+        ("poorgy", Num(|p| p.org[1], |p, v| p.org[1] = v)),
+        ("poorgz", Num(|p| p.org[2], |p, v| p.org[2] = v)),
+        ("podirectionx", Num(|p| p.dir[0], |p, v| p.dir[0] = v)),
+        ("podirectiony", Num(|p| p.dir[1], |p, v| p.dir[1] = v)),
+        ("podirectionz", Num(|p| p.dir[2], |p, v| p.dir[2] = v)),
+        ("poupx", Num(|p| p.up[0], |p, v| p.up[0] = v)),
+        ("poupy", Num(|p| p.up[1], |p, v| p.up[1] = v)),
+        ("poupz", Num(|p| p.up[2], |p, v| p.up[2] = v)),
+        ("pofocus", Num(|p| p.focus, |p, v| p.focus = v)),
+        ("pofar_clip", Num(|p| p.far_clip, |p, v| p.far_clip = v)),
+        ("ponear_clip", Num(|p| p.near_clip, |p, v| p.near_clip = v)),
+        ("poextentx", Num(|p| p.extent[0], |p, v| p.extent[0] = v)),
+        ("poextenty", Num(|p| p.extent[1], |p, v| p.extent[1] = v)),
+        ("poextentz", Num(|p| p.extent[2], |p, v| p.extent[2] = v)),
+        ("pooffsetx", Num(|p| p.offset[0], |p, v| p.offset[0] = v)),
+        ("pooffsety", Num(|p| p.offset[1], |p, v| p.offset[1] = v)),
+        ("porendertype", Num(|p| p.render_type as f64, |p, v| p.render_type = v as u16)),
+        ("poflags", Num(|p| p.flags as f64, |p, v| p.flags = v as u8)),
+        ("poperspective", Num(|p| p.perspective as f64, |p, v| p.perspective = v as u8)),
+        ("pohazecolor", Color(|p| p.haze, |p, v| p.haze = v)),
+        ("pobackground", Color(|p| p.background, |p, v| p.background = v)),
+        ("porendername", Name),
+    ]
+}
+
 fn covers(sp: &crate::gfx::Space, wanted: crate::gfx::Handle, under: Option<crate::gfx::Handle>) -> bool {
     let mut cur = under;
     while let Some(h) = cur {
@@ -1189,6 +1243,42 @@ impl Vars for Frame<'_> {
                     }
                     None => Value::Float(0.0),
                 }
+            }
+            // _CameraProc3d(имидж, пространство, камера, 0|1): 0 — параметры
+            // камеры в переменные po… имиджа, 1 — обратно (имидж Camera3d)
+            "_cameraproc3d" => {
+                let Some(target) = self.resolve_arg(args.first()) else { return Some(Value::Float(0.0)) };
+                let (sp, cam) = (args.get(1).map(|v| v.as_float()).unwrap_or(0.0) as crate::gfx::Handle, args.get(2).map(|v| v.as_float()).unwrap_or(0.0) as crate::gfx::Handle);
+                let write = args.get(3).map(|v| v.as_float()).unwrap_or(0.0) != 0.0;
+                let Some(s3) = self.sim.effects.gfx.spaces3d.get_mut(&sp) else { return Some(Value::Float(0.0)) };
+                let Some(c) = s3.cameras.get(&cam).cloned() else { return Some(Value::Float(0.0)) };
+                let mut p = s3.camera_params.get(&cam).cloned().unwrap_or_else(|| crate::gfx::space3d::CameraParams::from_camera(&c));
+                let fields = camera_fields();
+                if write {
+                    let get = |sim: &Simulation, name: &str| sim.instances[target].vars.get(name).map(|&c| sim.cells[c].clone());
+                    let mut vals = Vec::new();
+                    for (name, _) in &fields {
+                        vals.push(get(self.sim, name));
+                    }
+                    for ((_, field), v) in fields.iter().zip(vals) {
+                        if let Some(v) = v {
+                            field.set(&mut p, &v);
+                        }
+                    }
+                    if let Some(s3) = self.sim.effects.gfx.spaces3d.get_mut(&sp) {
+                        if let Some(cam_obj) = s3.cameras.get_mut(&cam) {
+                            p.apply_to(cam_obj);
+                        }
+                        s3.camera_params.insert(cam, p);
+                    }
+                } else {
+                    for (name, field) in &fields {
+                        if let Some(&c) = self.sim.instances[target].vars.get(*name) {
+                            self.sim.cells[c] = field.get(&p).cast_to(self.sim.types[c]);
+                        }
+                    }
+                }
+                Value::Float(1.0)
             }
             // ── состав схемы имиджа: экземпляры, связи, переменные ─────────
             "getobjectcount" => {

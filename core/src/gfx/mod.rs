@@ -1007,15 +1007,16 @@ impl Gfx {
 
     /// Трёхмерные пространства рисунка: создаются раньше листа, номера — из
     /// общего с листами счётчика (сверено в Wine: T80 и EDS_IND,
-    /// tools/verify/load3d.txt). Возвращает «номер в файле → номер».
+    /// tools/verify/load3d.txt). Возвращает «место в чанке → номер».
     pub fn create_spaces3d(&mut self, pic: &Picture) -> BTreeMap<Handle, Handle> {
         let mut map = BTreeMap::new();
-        for data in &pic.spaces3d {
+        // проекция ссылается на пространство по его месту в чанке (с нуля)
+        for (i, data) in pic.spaces3d.iter().enumerate() {
             let h = self.create_space3d(0);
             if let Some(sp) = self.spaces3d.get_mut(&h) {
                 sp.load(data);
             }
-            map.insert(data.handle as Handle, h);
+            map.insert(i as Handle, h);
         }
         map
     }

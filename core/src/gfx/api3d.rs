@@ -410,19 +410,21 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx, ms: &mut Matrices, output
             let p = [f(args, 2), f(args, 3), f(args, 4)];
             ok(sp3(gfx, args, 0).is_some_and(|s| s.set_base(h(args, 1), p)))
         }
-        // GetObjectBase3d(hSpace3d, hObject, matrix) → 1×3
-        "getobjectbase3d" => match sp3(gfx, args, 0).and_then(|s| s.base(h(args, 1))) {
+        // GetObjectBase3dm(hSpace3d, hObject, matrix) → матрица 1×3 с
+        // индексами с нуля (MakeTankMatrix в T80 читает MGet(m, 0, 0…2));
+        // GetObjectBase3d(hSpace3d, hObject, &x, &y, &z) — по ссылкам
+        // (сигнатуры из таблицы компилятора)
+        "getobjectbase3dm" => match sp3(gfx, args, 0).and_then(|s| s.base(h(args, 1))) {
             Some(p) => {
-                let mut m = Matrix::new(1, 1, 1, 3).unwrap();
+                let mut m = Matrix::new(0, 0, 0, 2).unwrap();
                 for k in 0..3 {
-                    m.set(1, 1 + k as i64, p[k]);
+                    m.set(0, k as i64, p[k]);
                 }
                 num(ms.put_result(data::idx(f(args, 2)), m) as f64)
             }
             None => num(0.0),
         },
-        // GetObjectBase3dM(hSpace3d, hObject, &x, &y, &z)
-        "getobjectbase3dm" => match sp3(gfx, args, 0).and_then(|s| s.base(h(args, 1))) {
+        "getobjectbase3d" => match sp3(gfx, args, 0).and_then(|s| s.base(h(args, 1))) {
             Some(p) => {
                 outputs.push((2, num(p[0])));
                 outputs.push((3, num(p[1])));
