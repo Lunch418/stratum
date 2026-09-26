@@ -1,0 +1,54 @@
+# Группы на трёхмерном пространстве: CreateGroup2d, AddGroupItem2d,
+# GetGroupItem2d, DelGroupItem2d, перенос и поворот группы
+@ fixtures/PROJECTS/samples/BALLS WorkSpace
+% Wait = 1
++ fixtures/PROJECTS/samples/ROBOT/ROBOT3.VDR
+! hs := OpenSchemeWindow("W1", "WorkSpace", "")
+! h2 := LoadSpaceWindow("W3", "C:\verify\ROBOT3.VDR", "")
+! s3 := Handle(Float(~h2) - 1)
+! o1 := MakeBar3d(~s3, Rgb(1,2,3), 10, 10, 10)
+! o2 := MakeBar3d(~s3, Rgb(1,2,3), 10, 10, 10)
+! o3 := MakeBar3d(~s3, Rgb(1,2,3), 10, 10, 10)
+! r0 := SetObjectBase3d(~s3, ~o2, 100, 0, 0)
+! g1 := CreateGroup2d(~s3, ~o1)
+! a1 := AddGroupItem2d(~s3, ~g1, ~o2)
+! g2 := CreateGroup2d(~s3)
+! a2 := AddGroupItem2d(~s3, ~g2, ~g1)
+! a3 := AddGroupItem2d(~s3, ~g2, ~o3)
+! d1 := DelGroupItem2d(~s3, ~g2, ~o3)
+! m := MCreate(0, 1, 2, 1, 3, 1)
+! r1 := MPut(~m, 2, 3, 1, 1)
+! r2 := RotateObject3d(~s3, ~g1, ~m, Pi/2)
+! r3 := SetObjectBase3d(~s3, ~g1, 0, 0, 50)
+! q := GetObjectBase3d(~s3, ~o2, x2, y2, z2)
+! q1 := GetObjectBase3d(~s3, ~o1, x1, y1, z1)
+! qg := GetObjectBase3d(~s3, ~g1, xg, yg, zg)
+g1 | Float(g1)
+g2 | Float(g2)
+a1 | a1
+a2 | a2
+a3 | a3
+d1 | d1
+n1 | GetGroupItemsNum2d(s3, g1)
+n2 | GetGroupItemsNum2d(s3, g2)
+i0 | Float(GetGroupItem2d(s3, g2, 0))
+i1 | Float(GetGroupItem2d(s3, g2, 1))
+t1 | GetObjectType2d(s3, g1)
+r2 | r2
+r3 | r3
+q | q
+x2 | round(x2, 3)
+y2 | round(y2, 3)
+z2 | round(z2, 3)
+x1 | round(x1, 3)
+y1 | round(y1, 3)
+z1 | round(z1, 3)
+qg | qg
+xg | round(xg, 3)
+yg | round(yg, 3)
+zg | round(zg, 3)
+nm | Float(GetObject2dByName(s3, #0, "Zagatovka"))
+to | GetObjectType2d(s3, o1)
+tc | GetObjectType2d(s3, #11)
+tl | GetObjectType2d(s3, #1)
+dg | DeleteGroup2d(s3, g2)

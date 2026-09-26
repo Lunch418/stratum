@@ -86,8 +86,63 @@ fn view_rect(gfx: &Gfx, space2d: Handle, view: Handle) -> (f64, f64) {
     gfx.space(space2d).and_then(|sp| sp.objects.get(&view)).map(|o| (o.w, o.h)).unwrap_or((100.0, 100.0))
 }
 
+fn call_groups(lower: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
+    let s3 = gfx.spaces3d.get_mut(&h(args, 0))?;
+    Some(match lower {
+        "creategroup2d" => {
+            let items: Vec<Handle> = (1..args.len()).map(|i| h(args, i)).filter(|c| *c != 0).collect();
+            handle(s3.add_group(items))
+        }
+        "addgroupitem2d" => {
+            let (g, item) = (h(args, 1), h(args, 2));
+            ok(s3.groups.get_mut(&g).is_some_and(|g| {
+                if !g.children.contains(&item) {
+                    g.children.push(item);
+                }
+                true
+            }))
+        }
+        "delgroupitem2d" => {
+            let (g, item) = (h(args, 1), h(args, 2));
+            ok(s3.groups.get_mut(&g).is_some_and(|g| {
+                let n = g.children.len();
+                g.children.retain(|c| *c != item);
+                g.children.len() != n
+            }))
+        }
+        "getgroupitemsnum2d" => num(s3.groups.get(&h(args, 1)).map(|g| g.children.len() as f64).unwrap_or(0.0)),
+        "getgroupitem2d" => {
+            let n = f(args, 2);
+            handle(s3.groups.get(&h(args, 1)).and_then(|g| if n >= 0.0 { g.children.get(n as usize).copied() } else { None }).unwrap_or(0))
+        }
+        "deletegroup2d" => ok(s3.groups.remove(&h(args, 1)).is_some()),
+        "getobjecttype2d" => {
+            let o = h(args, 1);
+            num(if s3.groups.contains_key(&o) {
+                5.0
+            } else if s3.objects.contains_key(&o) {
+                10.0
+            } else if s3.cameras.contains_key(&o) {
+                11.0
+            } else if s3.lights.contains_key(&o) {
+                12.0
+            } else {
+                0.0
+            })
+        }
+        _ => return None,
+    })
+}
+
 pub fn call(name: &str, args: &[Value], gfx: &mut Gfx, ms: &mut Matrices, outputs: &mut Vec<(usize, Value)>) -> Option<Value> {
     let lower = name.to_ascii_lowercase();
+    // 2D-функции групп и типа объекта на трёхмерном пространстве
+    // (сверено в Wine, tools/verify/group3d.txt)
+    if gfx.spaces3d.contains_key(&h(args, 0)) {
+        if let Some(v) = call_groups(&lower, args, gfx) {
+            return Some(v);
+        }
+    }
     if !lower.contains("3d") {
         return None;
     }

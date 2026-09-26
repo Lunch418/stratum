@@ -80,6 +80,9 @@ pub struct Group3d {
     pub handle: Handle,
     pub name: String,
     pub children: Vec<Handle>,
+    /// Своя система координат: начало группы и её повороты (новая группа —
+    /// в начале мировой системы).
+    pub matrix: Mat4,
 }
 
 /// Камера в рисунке (запись типа 11, 200 байт): `u16, u16`, положение,
@@ -372,7 +375,7 @@ impl Space3d {
                     self.lights.insert(h, (o.name.clone(), raw.clone()));
                 }
                 Object3dKind::Group { children, .. } => {
-                    self.groups.insert(h, Group3d { handle: h, name: o.name.clone(), children: children.iter().map(|c| *c as Handle).collect() });
+                    self.groups.insert(h, Group3d { handle: h, name: o.name.clone(), children: children.iter().map(|c| *c as Handle).collect(), matrix: IDENTITY });
                 }
             }
         }
@@ -414,26 +417,90 @@ impl Space3d {
         false
     }
 
-    /// Преобразование `t`, заданное в текущей системе координат, применяется к объекту.
+    /// Новая группа из объектов `items` (сверено в Wine, group3d.txt:
+    /// номер — наименьший свободный, начало группы — в начале мира).
+    pub fn add_group(&mut self, items: Vec<Handle>) -> Handle {
+        let h = self.alloc();
+        self.groups.insert(h, Group3d { handle: h, name: String::new(), children: items, matrix: IDENTITY });
+        h
+    }
+
+    /// Тела внутри объекта: само тело или все тела группы и её подгрупп.
+    pub fn meshes_of(&self, h: Handle) -> Vec<Handle> {
+        let mut out = Vec::new();
+        let mut todo = vec![h];
+        let mut guard = 0;
+        while let Some(x) = todo.pop() {
+            guard += 1;
+            if guard > 10_000 {
+                break;
+            }
+            if self.objects.contains_key(&x) {
+                out.push(x);
+            } else if let Some(g) = self.groups.get(&x) {
+                todo.extend(g.children.iter().rev());
+            }
+        }
+        out
+    }
+
+    /// Матрица объекта: тела, камеры не в счёт, группы — своя.
+    fn matrix_of(&self, h: Handle) -> Option<Mat4> {
+        self.objects.get(&h).map(|o| o.matrix).or_else(|| self.groups.get(&h).map(|g| g.matrix))
+    }
+
+    /// Преобразование `t`, заданное в текущей системе координат, применяется
+    /// к объекту; у группы — к ней самой и ко всем её телам и подгруппам.
     pub fn transform_object(&mut self, h: Handle, t: &Mat4) -> bool {
         let crd = self.crd;
-        let Some(o) = self.objects.get_mut(&h) else { return false };
         let world_t = mul(&mul(&inverse(&crd), t), &crd);
-        o.matrix = mul(&o.matrix, &world_t);
+        if let Some(o) = self.objects.get_mut(&h) {
+            o.matrix = mul(&o.matrix, &world_t);
+            return true;
+        }
+        if !self.groups.contains_key(&h) {
+            return false;
+        }
+        let mut groups = vec![h];
+        let mut i = 0;
+        while i < groups.len() && i < 10_000 {
+            let kids = self.groups.get(&groups[i]).map(|g| g.children.clone()).unwrap_or_default();
+            for k in kids {
+                if self.groups.contains_key(&k) && !groups.contains(&k) {
+                    groups.push(k);
+                }
+            }
+            i += 1;
+        }
+        for g in &groups {
+            if let Some(g) = self.groups.get_mut(g) {
+                g.matrix = mul(&g.matrix, &world_t);
+            }
+        }
+        for m in self.meshes_of(h) {
+            if let Some(o) = self.objects.get_mut(&m) {
+                o.matrix = mul(&o.matrix, &world_t);
+            }
+        }
         true
     }
 
-    /// Начало координат объекта — в точку (x, y, z) текущей системы.
+    /// Начало координат объекта — в точку (x, y, z) текущей системы; группа
+    /// переносится целиком.
     pub fn set_base(&mut self, h: Handle, p: Vec3) -> bool {
         let world = apply(p, &self.crd);
-        let Some(o) = self.objects.get_mut(&h) else { return false };
-        o.matrix[3] = [world[0], world[1], world[2], 1.0];
-        true
+        let Some(m) = self.matrix_of(h) else { return false };
+        let d = [world[0] - m[3][0], world[1] - m[3][1], world[2] - m[3][2]];
+        let t = translation(d);
+        let crd = self.crd;
+        // перенос задаётся в мировой системе: переводим в текущую
+        let local_t = mul(&mul(&crd, &t), &inverse(&crd));
+        self.transform_object(h, &local_t)
     }
 
     pub fn base(&self, h: Handle) -> Option<Vec3> {
-        let o = self.objects.get(&h)?;
-        let world = [o.matrix[3][0], o.matrix[3][1], o.matrix[3][2]];
+        let m = self.matrix_of(h)?;
+        let world = [m[3][0], m[3][1], m[3][2]];
         Some(apply(world, &inverse(&self.crd)))
     }
 
