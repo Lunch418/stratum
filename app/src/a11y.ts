@@ -38,6 +38,35 @@ function prepare(backdrop: HTMLElement) {
   target?.focus({ preventScroll: true });
 }
 
+// Деревья и списки строк (иерархия, библиотеки, справка, папки): в каждую
+// панель входят одной остановкой Tab, дальше ↑/↓, Home/End — по строкам,
+// пробел — выбрать (как щелчок); Enter оставлен за «Свойствами имиджа».
+function rovingTrees() {
+  for (const row of document.querySelectorAll<HTMLElement>('.tree-row:not([tabindex])')) row.tabIndex = -1;
+  for (const panel of document.querySelectorAll<HTMLElement>('.left, .right-bottom, .tree.browse')) {
+    const rows = panel.querySelectorAll<HTMLElement>('.tree-row');
+    if (rows.length && ![...rows].some(r => r.tabIndex === 0)) rows[0].tabIndex = 0;
+  }
+}
+
+function treeKeys(e: KeyboardEvent) {
+  const row = (e.target as HTMLElement | null)?.closest?.('.tree-row') as HTMLElement | null;
+  if (!row || row !== e.target) return;
+  const panel = row.closest('.left, .right-bottom, .tree.browse, .modal') ?? document.body;
+  const rows = [...panel.querySelectorAll<HTMLElement>('.tree-row')].filter(visible);
+  const i = rows.indexOf(row);
+  const go = (j: number) => {
+    const next = rows[Math.max(0, Math.min(rows.length - 1, j))];
+    if (!next || next === row) return;
+    row.tabIndex = -1; next.tabIndex = 0; next.focus(); next.scrollIntoView({ block: 'nearest' });
+  };
+  if (e.key === 'ArrowDown') { e.preventDefault(); go(i + 1); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); go(i - 1); }
+  else if (e.key === 'Home') { e.preventDefault(); go(0); }
+  else if (e.key === 'End') { e.preventDefault(); go(rows.length - 1); }
+  else if (e.key === ' ') { e.preventDefault(); row.click(); }
+}
+
 export function installModalBehaviour() {
   const seen = new Set<HTMLElement>();
   const sync = () => {
@@ -49,7 +78,9 @@ export function installModalBehaviour() {
       if (back && back.isConnected && !topBackdrop()) back.focus({ preventScroll: true });
     }
   };
-  new MutationObserver(sync).observe(document.body, { childList: true, subtree: true });
+  new MutationObserver(() => { sync(); rovingTrees(); }).observe(document.body, { childList: true, subtree: true });
+  rovingTrees();
+  window.addEventListener('keydown', treeKeys);
 
   window.addEventListener('keydown', e => {
     const top = topBackdrop();
