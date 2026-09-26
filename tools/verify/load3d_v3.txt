@@ -1,0 +1,11 @@
+# LoadSpaceWindow рисунка 3.x с трёхмерным пространством (ROBOT3.VDR)
+@ fixtures/PROJECTS/samples/BALLS WorkSpace
+% Wait = 1
++ fixtures/PROJECTS/samples/ROBOT/ROBOT3.VDR
+! hs := OpenSchemeWindow("W1", "WorkSpace", "")
+! h2 := LoadSpaceWindow("W3", "C:\verify\ROBOT3.VDR", "")
+h2 | Float(h2)
+obj | Float(GetObject2dByName(Handle(Float(h2)-1), #0, "Zagatovka"))
+cam | Float(GetObject2dByName(Handle(Float(h2)-1), #0, "Sc Default Camera"))
+view | GetObjectType2d(h2, #1)
+vw | GetObjectWidth2d(h2, #1)

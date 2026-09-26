@@ -446,6 +446,17 @@ pub fn parse(data: &[u8], path: &str) -> Result<Picture> {
     if ctx.sized {
         r.u16()?;
         r.bytes(8)?;
+        // заголовок бывает длиннее (у рисунка с 3D в «Роботе» — ещё блок
+        // с прямоугольником и сеткой): первый чанк ищется по id и размеру
+        let fits = |r: &Reader, at: usize| {
+            r.peek_u16(at).is_some_and(|id| (1000..=1030).contains(&id))
+                && r.data.get(at + 2..at + 6).map(|b| u32::from_le_bytes([b[0], b[1], b[2], b[3]]) as usize).is_some_and(|n| n >= 12 && at + n <= r.data.len())
+        };
+        if !fits(&r, r.pos) {
+            if let Some(at) = (r.pos..(r.pos + 512).min(r.data.len())).find(|&at| fits(&r, at)) {
+                r.pos = at;
+            }
+        }
     } else {
         r.string()?;
         r.bytes(8)?;

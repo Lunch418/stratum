@@ -381,3 +381,16 @@ fn space3d_in_a_picture_is_read() {
     let back = vdr::parse(&vdr::write(&pic), "again").unwrap();
     assert_eq!(back.spaces3d[0].objects.len(), sp.objects.len());
 }
+
+#[test]
+fn space3d_in_a_v3_picture_is_read() {
+    use stratum_core::formats::vdr::{self, ObjectKind};
+    let Some(root) = fixtures() else { return };
+    let data = std::fs::read(root.join("PROJECTS/samples/ROBOT/ROBOT3.VDR")).unwrap();
+    let pic = vdr::parse(&data, "ROBOT3.VDR").unwrap();
+    assert!(pic.objects.iter().any(|o| matches!(o.kind, ObjectKind::View3d { camera: 11, .. })));
+    let sp = &pic.spaces3d[0];
+    let named = |n: &str| sp.objects.iter().find(|o| o.name == n).map(|o| o.handle);
+    assert_eq!((named("Zagatovka"), named("Sc Default Camera")), (Some(10), Some(11)));
+    assert!(sp.materials.is_some());
+}
