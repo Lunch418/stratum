@@ -727,6 +727,8 @@ table.vars button.small.ghost { min-height: 20px; padding: 0 5px; }
 /* ── пустые состояния и метки ───────────────────────────────────────────── */
 .empty { padding: var(--sp-7) var(--sp-6); color: var(--text-muted); font-size: var(--fs-sm); line-height: 1.55; max-width: 46ch; }
 .tab-body > .empty, .center .empty:only-child { margin: 12vh auto 0; text-align: center; }
+.model > .empty { margin: 10vh auto 0; text-align: center; background: var(--bg-raised); border: 1px solid var(--border-subtle); border-radius: var(--r-md); box-shadow: var(--shadow-1); padding: var(--sp-6) var(--sp-7); }
+.graph-view > .empty { margin: 12vh auto 0; text-align: center; }
 .tag {
   display: inline-flex; align-items: center; font-size: var(--fs-xs); font-weight: 500; line-height: 18px; padding: 0 7px;
   border-radius: 999px; background: var(--bg-sunken); color: var(--text-secondary); white-space: nowrap;

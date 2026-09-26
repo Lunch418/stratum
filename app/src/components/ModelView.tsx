@@ -71,7 +71,7 @@ export function ModelView() {
     for (const div of [...root.children]) if (!frame.windows.some(w => String(w.id) === (div as HTMLElement).dataset.win)) div.remove();
   }, [frame, activeName]);
 
-  if (!frame?.windows.length) return <div className="model"><div className="muted" style={{ color: '#eee' }}>Модель не открыла окон — нажмите Пуск или Шаг.</div>{frame?.dialog && <ModelDialogBox d={frame.dialog} />}</div>;
+  if (!frame?.windows.length) return <div className="model"><div className="empty">Модель ещё не открыла окон. Нажмите «Пуск» (F5) или «Шаг» (F10) — окна появятся здесь.</div>{frame?.dialog && <ModelDialogBox d={frame.dialog} />}</div>;
   const unsupported = frame.unsupported ?? [];
   return <div className="model-view">
     {unsupported.length > 0 && <div className="unsupported" role="status"

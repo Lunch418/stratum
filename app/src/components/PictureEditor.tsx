@@ -243,8 +243,8 @@ export function PictureEditor({ kind }: { kind: Kind }) {
     setView({ k, x: mx - (mx - view.x) * (k / view.k), y: my - (my - view.y) * (k / view.k) });
   }
 
-  if (!klass) return <div className="muted" style={{ padding: 16 }}>Выберите имидж.</div>;
-  if (!state) return <div className="muted" style={{ padding: 16 }}>Загрузка…</div>;
+  if (!klass) return <div className="empty">Выберите имидж в иерархии — здесь откроется его рисунок.</div>;
+  if (!state) return <div className="empty">Загрузка рисунка…</div>;
 
   const selObjs = state.objects.filter(o => sel.includes(o.handle));
   const one = selObjs.length === 1 ? selObjs[0] : null;

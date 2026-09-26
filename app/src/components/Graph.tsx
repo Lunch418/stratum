@@ -112,8 +112,8 @@ export function Graph() {
         </label>
         <span className="muted small" style={{ alignSelf: 'center', padding: '0 6px' }}>{shown.nodes.length} перем. · {shown.edges.length} дуг</span>
       </div>
-      {!data && <div className="muted" style={{ padding: 16 }}>Нет данных.</div>}
-      {data && !shown.nodes.length && <div className="muted" style={{ padding: 16 }}>В схеме «{klass}» нет зависимостей между переменными.</div>}
+      {!data && <div className="empty">Выберите имидж со схемой — здесь появится граф связей его переменных.</div>}
+      {data && !shown.nodes.length && <div className="empty">В схеме «{klass}» нет зависимостей между переменными.</div>}
       <svg width={size.w} height={size.h}>
         <defs>
           <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
