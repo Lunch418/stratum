@@ -159,9 +159,10 @@ export function BitmapEditor({ klass, kind, handle, onClose, onSaved }: Props) {
           {cropBox && <button className="small" onClick={crop} title="Обрезать до выделения">Обрезать {cropBox[2] - cropBox[0] + 1}×{cropBox[3] - cropBox[1] + 1}</button>}
           <button aria-label="Отменить" className="small icon-only" onClick={undo} title="Отменить"><Icon name="undo" /></button>
           <button aria-label="Сетка" className={`small icon-only${grid ? ' active' : ''}`} onClick={() => setGrid(g => !g)} title="Сетка"><Icon name="grid" /></button>
-          <button className="small ghost mono" onClick={() => setZoom(z => Math.max(1, z - 1))}>−</button>
-          <span className="mono small">{zoom}×</span>
-          <button className="small ghost mono" onClick={() => setZoom(z => Math.min(32, z + 1))}>+</button>
+          <span className="sep" />
+          <button aria-label="Мельче" title="Мельче" className="small ghost mono" onClick={() => setZoom(z => Math.max(1, z - 1))}>−</button>
+          <span className="mono small zoom-value" aria-live="polite">{zoom}×</span>
+          <button aria-label="Крупнее" title="Крупнее" className="small ghost mono" onClick={() => setZoom(z => Math.min(32, z + 1))}>+</button>
         </div>
         <div className="modal-body bitmap-body">
           {error ? <div className="muted">{error}</div> : <canvas ref={canvas} onMouseDown={onDown} onMouseMove={onMove} onMouseUp={onUp} onMouseLeave={onUp} onContextMenu={e => e.preventDefault()} />}

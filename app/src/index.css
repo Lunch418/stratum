@@ -331,6 +331,9 @@ input[type="range"] { height: 18px; }
 }
 .dialog-page legend { color: var(--text-secondary); font-size: var(--fs-sm); font-weight: 600; padding: 0 var(--sp-2); margin-left: -2px; }
 .dialog-page .prop { display: grid; grid-template-columns: minmax(96px, 42%) minmax(0, 1fr); gap: var(--sp-4); align-items: center; }
+/* поля в две колонки (X/Y, ширина/высота): подпись короче, поле шире */
+.dialog-page .dialog-cols > .prop { grid-template-columns: minmax(3.5em, 32%) minmax(0, 1fr); }
+.draw-tools .zoom-value { min-width: 3.2em; text-align: center; color: var(--text-secondary); }
 .dialog-page .prop > span:first-child { min-width: 0; color: var(--text-secondary); }
 .dialog-page .prop > :not(:first-child) { justify-self: stretch; }
 .dialog-page .prop input[type="number"] { max-width: 120px; justify-self: start; }
