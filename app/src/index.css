@@ -769,3 +769,16 @@ table.vars button.small.ghost { min-height: 20px; padding: 0 5px; }
   .topbar .brand-accent { display: none; }
   .menubar .menu-title { padding: 0 7px; }
 }
+@media (max-width: 1300px) {
+  .topbar .speed input { width: 52px; }
+  .topbar .counter { min-width: 84px; padding: 0 8px; }
+  .menubar .menu-title { padding: 0 5px; }
+  .topbar > button.ghost.icon-only, .topbar > button.icon-only { width: 24px; }
+}
+/* совсем узко: от названия остаётся знак, кнопки справа уходят во второй ряд
+   и прижимаются к правому краю */
+@media (max-width: 1180px) {
+  .topbar { row-gap: 0; padding-left: var(--sp-4); }
+  .topbar .brand { font-size: 0; gap: 0; margin-right: var(--sp-2); }
+  .topbar > .spacer { flex-basis: 24px; }
+}
