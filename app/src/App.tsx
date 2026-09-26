@@ -187,6 +187,8 @@ export default function App() {
         <span className="counter mono">такт {frame?.tick ?? 0}{frame?.stopped ? ' · стоп' : ''}</span>
         </div>
         <span className="spacer" />
+        {/* кнопки проекта — одной группой: на узком окне уходят во второй ряд целиком */}
+        <div className="topbar-actions" role="toolbar" aria-label="Проект">
         <button aria-label="Открыть проект" className="ghost icon-only" onClick={() => setDialog('open')} title="Открыть проект (Ctrl+O)"><Icon name="open" /></button>
         <button aria-label="Сохранить всё" onClick={save} title="Сохранить всё (Ctrl+S)" className={`icon-only${s.unsaved ? ' attention' : ' ghost'}`}><Icon name="save" /></button>
         <button aria-label="Отмена" className="ghost icon-only" onClick={s.undo} disabled={!s.project?.canUndo} title="Отмена (Ctrl+Z)"><Icon name="undo" /></button>
@@ -194,6 +196,7 @@ export default function App() {
         <button aria-label="Информация о проекте" className="ghost icon-only" onClick={() => setDialog('info')} disabled={!s.project || s.project.empty} title="Информация о проекте"><Icon name="info" /></button>
         <button aria-label="Палитра команд" className="ghost icon-only" onClick={() => s.setPaletteOpen(true)} title="Палитра команд (Ctrl+Shift+P)"><Icon name="search" /></button>
         <button aria-label={s.theme === 'light' ? 'Тёмная тема' : 'Светлая тема'} className="ghost icon-only" onClick={s.toggleTheme} title={s.theme === 'light' ? 'Тёмная тема' : 'Светлая тема'}><Icon name={s.theme === 'light' ? 'moon' : 'sun'} /></button>
+        </div>
       </header>
       {dialog === 'open' && <OpenDialog required={!!s.project?.empty} onClose={() => setDialog(null)} />}
       {s.paletteOpen && <Palette commands={commands} onClose={() => s.setPaletteOpen(false)} />}

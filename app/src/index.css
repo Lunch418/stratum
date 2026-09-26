@@ -254,9 +254,10 @@ input[type="range"] { height: 18px; }
 .topbar .brand-accent { color: var(--text-muted); font-weight: 400; margin-left: 4px; }
 .topbar .spacer { flex: 1; }
 .topbar .sep { width: 1px; height: 22px; background: var(--border); margin: 0 var(--sp-2); }
-.topbar > button.ghost.icon-only, .topbar > button.icon-only { width: 26px; }
-.topbar > button.ghost.icon-only { color: var(--text-muted); }
-.topbar > button.ghost.icon-only:hover { color: var(--text-primary); }
+.topbar-actions { display: flex; align-items: center; gap: var(--sp-1); }
+.topbar-actions > button.icon-only { width: 26px; }
+.topbar-actions > button.ghost.icon-only { color: var(--text-muted); }
+.topbar-actions > button.ghost.icon-only:hover { color: var(--text-primary); }
 
 /* пульт модели — единственное громкое место интерфейса */
 .transport {
@@ -526,7 +527,7 @@ table.vars button.small.ghost { min-height: 20px; padding: 0 5px; }
 /* скрываемые полосы: «Вид → Строка состояния», «Вид → Панель инструментов» */
 .ide.no-statusbar { grid-template-rows: auto 1fr; }
 .ide.no-statusbar > .statusbar { display: none; }
-.ide.no-toolbar .topbar > .spacer ~ button { display: none; }
+.ide.no-toolbar .topbar-actions { display: none; }
 .zoom-select { width: auto; min-width: 72px; }
 .model-view { display: flex; flex-direction: column; height: 100%; }
 .model-view > .model { flex: 1; min-height: 0; height: auto; }
@@ -773,12 +774,13 @@ table.vars button.small.ghost { min-height: 20px; padding: 0 5px; }
   .topbar .speed input { width: 52px; }
   .topbar .counter { min-width: 84px; padding: 0 8px; }
   .menubar .menu-title { padding: 0 5px; }
-  .topbar > button.ghost.icon-only, .topbar > button.icon-only { width: 24px; }
+  .topbar-actions > button.icon-only { width: 24px; }
 }
 /* совсем узко: от названия остаётся знак, кнопки справа уходят во второй ряд
    и прижимаются к правому краю */
 @media (max-width: 1180px) {
   .topbar { row-gap: 0; padding-left: var(--sp-4); }
   .topbar .brand { font-size: 0; gap: 0; margin-right: var(--sp-2); }
-  .topbar > .spacer { flex-basis: 24px; }
+  .topbar > .spacer { flex: 0 0 0; }
+  .topbar-actions { margin-left: auto; }
 }
