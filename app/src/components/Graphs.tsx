@@ -13,6 +13,8 @@ export function Graphs() {
   const [traces, setTraces] = useState<Trace[]>([]);
   const [window_, setWindow] = useState(300);
   const [hidden, setHidden] = useState<Set<number>>(new Set());
+  // ряд под указателем в легенде: его шкала подписана, остальные приглушены
+  const [focus, setFocus] = useState<number | null>(null);
   const box = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 600, h: 120 });
 
@@ -57,7 +59,7 @@ export function Graphs() {
           {traces.map((t, i) => {
             const last = t.points.length ? t.points[t.points.length - 1][1] : null;
             return (
-              <div key={t.id} className={`item${hidden.has(t.id) ? ' off' : ''}`} onClick={() => setHidden(h => { const n = new Set(h); n.has(t.id) ? n.delete(t.id) : n.add(t.id); return n; })}>
+              <div key={t.id} className={`item${hidden.has(t.id) ? ' off' : ''}${focus === t.id ? ' focus' : ''}`} onMouseEnter={() => setFocus(t.id)} onMouseLeave={() => setFocus(null)} onClick={() => setHidden(h => { const n = new Set(h); n.has(t.id) ? n.delete(t.id) : n.add(t.id); return n; })}>
                 <span className="swatch" style={{ background: COLORS[i % COLORS.length] }} />
                 <span className="name" title={`${t.path}.${t.var}`}>{t.path.split('\\').pop()}.{t.var}</span>
                 <span className="mono val">{last === null ? '—' : fmt(last)}</span>
@@ -80,9 +82,12 @@ export function Graphs() {
               const d = pts.map((p, k) => `${k ? 'L' : 'M'} ${px(p[0]).toFixed(1)} ${py(p[1]).toFixed(1)}`).join(' ');
               return (
                 <g key={t.id}>
-                  <path d={d} fill="none" style={{ stroke: COLORS[i % COLORS.length] }} strokeWidth={1.5} strokeLinejoin="round" />
-                  <text x={W - pad.r - 2} y={py(hi) + 10} textAnchor="end" style={{ fill: COLORS[i % COLORS.length] }} className="tick">{fmt(hi)}</text>
-                  <text x={W - pad.r - 2} y={py(lo) - 2} textAnchor="end" style={{ fill: COLORS[i % COLORS.length] }} className="tick">{fmt(lo)}</text>
+                  <path d={d} fill="none" style={{ stroke: COLORS[i % COLORS.length] }} strokeWidth={focus === t.id ? 2.25 : 1.5} strokeLinejoin="round" opacity={focus !== null && focus !== t.id ? 0.25 : 1} />
+                  {/* у каждого ряда своя шкала; подписи — только у выделенного (или единственного), иначе они наезжают друг на друга */}
+                  {(focus === t.id || (focus === null && shown.length === 1)) && <>
+                    <text x={W - pad.r - 2} y={py(hi) + 10} textAnchor="end" style={{ fill: COLORS[i % COLORS.length] }} className="tick scale">{fmt(hi)}</text>
+                    <text x={W - pad.r - 2} y={py(lo) - 3} textAnchor="end" style={{ fill: COLORS[i % COLORS.length] }} className="tick scale">{fmt(lo)}</text>
+                  </>}
                 </g>
               );
             })}

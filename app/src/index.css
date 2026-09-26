@@ -619,6 +619,8 @@ table.vars button.small.ghost { min-height: 20px; padding: 0 5px; }
 .graphs .plot svg { display: block; }
 .graphs .plot .grid { stroke: var(--border-subtle); stroke-width: 1; }
 .graphs .plot .tick { font-size: 10px; font-family: var(--font-mono); fill: var(--text-muted); }
+.graphs .plot .tick.scale { paint-order: stroke; stroke: var(--bg-canvas); stroke-width: 3px; font-weight: 600; }
+.graphs .legend .item.focus { background: var(--accent-softer); }
 
 /* ── палитра команд ─────────────────────────────────────────────────────── */
 .palette-backdrop { align-items: flex-start; padding-top: 12vh; }
@@ -654,11 +656,25 @@ table.vars button.small.ghost { min-height: 20px; padding: 0 5px; }
 
 /* ── граф имиджей ───────────────────────────────────────────────────────── */
 .graph-view { position: relative; width: 100%; height: 100%; background: var(--bg-canvas); overflow: hidden; }
-.graph-view svg { display: block; }
-.graph-view .label { font-size: 11px; fill: var(--text-primary); font-family: var(--font-mono); pointer-events: none; }
-.graph-view .toolbar { position: absolute; right: 10px; top: 10px; display: flex; gap: var(--sp-3); z-index: 2; }
-.legend-floating { position: absolute; left: 10px; bottom: 8px; display: flex; flex-wrap: wrap; gap: 10px; font-size: var(--fs-xs); color: var(--text-muted); background: color-mix(in srgb, var(--bg-canvas) 85%, transparent); padding: 2px 6px; border-radius: var(--r-sm); }
-.legend-floating .swatch { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
+.graph-view svg { display: block; cursor: grab; }
+.graph-view svg.panning { cursor: grabbing; }
+/* подпись с «ореолом» цвета листа — читается поверх дуг */
+.graph-view .label { font-size: 11px; fill: var(--text-primary); font-family: var(--font-mono); pointer-events: none; paint-order: stroke; stroke: var(--bg-canvas); stroke-width: 3px; stroke-linejoin: round; }
+.graph-view .label.lit { font-weight: 600; }
+.graph-view .toolbar {
+  position: absolute; right: 10px; top: 10px; display: flex; align-items: center; gap: 2px; z-index: 2;
+  background: var(--bg-raised); border: 1px solid var(--border); border-radius: var(--r-md); padding: 3px 3px 3px 8px; box-shadow: var(--shadow-1);
+}
+.graph-view .graph-opt { display: flex; gap: var(--sp-2); align-items: center; padding: 0 6px; color: var(--text-secondary); }
+.graph-view .graph-count { padding: 0 6px; border-left: 1px solid var(--border-subtle); font-variant-numeric: tabular-nums; }
+.graph-view .toolbar button.small { border-color: transparent; box-shadow: none; background: transparent; color: var(--text-secondary); }
+.graph-view .toolbar button.small:hover { background: var(--bg-hover); color: var(--text-primary); }
+.legend-floating {
+  position: absolute; left: 10px; right: 10px; bottom: 8px; max-height: 44px; overflow: auto; display: flex; flex-wrap: wrap; gap: 2px 12px;
+  font-size: var(--fs-xs); color: var(--text-muted); background: color-mix(in srgb, var(--bg-canvas) 88%, transparent); padding: 3px 8px; border-radius: var(--r-sm);
+}
+.legend-floating:hover { max-height: 40%; background: var(--bg-raised); box-shadow: var(--shadow-pop); }
+.legend-floating .swatch { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: 0; }
 
 /* ── редактор рисунка ───────────────────────────────────────────────────── */
 .picture-editor { position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; background: var(--bg-canvas); overflow: hidden; }
