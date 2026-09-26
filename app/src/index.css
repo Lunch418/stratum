@@ -763,6 +763,15 @@ table.vars button.small.ghost { min-height: 20px; padding: 0 5px; }
 .right-top table.vars td:first-child { white-space: nowrap; }
 .right-top table.vars td, .right-top table.vars th { padding-left: 6px; padding-right: 6px; }
 .right-top table.vars td:last-child:has(> button) { padding: 0; text-align: center; }
+/* узкий инспектор у работающего экземпляра: тип сжимается до буквы (полное
+   имя — в подсказке), место уходит под «По умолчанию» и «Сейчас» */
+.right-top { container-type: inline-size; }
+@container (max-width: 400px) {
+  .right-top table.vars.live thead th:nth-child(1) { width: 34%; }
+  .right-top table.vars.live thead th:nth-child(2) { width: 30px; }
+  .right-top table.vars.live .chip { font-size: 0; padding: 0; width: 18px; text-align: center; }
+  .right-top table.vars.live .chip::first-letter { font-size: 10px; }
+}
 
 /* узкое окно: полоса заголовка переносится в два ряда — разделитель там лишний */
 @media (max-width: 1420px) {

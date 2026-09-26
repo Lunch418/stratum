@@ -144,7 +144,7 @@ export function Inspector() {
         )}
         <div className="panel-title">Переменные <span className="spacer" /><span className="muted">{vars.length}</span></div>
         {!vars.length && <div className="empty">У имиджа нет переменных. Объявите их в тексте имиджа — они появятся здесь и станут портами на схеме.</div>}
-        {vars.length > 0 && <table className="vars">
+        {vars.length > 0 && <table className={`vars${instance !== null ? ' live' : ''}`}>
           <thead><tr><th>Имя</th><th>Тип</th><th>По умолчанию</th><th>{instance !== null ? 'Сейчас' : 'Описание'}</th>{instance !== null && <th></th>}</tr></thead>
           <tbody>
             {vars.map((v, i) => (
@@ -152,7 +152,7 @@ export function Inspector() {
                 <td title={`${v.description || v.name}\nДвойной щелчок — где используется`} style={{ cursor: 'help' }}
                   onDoubleClick={() => { const st = useStore.getState(); st.setSearchQuery(v.name); st.setBottomTab('search'); }}>
                   {v.name}{v.local && <span className="muted"> local</span>}</td>
-                <td><span className={`chip ${v.type.toUpperCase()}`}>{v.type.toUpperCase()}</span></td>
+                <td><span className={`chip ${v.type.toUpperCase()}`} title={v.type.toUpperCase()}>{v.type.toUpperCase()}</span></td>
                 <td className="num">
                   {klass.library || i >= klass.vars.length ? v.default : <input defaultValue={v.default} onBlur={e => e.target.value !== v.default && edit(i, 'default', e.target.value)} />}
                 </td>
