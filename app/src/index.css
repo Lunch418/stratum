@@ -432,6 +432,9 @@ table.vars td.num { font-family: var(--font-mono); font-variant-numeric: tabular
 table.vars td.changed { background: var(--accent-soft); transition: background-color .6s; }
 table.vars input { width: 100%; min-width: 0; min-height: 22px; border: 1px solid transparent; background: transparent; padding: 1px 4px; font-family: var(--font-mono); text-align: inherit; box-shadow: none; }
 table.vars input:hover { border-color: var(--border); }
+/* во время счёта значение недоступно для правки, но читается в полную силу */
+table.vars input:disabled { opacity: 1; color: var(--text-primary); }
+table.vars input:disabled:hover { border-color: transparent; }
 table.vars input:focus { border-color: var(--accent); background: var(--bg-raised); box-shadow: 0 0 0 2px var(--accent-soft); }
 table.vars button.small.ghost { min-height: 20px; padding: 0 5px; }
 
@@ -737,10 +740,12 @@ table.vars button.small.ghost { min-height: 20px; padding: 0 5px; }
 .tag.accent { background: var(--accent-soft); color: var(--accent-ink); }
 
 /* колонки таблицы переменных инспектора: имя шире, тип и кнопка — по содержимому */
-.right-top table.vars thead th:nth-child(1) { width: 34%; }
-.right-top table.vars thead th:nth-child(2) { width: 76px; }
-.right-top table.vars thead th:nth-child(5) { width: 26px; }
+.right-top table.vars thead th:nth-child(1) { width: 31%; }
+.right-top table.vars thead th:nth-child(2) { width: 66px; }
+.right-top table.vars thead th:nth-child(5) { width: 24px; }
 .right-top table.vars td:first-child { white-space: nowrap; }
+.right-top table.vars td, .right-top table.vars th { padding-left: 6px; padding-right: 6px; }
+.right-top table.vars td:last-child:has(> button) { padding: 0; text-align: center; }
 
 /* узкое окно: полоса заголовка переносится в два ряда — разделитель там лишний */
 @media (max-width: 1420px) {
