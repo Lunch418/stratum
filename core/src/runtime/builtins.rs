@@ -102,6 +102,9 @@ fn boolean(b: bool) -> Value {
 }
 
 /// Вызывает встроенную функцию. `None` — функции с таким именем нет.
+/// Наибольшая строка, которую строит одна функция (16 МБ).
+const MAX_STRING: usize = 1 << 24;
+
 pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
     let lower = name.to_ascii_lowercase();
     let v = match lower.as_str() {
@@ -120,7 +123,13 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
             fx.ask(DialogRequest { kind: "input", title: s(args, 1), text: s(args, 0), style: 0, default: d.clone() }, Value::Str(d))
         }
         "change" => Value::Str(s(args, 0).replace(&s(args, 1), &s(args, 2))),
-        "replicate" => Value::Str(s(args, 0).repeat(f(args, 1).max(0.0) as usize)),
+        // число повторов из модели: без предела Replicate("x", 1e12) просил
+        // терабайт памяти, и процесс падал (выделение не перехватывается)
+        "replicate" => {
+            let t = s(args, 0);
+            let n = (f(args, 1).max(0.0) as usize).min(MAX_STRING / t.len().max(1));
+            Value::Str(t.repeat(n))
+        }
         // подставные значения при ошибке — как у оригинала (сверено в Wine,
         // tools/verify/matherr.txt, power.txt): exp с переполнением — 1.7e308,
         // ln и lg неположительного — -1.7e308 и -1.7e308/ln(10)
@@ -173,7 +182,9 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
         "delta" => boolean(f(args, 0) == 0.0),
         "limit" => {
             let (x, lo, hi) = (f(args, 0), f(args, 1), f(args, 2));
-            num(x.clamp(lo.min(hi), hi.max(lo)))
+            // не f64::clamp: тот паникует на NaN в границах
+            let (a, b) = (lo.min(hi), hi.max(lo));
+            num(if x < a { a } else if x > b { b } else { x })
         }
         "not" => boolean(f(args, 0) == 0.0),
         "and" => boolean(f(args, 0) != 0.0 && f(args, 1) != 0.0),
