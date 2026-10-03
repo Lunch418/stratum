@@ -186,13 +186,26 @@ impl Simulation {
     /// сливает связанные переменные в общие ячейки.
     pub fn build(project: &LoadedProject) -> Result<Simulation, BuildError> {
         let mut classes = Vec::with_capacity(project.classes.len());
+        let image_functions: HashMap<String, lang::compile::ImageFunction> = project
+            .classes
+            .iter()
+            .filter_map(|c| lang::parse(&c.text).ok().filter(|m| m.is_function).map(|m| (lang::fold(&c.name), lang::compile::image_function(c, &m))))
+            .collect();
         for cls in &project.classes {
-            let (model, parse_error) = match lang::parse(&cls.text) {
+            let (mut model, parse_error) = match lang::parse(&cls.text) {
                 Ok(m) => (m, None),
                 Err(e) => (Model::default(), Some(e)),
             };
-            let body = std::sync::Arc::new(model.body.clone());
             let equations = equations::collect(&model.body);
+            // оригинал исполняет сохранённый байт-код: если текст даёт другой
+            // код (старый компилятор, иная группировка, старые имена), имидж
+            // исполняется по байт-коду (сверено: ENGINE, "PI" в коде - 2 и 3)
+            let mut parse_error = parse_error;
+            if let Some(body) = bytecode_body(cls, &model, parse_error.is_some(), &image_functions) {
+                model.body = body;
+                parse_error = None;
+            }
+            let body = std::sync::Arc::new(model.body.clone());
             classes.push(CompiledClass { name: cls.name.clone(), model, body, parse_error, equations });
         }
 
@@ -1023,6 +1036,40 @@ fn message_matches(registered: u32, msg: u32) -> bool {
 }
 
 /// Объект `wanted` (или группа с ним) находится под мышью.
+/// Операторы из сохранённого байт-кода имиджа, если он расходится с
+/// компиляцией текста (или текст не компилируется); иначе `None`.
+fn bytecode_body(cls: &crate::formats::Class, model: &Model, unparsed: bool, functions: &HashMap<String, lang::compile::ImageFunction>) -> Option<Vec<crate::lang::ast::Stmt>> {
+    use crate::lang::compile::{compile, Env, Ty};
+    // STRATUM_TEXT_ONLY - исполнять только текст (для сравнения при отладке)
+    if std::env::var_os("STRATUM_TEXT_ONLY").is_some() {
+        return None;
+    }
+    let bc = cls.bytecode.as_ref()?;
+    if cls.bytecode_text.as_deref() != Some(cls.text.as_str()) {
+        return None;
+    }
+    let original: Vec<u16> = bc.chunks(2).map(|c| u16::from_le_bytes([c[0], c.get(1).copied().unwrap_or(0)])).collect();
+    let known: Vec<(String, Ty)> = cls.vars.iter().map(|v| (v.name.clone(), Ty::from_name(&v.var_type))).collect();
+    let constant = |n: &str| crate::runtime::constants::lookup(n);
+    let function = |n: &str| functions.get(&lang::fold(n)).cloned();
+    let mut names: Vec<String> = known.iter().map(|(n, _)| n.clone()).collect();
+    if !unparsed {
+        let mut same = false;
+        for fold_minus in [true, false] {
+            if let Ok(c) = compile(model, &known, &Env { constant: &constant, function: &function, fold_minus, placeholders: false }) {
+                same |= c.code == original;
+                if names.len() < c.vars.len() {
+                    names = c.vars.iter().map(|(n, _)| n.clone()).collect();
+                }
+            }
+        }
+        if same {
+            return None;
+        }
+    }
+    lang::decompile::decompile(&original, &names).ok()
+}
+
 /// Поле параметров камеры, связанное с переменной `po…` имиджа Camera3d.
 enum CamField {
     Num(fn(&crate::gfx::space3d::CameraParams) -> f64, fn(&mut crate::gfx::space3d::CameraParams, f64)),

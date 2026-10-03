@@ -2,6 +2,7 @@
 
 pub mod ast;
 pub mod compile;
+pub mod decompile;
 pub mod lexer;
 mod opcodes;
 pub mod parser;

@@ -494,6 +494,7 @@ fn cmd_bytecode(args: &[String]) -> Result<(), String> {
     let mut show = 0usize;
     let mut filter = String::new();
     let mut aliases = false;
+    let mut decompile_check = false;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
@@ -502,6 +503,7 @@ fn cmd_bytecode(args: &[String]) -> Result<(), String> {
                 show = args.get(i).and_then(|v| v.parse().ok()).unwrap_or(5);
             }
             "--aliases" => aliases = true,
+            "--decompile" => decompile_check = true,
             "--only" => {
                 i += 1;
                 filter = args.get(i).cloned().unwrap_or_default();
@@ -567,6 +569,44 @@ fn cmd_bytecode(args: &[String]) -> Result<(), String> {
         let constants = |n: &str| stratum_core::runtime::constants::lookup(n);
         let functions = |n: &str| image_functions.get(&lang::fold(n)).cloned();
         let env = |fold_minus| Env { constant: &constants, function: &functions, fold_minus, placeholders: false };
+        // --decompile: байт-код оригинала → операторы → снова байт-код
+        if decompile_check {
+            let mut names: Vec<String> = known.iter().map(|(n, _)| n.clone()).collect();
+            if let Ok(c) = compile(&model, &known, &env(true)) {
+                for (n, _) in c.vars.iter().skip(names.len()) {
+                    names.push(n.clone());
+                }
+            }
+            match lang::decompile::decompile(&original, &names) {
+                Ok(body) => {
+                    let m = lang::ast::Model { body, declarations: model.declarations.clone(), is_function: model.is_function };
+                    let back = [true, false].iter().filter_map(|&fm| compile(&m, &known, &env(fm)).ok()).any(|c| c.code == original);
+                    if back {
+                        same += 1;
+                    } else {
+                        differ += 1;
+                        if shown < show {
+                            shown += 1;
+                            println!("== {} — обратная сборка расходится", f.display());
+                            if let Ok(c) = compile(&m, &known, &env(true)) {
+                                let at = c.code.iter().zip(&original).position(|(a, b)| a != b).unwrap_or(0);
+                                println!("  слово {at}: ядро {:?}\n  оригинал {:?}", &c.code[at.saturating_sub(4)..(at + 12).min(c.code.len())], &original[at.saturating_sub(4)..(at + 12).min(original.len())]);
+                                println!("  {:?}", m.body.iter().take(3).collect::<Vec<_>>());
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    failed += 1;
+                    *reasons.entry(format!("разбор кода: {}", e.split(" на ").next().unwrap_or(&e))).or_default() += 1;
+                    if shown < show {
+                        shown += 1;
+                        println!("== {} — {e}", f.display());
+                    }
+                }
+            }
+            continue;
+        }
         // сворачивание `-число` в корпусе встречается в обоих вариантах
         let result = compile(&model, &known, &env(true)).and_then(|a| {
             if a.code == original {
