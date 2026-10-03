@@ -312,3 +312,37 @@ fn deepest_allowed_text_builds_and_runs() {
         .unwrap();
 }
 
+
+/// Два ребенка шлют сообщение родителю, а сообщение исполняет подсхему
+/// получателя: ветвление 2 на каждом из 64 уровней вложенности - вечный такт.
+/// Такт должен кончиться за разумное время.
+#[test]
+fn messages_to_parent_do_not_explode_exponentially() {
+    use stratum_core::formats::cls::Child;
+    use stratum_core::formats::{Class, LoadedProject, Project};
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::Builder::new()
+        .stack_size(64 << 20)
+        .spawn(move || {
+            let class = |name: &str, text: &str, kids: &[(&str, u16)]| Class {
+                name: name.into(),
+                version: 0x3003,
+                text: text.into(),
+                children: kids.iter().map(|&(c, h)| Child { class_name: c.into(), handle: h, name: String::new(), x: 0.0, y: 0.0, flags: 0 }).collect(),
+                ..Default::default()
+            };
+            let project = LoadedProject {
+                dir: PathBuf::new(),
+                project: Project { root: "Main".into(), ..Default::default() },
+                classes: vec![class("Main", "", &[("A", 1), ("B", 2)]), class("A", "SendMessage(\"\", \"Main\")", &[]), class("B", "SendMessage(\"\", \"Main\")", &[])],
+                own_classes: 3,
+                state: None,
+                library_dirs: Vec::new(),
+            };
+            let mut sim = stratum_core::sim::Simulation::build(&project).expect("модель не собралась");
+            let _ = sim.step();
+            let _ = tx.send(());
+        })
+        .unwrap();
+    assert!(rx.recv_timeout(std::time::Duration::from_secs(10)).is_ok(), "такт не кончился");
+}

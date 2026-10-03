@@ -128,6 +128,8 @@ pub struct Simulation {
     /// Вложенность исполнения: имидж-функция, вызывающая себя, или имиджи,
     /// шлющие сообщения друг другу, без предела переполняли стек.
     nesting: usize,
+    /// Получатели сообщений, чья подсхема исполняется сейчас: им сообщение не повторяется.
+    receiving: Vec<usize>,
     /// Нажатые сейчас виртуальные клавиши (для `GetAsyncKeyState`).
     pub keys_down: std::collections::HashSet<u32>,
     /// Папка файла каждого имиджа (имя в нижнем регистре) — для
@@ -226,6 +228,7 @@ impl Simulation {
             class_meta: project.classes.clone(),
             function_instances: HashMap::new(),
             nesting: 0,
+            receiving: Vec::new(),
             keys_down: std::collections::HashSet::new(),
             class_dirs: HashMap::new(),
             instances: Vec::new(),
@@ -956,7 +959,9 @@ impl Simulation {
             targets.extend((0..self.instances.len()).rev().filter(|&i| crate::lang::same_name(&self.instances[i].class_name, class)));
         }
         for target in targets {
-            if target == sender {
+            // получатель, который уже исполняется (ребенок шлет родителю), второй раз
+            // не запускается: иначе ветвление по детям растет на каждом уровне
+            if target == sender || self.receiving.contains(&target) {
                 continue;
             }
             // переданное значение получатель видит и без тильды; после
@@ -968,7 +973,10 @@ impl Simulation {
                     self.set_var(target, to, v);
                 }
             }
-            self.run_with_children(target)?;
+            self.receiving.push(target);
+            let ran = self.run_with_children(target);
+            self.receiving.pop();
+            ran?;
             for &cell in self.instances[target].vars.values() {
                 self.old[cell] = self.cells[cell].clone();
             }
