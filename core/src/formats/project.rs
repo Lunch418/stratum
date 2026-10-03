@@ -215,6 +215,9 @@ pub struct StateImage {
 /// Старая редакция (DEFAULT.STT, снимки 1.STT...) устроена так же, но без
 /// заголовка `record_size, format` перед 0x3E8 и без отметки времени у
 /// записей таблицы: `stamped = false`.
+/// Больше имиджей в одном состоянии не бывает: в корпусе - тысячи.
+const MAX_STATE_IMAGES: usize = 1 << 18;
+
 fn parse_state_typed(r: &mut Reader, root: String, stamped: bool) -> Result<State> {
     struct Entry {
         name: String,
@@ -241,9 +244,18 @@ fn parse_state_typed(r: &mut Reader, root: String, stamped: bool) -> Result<Stat
     }
     let mut state = State { root, images: Vec::new() };
     // обход в глубину от корня (запись 0), как пишет оригинал
-    let mut stack: Vec<(usize, u16)> = vec![(0, 0)];
-    while let Some((ci, handle)) = stack.pop() {
+    // глубина пути длиннее таблицы - класс входит сам в себя (порча файла):
+    // без проверки обход не кончался и копил записи до исчерпания памяти;
+    // ветвящаяся таблица без цикла тоже даёт 2^n записей - отсюда предел
+    let mut stack: Vec<(usize, u16, usize)> = vec![(0, 0, 0)];
+    while let Some((ci, handle, depth)) = stack.pop() {
         let Some(e) = table.get(ci) else { return r.err(format!("нет записи класса {ci}")) };
+        if depth > table.len() {
+            return r.err("таблица имиджей .stt ссылается сама на себя");
+        }
+        if state.images.len() >= MAX_STATE_IMAGES {
+            return r.err(format!("в .stt больше {MAX_STATE_IMAGES} имиджей"));
+        }
         let mut vars = Vec::with_capacity(e.vars.len());
         for (name, ty) in &e.vars {
             let value = match table.get(*ty as usize).map(|t| t.name.as_str()) {
@@ -256,7 +268,7 @@ fn parse_state_typed(r: &mut Reader, root: String, stamped: bool) -> Result<Stat
         let reference = state.images.len() as u32;
         state.images.push(StateImage { class_name: e.name.clone(), reference, handle, vars });
         for (h, k) in e.kids.iter().rev() {
-            stack.push((*k as usize, *h));
+            stack.push((*k as usize, *h, depth + 1));
         }
     }
     Ok(state)
@@ -319,6 +331,34 @@ mod tests {
         let p = parse_project(&data, "project.spj").unwrap();
         let names: Vec<_> = p.variables.iter().map(|v| v.name.as_str()).collect();
         assert_eq!(names, ["ScaleZ", "ScaleY", "OffsetY"]);
+    }
+
+    #[test]
+    fn self_referencing_state_table_is_an_error() {
+        let str16 = |out: &mut Vec<u8>, t: &str| {
+            out.extend_from_slice(&(t.len() as u16).to_le_bytes());
+            out.extend_from_slice(t.as_bytes());
+        };
+        // старая редакция: одна запись без переменных; дети - она же
+        // (цикл) или две ссылки на следующую (ветвление 2^n)
+        for kids in [vec![(1u16, 0u16)], vec![(1, 0), (2, 0)]] {
+            let mut d = Vec::new();
+            str16(&mut d, "SC 3");
+            str16(&mut d, "Root");
+            for v in [0x3e8u16, 1] {
+                d.extend_from_slice(&v.to_le_bytes());
+            }
+            str16(&mut d, "Root");
+            for v in [0u16, kids.len() as u16, 0] {
+                d.extend_from_slice(&v.to_le_bytes());
+            }
+            for (h, k) in &kids {
+                d.extend_from_slice(&h.to_le_bytes());
+                d.extend_from_slice(&k.to_le_bytes());
+            }
+            d.extend_from_slice(&0x3e9u16.to_le_bytes());
+            assert!(parse_state(&d, "x.stt").is_err());
+        }
     }
 
     #[test]
