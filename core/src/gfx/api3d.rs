@@ -529,14 +529,16 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx, ms: &mut Matrices, output
             }
             None => num(0.0),
         },
-        // GetObjectMatrix3d(matrix, hSpace3d, hObject) — матрица первым аргументом
-        "getobjectmatrix3d" => match gfx.spaces3d.get(&h(args, 1)).and_then(|s| s.objects.get(&h(args, 2))) {
-            Some(o) => num(mat4_to(data::idx(f(args, 0)), &o.matrix, ms) as f64),
+        // GetObjectMatrix3d(hSpace3d, hObject, matrix) — порядок из текстов
+        // библиотеки (справка называет матрицу первой; сверено в Wine,
+        // tools/verify/hist3d_ret.txt)
+        "getobjectmatrix3d" => match gfx.spaces3d.get(&h(args, 0)).and_then(|s| s.objects.get(&h(args, 1))) {
+            Some(o) => num(mat4_to(data::idx(f(args, 2)), &o.matrix, ms) as f64),
             None => num(0.0),
         },
         "setobjectmatrix3d" => {
-            let Some(m) = ms.get(data::idx(f(args, 0))).map(mat4_from) else { return Some(ok(false)) };
-            ok(gfx.spaces3d.get_mut(&h(args, 1)).and_then(|s| s.objects.get_mut(&h(args, 2))).map(|o| o.matrix = m).is_some())
+            let Some(m) = ms.get(data::idx(f(args, 2))).map(mat4_from) else { return Some(ok(false)) };
+            ok(gfx.spaces3d.get_mut(&h(args, 0)).and_then(|s| s.objects.get_mut(&h(args, 1))).map(|o| o.matrix = m).is_some())
         }
         // TransformObject3d(hSpace3d, hObject, matrix4×4) — в текущей системе координат
         "transformobject3d" => {

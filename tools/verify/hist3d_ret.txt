@@ -1,0 +1,36 @@
+# HIST3D: возвраты вызовов Histogramm3D (MakeCylinder3d, MakeGrid3d, _MoveObjectPoints3d, AddGroupItem2d, MDelete, GetObjectMatrix3d)
+@ fixtures/PROJECTS/samples/BALLS WorkSpace
+% Wait = 1
+! hs := OpenSchemeWindow("W1", "WorkSpace", "")
+! s3 := CreateSpace3d(~hs)
+! g := CreateGroup2d(~s3)
+! o := MakeBar3d(~s3, Rgb(1,2,3), 10, 10, 10)
+! c := MakeCylinder3d(~s3, #0, Rgb(1,2,3), 5, 5, 1, 8, 1)
+! gr := MakeGrid3d(~s3, 10, 3, 10, 3, Rgb(128,128,128))
+! r1 := _MoveObjectPoints3d(~s3, ~o, 1, 2, 3)
+! r2 := _MoveObjectPoints3d(~s3, ~gr, 0, 0, -1)
+! r3 := AddGroupItem2d(~s3, ~g, ~o)
+! r4 := AddGroupItem2d(~s3, ~g, ~gr)
+! m := MCreate(0, 1, 4, 1, 4, 1)
+! m2 := GetObjectMatrix3d(~s3, ~o, ~m)
+! tz := MPut(~m, 4, 3, 7.5, 1)
+! r8 := SetObjectMatrix3d(~s3, ~o, ~m)
+! mq := MCreate(0, 1, 4, 1, 4, 1)
+! r9 := GetObjectMatrix3d(~s3, ~o, ~mq)
+! r5 := MDelete(~m, 1)
+! r6 := SetObjectColor3d(~s3, ~o, Rgb(5,5,5))
+! r7 := SetObjectMatrix3d(~s3, ~o, ~m)
+r1 | r1
+r2 | r2
+r3 | r3
+r4 | r4
+r5 | r5
+r6 | r6
+r7 | r7
+m2 | m2
+c | Float(c)
+gr | Float(gr)
+r8 | r8
+r9 | r9
+z | MGet(mq, 4, 3, 1)
+m9 | mq
