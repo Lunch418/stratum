@@ -1244,7 +1244,7 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
                 if field == "camera.new" || field == "camera.duplicate" {
                     let mut c = match (field.as_str(), sp3.cameras.get(&cam)) {
                         ("camera.duplicate", Some(c)) => crate::gfx::space3d::Camera { name: format!("{} копия", c.name), ..c.clone() },
-                        _ => crate::gfx::space3d::Camera { handle: 0, name: "Камера".into(), pos: [1000.0, 800.0, 500.0], target: [0.0; 3], up: [0.0, 0.0, 1.0], extent: 0.0, focus: 0.0, background: sp3.cameras.get(&cam).map(|c| c.background).unwrap_or(0xFFFFFF), flags: 0 },
+                        _ => crate::gfx::space3d::Camera { handle: 0, name: "Камера".into(), pos: [1000.0, 800.0, 500.0], target: [0.0; 3], up: [0.0, 0.0, 1.0], extent: 0.0, focus: 0.0, background: sp3.cameras.get(&cam).map(|c| c.background).unwrap_or(0xFFFFFF), flags: 0, render: 0 },
                     };
                     c.handle = 0;
                     let h = sp3.add_camera(c);

@@ -3,7 +3,7 @@
 
 Из файла проб (`tools/verify/*.txt`, строки `имя | выражение`) собирается
 проект из одного имиджа. Его текст в первом такте вычисляет все выражения,
-пишет строки `имя=значение` в файл и вызывает Quit(1). Тот же проект
+пишет строки `имя=значение` в файл и вызывает Quit(1). Строка `$ ТИП имя, имя` объявляет переменные главного имиджа. Тот же проект
 выполняется ядром (`stratum run`) и оригиналом (`SC200032.EXE проект /run`),
 ответы сравниваются.
 
@@ -66,6 +66,11 @@ def probes(path):
             continue
         if line.startswith('>'):
             out.append((None, line[1:].strip()))
+            continue
+        if line.startswith('$'):
+            # `$ ТИП имя, имя` - переменные главного имиджа (для функций, пишущих в переменные)
+            kind, names = line[1:].strip().split(None, 1)
+            PROBE_VARS.extend(VAR(n.strip(), kind.upper()) for n in names.split(','))
             continue
         if line.startswith('+'):
             FILES.append(ROOT / line[1:].strip())

@@ -197,10 +197,10 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx, ms: &mut Matrices, output
             let focus = f(args, 6);
             let up = [f(args, 7), f(args, 8), f(args, 9)];
             let pos = [f(args, 10), f(args, 11), f(args, 12)];
-            let pos = if pos == [0.0; 3] { [1000.0, 1000.0, 1000.0] } else { pos };
             let mut cam = Camera::looking_from(pos);
             cam.name = name;
             cam.flags = flags;
+            cam.render = (f(args, 3) as u32 & 15) as u8;
             cam.background = background;
             if space3d::dot(up, up) > 1e-9 {
                 cam.up = space3d::norm(up);

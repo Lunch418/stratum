@@ -52,6 +52,8 @@ pub struct Camera {
     pub focus: f64,
     pub background: u32,
     pub flags: u32,
+    /// Параметр `render` из `CreateCamera3dEx`: младшие биты `poFlags`.
+    pub render: u8,
 }
 
 #[derive(Debug, Clone)]
@@ -114,7 +116,7 @@ pub struct CameraParams {
 impl CameraParams {
     /// Параметры камеры, созданной на ходу.
     pub fn from_camera(c: &Camera) -> Self {
-        CameraParams { org: c.pos, dir: c.target, up: c.up, focus: c.focus, extent: [c.extent, c.extent, 1.0], offset: [0.5, 0.5], background: c.background, render_name: "Zbuffer".into(), ..Default::default() }
+        CameraParams { org: c.pos, dir: c.target, up: c.up, focus: if c.focus > 0.0 { c.focus } else { 1.0 }, extent: [c.extent, c.extent, 1.0], offset: [0.5, 0.5], background: c.background, render_name: c.name.clone(), render_type: c.flags as u16, flags: 32 | c.render, perspective: (c.focus > 0.0) as u8, ..Default::default() }
     }
 
     /// Положение, направление и фон — в камеру, по которой рисуется проекция.
@@ -541,7 +543,7 @@ impl Space3d {
 impl Camera {
     pub fn looking_from(pos: Vec3) -> Camera {
         let up = if pos[0].abs() < 1e-9 && pos[1].abs() < 1e-9 { [0.0, 1.0, 0.0] } else { [0.0, 0.0, 1.0] };
-        Camera { handle: 0, name: String::new(), pos, target: [0.0; 3], up, extent: 0.0, focus: 0.0, background: 0xFFFFFF, flags: 0 }
+        Camera { handle: 0, name: String::new(), pos, target: [0.0; 3], up, extent: 0.0, focus: 0.0, background: 0xFFFFFF, flags: 0, render: 0 }
     }
 
     /// Оси камеры: вправо, вверх, вперёд.

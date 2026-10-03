@@ -1,0 +1,65 @@
+# Камера, созданная CreateCamera3dEx: что читает _CameraProc3d (параметры po...)
+@ fixtures/PROJECTS/samples/BALLS WorkSpace
+% Wait = 1
+$ FLOAT poOrgX,poOrgY,poOrgZ,poDirectionX,poDirectionY,poDirectionZ,poUpX,poUpY,poUpZ
+$ FLOAT poFocus,poFar_Clip,poNear_Clip,poExtentX,poExtentY,poExtentZ,poOffsetX,poOffsetY
+$ FLOAT poRenderType,poFlags,poPerspective
+$ COLORREF poHazeColor,poBackground
+$ STRING poRenderName
+$ HANDLE hs,s3,cam,c2,c3,c4
+$ FLOAT a_rt,a_fl,a_fo,a_per,b_rt,b_fl,b_fo,b_per,b_ex,b_ox,b_oz,c_rt,c_fl,c_fo,c_per,d_rt,d_fl,d_fo,d_per
+$ STRING a_rn,b_rn,c_rn
+! hs := OpenSchemeWindow("W1", "WorkSpace", "")
+! s3 := CreateSpace3d(~hs)
+! cam := CreateCamera3dEx(~s3, "Auto", 4+2048+32, 2, Rgb(20,21,22), 5, 1, 0, 0, 1, 10, 20, 30)
+! r := _CameraProc3d("", ~s3, ~cam, 0)
+! a_rn := ~poRenderName
+! a_rt := ~poRenderType
+! a_fl := ~poFlags
+! a_fo := ~poFocus
+! a_per := ~poPerspective
+! c2 := CreateCamera3dEx(~s3, "Zbuffer", 4+2048+32, 0, Rgb(20,21,22), 0, 0, 0, 0, 1, 0, 0, 0)
+! r := _CameraProc3d("", ~s3, ~c2, 0)
+! b_rn := ~poRenderName
+! b_rt := ~poRenderType
+! b_fl := ~poFlags
+! b_fo := ~poFocus
+! b_per := ~poPerspective
+! b_ex := ~poExtentX
+! b_ox := ~poOrgX
+! b_oz := ~poOrgZ
+! c3 := CreateCamera3dEx(~s3, "", 1, 1, Rgb(20,21,22), 3, 0.5, 0, 0, 1, 1, 0, 0)
+! r := _CameraProc3d("", ~s3, ~c3, 0)
+! c_rn := ~poRenderName
+! c_rt := ~poRenderType
+! c_fl := ~poFlags
+! c_fo := ~poFocus
+! c_per := ~poPerspective
+! c4 := CreateCamera3dEx(~s3, "Auto", 0, 3, Rgb(20,21,22), 3, 0, 0, 0, 1, 1, 0, 0)
+! r := _CameraProc3d("", ~s3, ~c4, 0)
+! d_rt := ~poRenderType
+! d_fl := ~poFlags
+! d_fo := ~poFocus
+! d_per := ~poPerspective
+a_rn | s:a_rn
+a_rt | a_rt
+a_fl | a_fl
+a_fo | a_fo
+a_per | a_per
+b_rn | s:b_rn
+b_rt | b_rt
+b_fl | b_fl
+b_fo | b_fo
+b_per | b_per
+b_ex | b_ex
+b_ox | b_ox
+b_oz | b_oz
+c_rn | s:c_rn
+c_rt | c_rt
+c_fl | c_fl
+c_fo | c_fo
+c_per | c_per
+d_rt | d_rt
+d_fl | d_fl
+d_fo | d_fo
+d_per | d_per
