@@ -145,12 +145,12 @@ impl CameraParams {
             extent: [f(100), f(108), f(116)],
             offset: [f(124), f(132)],
             extra: [f(140), f(148)],
-            haze: u32_at(156),
+            haze: u32_at(196),
             render_name: crate::formats::cp1251::decode(&b[160..160 + name_end]),
             render_type: u16_at(192),
             flags: b[194],
             perspective: b[195],
-            background: u32_at(196),
+            background: u32_at(156),
         })
     }
 
@@ -167,14 +167,14 @@ impl CameraParams {
         for v in self.extent.iter().chain(&self.offset).chain(&self.extra) {
             b.extend_from_slice(&v.to_le_bytes());
         }
-        b.extend_from_slice(&self.haze.to_le_bytes());
+        b.extend_from_slice(&self.background.to_le_bytes());
         let mut name = crate::formats::cp1251::encode(&self.render_name);
         name.resize(32, 0);
         b.extend_from_slice(&name);
         b.extend_from_slice(&self.render_type.to_le_bytes());
         b.push(self.flags);
         b.push(self.perspective);
-        b.extend_from_slice(&self.background.to_le_bytes());
+        b.extend_from_slice(&self.haze.to_le_bytes());
         b
     }
 }
@@ -399,6 +399,24 @@ impl Space3d {
                 Object3dKind::Group { children, .. } => {
                     self.groups.insert(h, Group3d { handle: h, name: o.name.clone(), children: children.iter().map(|c| *c as Handle).collect(), matrix: IDENTITY });
                 }
+            }
+        }
+        // матрица группы из файла — матрица её первого элемента (сверено в
+        // Wine: ROBOT2, tools/verify/robot_base.txt)
+        let handles: Vec<Handle> = self.groups.keys().copied().collect();
+        for g in handles {
+            let (mut cur, mut depth) = (g, 0);
+            while depth < 64 {
+                let Some(first) = self.groups.get(&cur).and_then(|x| x.children.first().copied()) else { break };
+                if let Some(o) = self.objects.get(&first) {
+                    let m = o.matrix;
+                    if let Some(x) = self.groups.get_mut(&g) {
+                        x.matrix = m;
+                    }
+                    break;
+                }
+                cur = first;
+                depth += 1;
             }
         }
         // материалы (3.x, чанк 1024): номер — по порядку, имя — строка

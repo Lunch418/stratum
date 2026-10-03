@@ -1,0 +1,18 @@
+# ROBOT2: координаты объекта h1 (4) в системе основания P4 (7), статичная сцена из ROBOT2.VDR
+@ fixtures/PROJECTS/samples/BALLS WorkSpace
+% Wait = 1
++ fixtures/PROJECTS/samples/ROBOT2/ROBOT2.VDR
+! hs := OpenSchemeWindow("W1", "WorkSpace", "")
+! h2 := LoadSpaceWindow("W3", "C:\verify\ROBOT2.VDR", "")
+! s3 := Handle(Float(~h2) - 1)
+! qa := GetObjectBase3d(~s3, Handle(4), xa, ya, za)
+! p := PushCrdSystem3d(~s3)
+! l := SelectLocalCrd3d(~s3, Handle(7))
+! q := GetObjectBase3d(~s3, Handle(4), x, y, z)
+! pp := PopCrdSystem3d(~s3)
+xa | xa
+ya | ya
+za | za
+x | x
+y | y
+z | z
