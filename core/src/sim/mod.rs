@@ -104,6 +104,7 @@ pub mod wm {
     pub const ALLMOUSEMESSAGE: u32 = 1536;
     pub const ALLKEYMESSAGE: u32 = 1537;
     pub const SPACEDONE: u32 = 1539;
+    pub const SIZE: u32 = 5;
     pub const CONTROLNOTIFY: u32 = 1544;
     pub const HYPERJUMP: u32 = 1546;
     pub const SPACEINIT: u32 = 1540;
@@ -624,8 +625,26 @@ impl Simulation {
                 self.set_var(instance, &name, value);
             }
         }
+        self.deliver_resized()?;
         self.tick += 1;
         self.effects.gfx.flush_dibs();
+        Ok(())
+    }
+
+    /// WM_SIZE: окно сменило размер - подписанные имиджи исполняются с msg.
+    fn deliver_resized(&mut self) -> Result<(), RuntimeError> {
+        let spaces = std::mem::take(&mut self.effects.gfx.resized);
+        if !spaces.is_empty() {
+            self.old.clone_from(&self.cells);
+        }
+        for space in spaces {
+            let targets: Vec<Registration> =
+                self.registrations.iter().filter(|r| r.space == space && message_matches(r.msg, wm::SIZE)).cloned().collect();
+            for r in targets {
+                self.set_var(r.instance, "msg", Value::Float(wm::SIZE as f64));
+                self.run_instance(r.instance)?;
+            }
+        }
         Ok(())
     }
 

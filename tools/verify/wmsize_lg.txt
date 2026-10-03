@@ -1,0 +1,9 @@
+# WM_SIZE у LGSpace: Width := GetWindowWidth - целое; ширина окна после SetClientSize с дробью
+@ fixtures/PROJECTS/samples/BALLS WorkSpace
+% Wait = 2
+! h := OpenSchemeWindow("W1", "WorkSpace", "WS_BYSPACE| WS_VSCROLL| WS_HSCROLL|WS_AUTOSCROLL")
+! r := SetClientSize("W1", 973.91, 377)
+cw | GetClientWidth("W1")
+ch | GetClientHeight("W1")
+ww | GetWindowWidth("W1")
+wh | GetWindowHeight("W1")

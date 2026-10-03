@@ -37,7 +37,17 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
         // ── окна ──────────────────────────────────────────────────────────
         "getwindowspace" => handle(gfx.window_space(&s(args, 0)).unwrap_or(0)),
         "iswindowexist" => ok(gfx.window_space(&s(args, 0)).is_some()),
-        "openschemewindow" => handle(open_scheme_window(gfx, &s(args, 0), &s(args, 1))),
+        "openschemewindow" => {
+            let sp = open_scheme_window(gfx, &s(args, 0), &s(args, 1));
+            // окно с полосами прокрутки пересчитывает клиентскую область уже
+            // после открытия: WM_SIZE придёт и после SetClientSize (SMO2);
+            // без полос сообщение уходит в момент вызова, до подписки (L1)
+            let flags = s(args, 2).to_uppercase();
+            if let Some(space) = gfx.space_mut(sp) {
+                space.scroll_size_msg = flags.contains("SCROLL");
+            }
+            handle(sp)
+        }
         "loadspacewindow" => {
             let window = s(args, 0);
             let file = s(args, 1);
@@ -105,7 +115,19 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
         // начало листа — округление вниз (сверено в Wine, intsize.txt)
         "setclientsize" => {
             let (w, hh) = (f(args, 1).trunc(), f(args, 2).trunc());
-            ok(window_space_mut(gfx, &s(args, 0)).map(|sp| sp.client = (w, hh)).is_some())
+            let name = s(args, 0);
+            let changed = window_space_mut(gfx, &name).map(|sp| {
+                // размер окна целый: дробная часть прежнего - не изменение
+                let before = (sp.client.0.trunc(), sp.client.1.trunc());
+                sp.client = (w, hh);
+                before != (w, hh)
+            });
+            if changed == Some(true) {
+                if let Some(h) = gfx.window_space(&name).filter(|&h| gfx.space(h).is_some_and(|sp| sp.scroll_size_msg)) {
+                    gfx.resized.push(h);
+                }
+            }
+            ok(changed.is_some())
         }
         "showwindow" => {
             let mode = f(args, 1);

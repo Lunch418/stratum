@@ -1,0 +1,8 @@
+# Ширина объекта ramka схемы Root проекта SMO2 (в LGSpace Width в оригинале целая, 973)
+@ fixtures/PROJECTS/samples/SMO2 Root
+% Wait = 1
+! hs := OpenSchemeWindow("W1", "Root", "")
+! ho := GetObject2dByName(~hs, #0, "ramka")
+wo | GetObjectWidth2d(hs, ho)
+ho2 | GetObjectHeight2d(hs, ho)
+ty | GetObjectType2d(hs, ho)

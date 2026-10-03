@@ -191,6 +191,8 @@ pub struct Space {
     pub origin: (f64, f64),
     pub scale: (f64, f64),
     pub client: (f64, f64),
+    /// Окно с полосами прокрутки (флаги OpenSchemeWindow): посылает WM_SIZE после смены размера.
+    pub scroll_size_msg: bool,
     /// Левый верхний угол окна в рабочей области главного окна.
     pub org: (f64, f64),
     pub visible: bool,
@@ -236,6 +238,7 @@ impl Space {
             window: window.to_string(),
             scale: (1.0, 1.0),
             client: DEFAULT_CLIENT,
+            scroll_size_msg: false,
             visible: true,
             layers: u32::MAX,
             next: 1,
@@ -980,6 +983,9 @@ pub struct Gfx {
     pub clipboard: Option<(Object, Option<Pen>, Option<Brush>)>,
     /// Последний объект, попавший под мышь (`GetLastPrimary2d`).
     pub last_primary: Handle,
+    /// Пространства, чьё окно сменило размер: имиджам, подписанным на
+    /// WM_SIZE, сообщение уходит в конце такта (сверено в Wine, LGSpace).
+    pub resized: Vec<Handle>,
     /// Папка проекта — здесь ищутся `.vdr`, `.bmp` и наборы иконок.
     pub project_dir: std::path::PathBuf,
     pub library_dirs: Vec<std::path::PathBuf>,
