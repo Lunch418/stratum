@@ -1,6 +1,6 @@
 //! Чтение файлов Stratum 2000: имиджи, проекты, снимки состояния.
 //!
-//! Все форматы восстановлены по корпусу; спецификации — в `docs/formats/`.
+//! Все форматы восстановлены по корпусу; спецификации - в `docs/formats/`.
 
 pub mod cls;
 pub mod cp1251;
@@ -33,7 +33,7 @@ pub struct LoadedProject {
 }
 
 impl LoadedProject {
-    /// Имидж по имени, без учёта регистра — язык регистронезависим.
+    /// Имидж по имени, без учёта регистра - язык регистронезависим.
     pub fn class(&self, name: &str) -> Option<&Class> {
         self.classes.iter().find(|c| crate::lang::same_name(&c.name, name))
     }
@@ -43,7 +43,7 @@ impl LoadedProject {
     }
 }
 
-/// Открывает проект по пути к `.spj` или к папке проекта. `libraries` —
+/// Открывает проект по пути к `.spj` или к папке проекта. `libraries` -
 /// папки стандартной библиотеки (`library/`, `add.lib/`): их имиджи
 /// подключаются после имиджей проекта и не перекрывают одноимённые.
 pub fn load_project(
@@ -55,7 +55,7 @@ pub fn load_project(
             Ok(p) => p,
             Err(e) => return Ok(Err(e)),
         };
-        // библиотеки из project.json — относительно папки проекта
+        // библиотеки из project.json - относительно папки проекта
         let mut dirs: Vec<PathBuf> = loaded
             .library_dirs
             .iter()
@@ -108,14 +108,16 @@ pub fn load_project(
         }
     }
 
-    for name in ["_preload.stt", "_PRELOAD.STT"] {
+    // стартовые значения: _preload.stt, а если его нет или он не читается -
+    // DEFAULT.STT ("Сохранить в DEFAULT.STT" оригинала, старая редакция)
+    for name in ["_preload.stt", "_PRELOAD.STT", "DEFAULT.STT", "default.stt"] {
         let p = dir.join(name);
         if p.exists() {
             let data = std::fs::read(&p)?;
             if let Ok(s) = project::parse_state(&data, &p.display().to_string()) {
                 loaded.state = Some(s);
+                break;
             }
-            break;
         }
     }
     Ok(Ok(loaded))
@@ -158,10 +160,10 @@ fn load_classes(dir: &Path, out: &mut Vec<Class>) -> std::io::Result<std::result
 /// Папки библиотек по умолчанию: `STRATUM_LIBRARY` (список, как в PATH:
 /// через `:`, на Windows через `;`), иначе `fixtures/library` и
 /// `fixtures/add.lib` в текущем каталоге или выше, иначе установленный
-/// Stratum — в Wine или в Program Files.
+/// Stratum - в Wine или в Program Files.
 pub fn default_library_dirs() -> Vec<PathBuf> {
-    // список папок в STRATUM_LIBRARY — в формате PATH своей системы
-    // (на Windows разделитель «;», пути вида C:\…)
+    // список папок в STRATUM_LIBRARY - в формате PATH своей системы
+    // (на Windows разделитель ";", пути вида C:\...)
     if let Some(env) = std::env::var_os("STRATUM_LIBRARY") {
         return std::env::split_paths(&env).filter(|p| !p.as_os_str().is_empty()).collect();
     }
@@ -206,4 +208,31 @@ fn collect_classes(dir: &Path, out: &mut Vec<PathBuf>) -> std::io::Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_stt_gives_start_values_without_preload() {
+        // проект оригинала без _preload.stt, но с DEFAULT.STT в старой редакции
+        let src = PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../fixtures/PROJECTS/samples/ENGINE"));
+        if !src.is_dir() {
+            return; // корпус собирается локально
+        }
+        let dir = std::env::temp_dir().join(format!("stratum-default-stt-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        for e in std::fs::read_dir(&src).unwrap().flatten() {
+            let name = e.file_name().to_string_lossy().to_string();
+            if !name.eq_ignore_ascii_case("_preload.stt") && e.path().is_file() {
+                std::fs::copy(e.path(), dir.join(&name)).unwrap();
+            }
+        }
+        let loaded = load_project(&dir, &[]).unwrap().unwrap();
+        let state = loaded.state.expect("DEFAULT.STT не прочитан");
+        assert_eq!(state.root, "Engine");
+        assert!(state.images.iter().any(|i| i.class_name == "Rotate3d"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

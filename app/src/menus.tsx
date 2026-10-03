@@ -41,6 +41,13 @@ export function buildMenus(ctx: MenuContext): Menu[] {
     if (!p) { s.setTab('model'); s.showToast('Выберите проекцию 3D в окне модели: Alt+щелчок'); return; }
     api.objectSet(p.win, p.handle, field, 1).then(r => r.json()).then((j: { ok: boolean }) => s.showToast(j.ok ? 'Камера создана' : 'Выбранный объект — не проекция 3D'));
   };
+  // DEFAULT.STT в папке проекта (меню "Моделирование" оригинала)
+  const defaultStt = (action: 'save' | 'load') => {
+    const path = (s.project?.dir || '.').replace(/[\\/]+$/, '') + '/DEFAULT.STT';
+    api.stateAction(action, path)
+      .then(r => s.showToast(`${action === 'save' ? 'Записано в' : 'Загружено из'} DEFAULT.STT: ${r.images ?? 0}`))
+      .catch(e => s.say({ level: 'error', where: 'DEFAULT.STT', text: String(e) }));
+  };
   const drawTool = (label: string, tool: string, hint?: string): MenuItem => ({ label, hint, disabled: noProject || lib, run: () => { if (s.tab !== 'picture' && s.tab !== 'icon') s.setTab('picture'); setTimeout(() => window.dispatchEvent(new CustomEvent('draw-tool', { detail: tool })), 50); } });
 
   return [
@@ -182,6 +189,8 @@ export function buildMenus(ctx: MenuContext): Menu[] {
       { label: 'Сохранить переменные…', hint: 'F2', run: () => ctx.open('stateSave'), disabled: noProject },
       { label: 'Загрузить переменные…', hint: 'F3', run: () => ctx.open('stateLoad'), disabled: noProject },
       { label: 'Запомнить как стартовое состояние', hint: 'Alt+F2', run: () => st('keep'), disabled: noProject },
+      { label: 'Сохранить в DEFAULT.STT', run: () => defaultStt('save'), disabled: noProject },
+      { label: 'Загрузить из DEFAULT.STT', run: () => defaultStt('load'), disabled: noProject },
       { label: 'Вернуть стартовое состояние', hint: 'Alt+F3', run: () => api.event('type=reset').then(() => s.refreshInstances()), disabled: noProject },
       { sep: true },
       { label: 'Сохранить переменные имиджа…', run: () => ctx.open('imageSave'), disabled: !cls },

@@ -15,6 +15,8 @@ docs/verification.md (сверка с оригиналом в Wine), docs/review
   клавиатурная навигация (app/src/a11y.ts), узкие окна.
 - Безопасность: токен сессии, Host/Origin, песочница файлов модели, фаззинг
   разборщиков (core/tests/fuzz_parsers.rs), 21 находка исправлена (docs/review.md).
+- Состояния: все 81 файл .stt корпуса читаются, включая старую редакцию DEFAULT.STT
+  (переменные по номерам); проект без _preload.stt стартует со значениями DEFAULT.STT.
 - Сборка: CI (Linux/Windows/macOS), release.yml -> .deb/.AppImage/.msi/.exe/.dmg.
 
 ## В работе
@@ -22,6 +24,8 @@ docs/verification.md (сверка с оригиналом в Wine), docs/review
   незакоммичен, модуля lang/decompile.rs еще нет).
 
 ## Дальше
+- Данные листа рисунков 2.x (запись типа 2 блока 0x03FE): найти место в 3.x по корпусу
+  или писать 2.x обратно, если источник был 2.x.
 - Сверка: ENGINE, ANATOMY, Surf3d, ROBOT2, SMO2, AudioPlayer, HIST3D, WindowRegion,
   VIDEO2, Osc3d, Example.33, WRITEAVI, MENU; хвосты ROBOT, EDS_IND, L3, T80, IRONCLAD.
 - 3D: источники света и материалы формата 2.x.
@@ -34,4 +38,4 @@ docs/verification.md (сверка с оригиналом в Wine), docs/review
   2d/api/Net (нет файла проекта).
 - Нет движка: видеокадры, просмотр БД (DBF), Ogre3D - вызовы считаются и показываются
   плашкой "функции, которых здесь нет".
-- Данные листа из рисунков 2.x теряются при записи в 3.x; старый DEFAULT.STT не читается.
+- Данные листа из рисунков 2.x теряются при записи в 3.x.

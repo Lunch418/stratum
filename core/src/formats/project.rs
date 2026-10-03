@@ -112,7 +112,7 @@ fn read_properties(r: &mut Reader, count: u16, project: &mut Project) -> Result<
     Ok(())
 }
 
-/// Собирает `project.spj` вида `d` — так пишет сама Stratum 2000 v3.
+/// Собирает `project.spj` вида `d` - так пишет сама Stratum 2000 v3.
 pub fn write_project(project: &Project) -> Vec<u8> {
     use super::writer::Writer;
     let mut w = Writer::new();
@@ -205,13 +205,17 @@ pub struct StateImage {
     pub vars: Vec<(String, String)>,
 }
 
-/// Редакция 0x3E8 — её пишет `SaveObjectState` оригинала. Сначала таблица
-/// «классов», куда входят и типы (`HANDLE`, `STRING`, `FLOAT`, `COLORREF` —
+/// Редакция 0x3E8 - её пишет `SaveObjectState` оригинала. Сначала таблица
+/// "классов", куда входят и типы (`HANDLE`, `STRING`, `FLOAT`, `COLORREF` -
 /// у них ненулевой размер): имя, отметка времени, число переменных, число
 /// детей, размер; пары (handle ребёнка, номер класса); переменные (имя, номер
 /// типа в той же таблице). Затем маркер 0x3E9 и значения экземпляров в
-/// обходе дерева от корня: FLOAT — f64, STRING — строка, остальные — u32.
-fn parse_state_typed(r: &mut Reader, root: String) -> Result<State> {
+/// обходе дерева от корня: FLOAT - f64, STRING - строка, остальные - u32.
+///
+/// Старая редакция (DEFAULT.STT, снимки 1.STT...) устроена так же, но без
+/// заголовка `record_size, format` перед 0x3E8 и без отметки времени у
+/// записей таблицы: `stamped = false`.
+fn parse_state_typed(r: &mut Reader, root: String, stamped: bool) -> Result<State> {
     struct Entry {
         name: String,
         kids: Vec<(u16, u16)>,
@@ -221,7 +225,9 @@ fn parse_state_typed(r: &mut Reader, root: String) -> Result<State> {
     let mut table = Vec::with_capacity(count as usize);
     for _ in 0..count {
         let name = r.string()?;
-        let _stamp = r.u32()?;
+        if stamped {
+            r.u32()?;
+        }
         let nvars = r.u16()?;
         let nkids = r.u16()?;
         let _size = r.u16()?;
@@ -263,16 +269,16 @@ pub fn parse_state(data: &[u8], path: &str) -> Result<State> {
         return r.err(format!("не файл состояния: {magic:?}"));
     }
     let root = r.string()?;
+    // старая редакция: сразу 0x3E8 и таблица имиджей без отметок времени
+    if r.peek_u16(r.pos) == Some(0x3e8) {
+        r.u16()?;
+        return parse_state_typed(&mut r, root, false);
+    }
     let _record_size = r.u16()?;
     let _format = r.u16()?;
-    // в старой редакции здесь снова лежит имя корневого имиджа, а переменные
-    // хранятся по индексам; такие файлы (DEFAULT.STT и снимки) не читаем
-    if r.peek_u16(r.pos) == Some(cp1251::encode(&root).len() as u16) {
-        return r.err("старая редакция .stt: переменные хранятся по индексам");
-    }
     let id = r.u16()?;
     if id == 0x3e8 {
-        return parse_state_typed(&mut r, root);
+        return parse_state_typed(&mut r, root, true);
     }
     let mut state = State { root, images: Vec::new() };
     // список заканчивается двухбайтовым терминатором
@@ -313,6 +319,23 @@ mod tests {
         let p = parse_project(&data, "project.spj").unwrap();
         let names: Vec<_> = p.variables.iter().map(|v| v.name.as_str()).collect();
         assert_eq!(names, ["ScaleZ", "ScaleY", "OffsetY"]);
+    }
+
+    #[test]
+    fn reads_old_default_stt() {
+        // ENGINE: старая редакция, переменные по номерам в таблице имиджей
+        let Some(data) = fixture("PROJECTS/samples/ENGINE/DEFAULT.STT") else { return };
+        let s = parse_state(&data, "DEFAULT.STT").unwrap();
+        assert_eq!(s.root, "Engine");
+        assert_eq!(s.images[0].class_name, "Engine");
+        let rot = s.images.iter().find(|i| i.class_name == "Rotate3d").unwrap();
+        assert!(rot.vars.iter().any(|(k, _)| k == "AxisZ"));
+        // все старые файлы корпуса читаются целиком
+        for p in ["ANATOMY", "HIST3D", "IRONCLAD", "L2", "L3", "Surf3d", "WRITEAVI"] {
+            let Some(d) = fixture(&format!("PROJECTS/samples/{p}/DEFAULT.STT")) else { continue };
+            let s = parse_state(&d, p).unwrap_or_else(|e| panic!("{p}: {e}"));
+            assert!(!s.images.is_empty(), "{p}");
+        }
     }
 
     #[test]
