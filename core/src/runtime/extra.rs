@@ -72,7 +72,39 @@ fn resolve_path(fx: &Effects, name: &str) -> std::path::PathBuf {
         return fx.gfx.project_dir.join(name[2..].trim_start_matches('/'));
     }
     let p = std::path::Path::new(&name);
-    if p.is_absolute() { p.to_path_buf() } else { fx.gfx.project_dir.join(p) }
+    let full = if p.is_absolute() { p.to_path_buf() } else { fx.gfx.project_dir.join(p) };
+    case_insensitive(&full)
+}
+
+/// Windows не различает регистр в именах файлов: `\cls\img\play.gif` находит
+/// `cls/Img/Play.gif` (кнопки AudioPlayer). Несуществующий путь остаётся как есть.
+fn case_insensitive(path: &std::path::Path) -> std::path::PathBuf {
+    use std::path::Component;
+    if path.exists() {
+        return path.to_path_buf();
+    }
+    let mut out = std::path::PathBuf::new();
+    for c in path.components() {
+        match c {
+            Component::Normal(part) => {
+                let direct = out.join(part);
+                if direct.exists() {
+                    out = direct;
+                    continue;
+                }
+                let want = part.to_string_lossy().to_lowercase();
+                let found = std::fs::read_dir(&out)
+                    .ok()
+                    .and_then(|d| d.flatten().find(|e| e.file_name().to_string_lossy().to_lowercase() == want));
+                out = match found {
+                    Some(e) => e.path(),
+                    None => direct,
+                };
+            }
+            other => out.push(other.as_os_str()),
+        }
+    }
+    out
 }
 
 /// Путь без `.` и `..`, от корня файловой системы — чтобы сравнивать папки
