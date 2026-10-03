@@ -113,6 +113,10 @@ pub mod wm {
     pub const FLAG_ALWAYS: u32 = 256;
 }
 
+/// Предел вложенности вызовов имиджей: глубже бесконечной рекурсии в
+/// настоящих моделях не бывает, и до конца стека потока (2 МБ) далеко.
+const MAX_NESTING: usize = 64;
+
 #[derive(Clone)]
 pub struct Simulation {
     classes: Vec<CompiledClass>,
@@ -121,6 +125,9 @@ pub struct Simulation {
     class_meta: Vec<Class>,
     /// Экземпляр-«стек» для каждого имиджа-функции (по номеру класса).
     function_instances: HashMap<usize, usize>,
+    /// Вложенность исполнения: имидж-функция, вызывающая себя, или имиджи,
+    /// шлющие сообщения друг другу, без предела переполняли стек.
+    nesting: usize,
     /// Нажатые сейчас виртуальные клавиши (для `GetAsyncKeyState`).
     pub keys_down: std::collections::HashSet<u32>,
     /// Папка файла каждого имиджа (имя в нижнем регистре) — для
@@ -218,6 +225,7 @@ impl Simulation {
             registrations: Vec::new(),
             class_meta: project.classes.clone(),
             function_instances: HashMap::new(),
+            nesting: 0,
             keys_down: std::collections::HashSet::new(),
             class_dirs: HashMap::new(),
             instances: Vec::new(),
@@ -646,6 +654,16 @@ impl Simulation {
 
     /// Исполняет текст одного экземпляра (в такте или по сообщению).
     fn run_instance(&mut self, index: usize) -> Result<(), RuntimeError> {
+        if self.nesting >= MAX_NESTING {
+            return Err(RuntimeError { message: format!("слишком глубокая вложенность вызовов (больше {MAX_NESTING})"), line: 0, instance: Some(index) });
+        }
+        self.nesting += 1;
+        let result = self.run_instance_inner(index);
+        self.nesting -= 1;
+        result
+    }
+
+    fn run_instance_inner(&mut self, index: usize) -> Result<(), RuntimeError> {
         let class = self.instances[index].class;
         let body = std::sync::Arc::clone(&self.classes[class].body);
         if body.is_empty() {
@@ -1497,6 +1515,19 @@ impl Simulation {
     /// Вызов имиджа-функции: параметры по порядку объявления, текст,
     /// значение `return`.
     fn call_function(&mut self, class: usize, args: &[Value]) -> Value {
+        if self.nesting >= MAX_NESTING {
+            if !self.effects.log.iter().rev().take(8).any(|l| l.contains("вложенность вызовов")) {
+                self.effects.log.push(format!("слишком глубокая вложенность вызовов (больше {MAX_NESTING}): {} возвращает 0", self.classes[class].name));
+            }
+            return Value::Float(0.0);
+        }
+        self.nesting += 1;
+        let v = self.call_function_inner(class, args);
+        self.nesting -= 1;
+        v
+    }
+
+    fn call_function_inner(&mut self, class: usize, args: &[Value]) -> Value {
         let index = match self.function_instances.get(&class) {
             Some(&i) => i,
             None => {

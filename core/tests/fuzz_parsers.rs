@@ -249,6 +249,33 @@ fn cyclic_groups_do_not_recurse_forever() {
     let _ = vdr::write(&pic);
 }
 
+/// Имидж-функция, вызывающая саму себя без конца: такт должен кончиться
+/// ошибкой, а не переполнением стека (оно роняет процесс IDE).
+#[test]
+fn endless_function_recursion_is_an_error() {
+    use stratum_core::formats::{Class, LoadedProject, Project};
+    std::thread::Builder::new()
+        .stack_size(2 << 20)
+        .spawn(|| {
+            let class = |name: &str, text: &str| Class { name: name.into(), version: 0x3003, text: text.into(), ..Default::default() };
+            let project = LoadedProject {
+                dir: PathBuf::new(),
+                project: Project { root: "Main".into(), ..Default::default() },
+                // вызов спрятан в глубокое выражение: стек на уровень - наибольший
+                classes: vec![class("Main", "x := Rec(1)"), class("Rec", &format!("function\nFLOAT parameter a\nreturn {}Rec(a + 1){}", "(".repeat(190), ")".repeat(190)))],
+                own_classes: 2,
+                state: None,
+                library_dirs: Vec::new(),
+            };
+            let mut sim = stratum_core::sim::Simulation::build(&project).expect("модель не собралась");
+            let _ = sim.step();
+            assert!(sim.effects.log.iter().any(|l| l.contains("вложенность")), "рекурсия не дошла до предела: {:?}", sim.effects.log);
+        })
+        .unwrap()
+        .join()
+        .unwrap();
+}
+
 /// Наибольшая допустимая вложенность проходит и дальше разбора: сборка
 /// модели и такт на стеке потока сервера.
 #[test]
