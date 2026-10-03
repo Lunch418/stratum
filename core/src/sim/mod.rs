@@ -653,6 +653,22 @@ impl Simulation {
     }
 
     /// Исполняет текст одного экземпляра (в такте или по сообщению).
+    /// Сообщение исполняет подсхему получателя: сначала включенные дети по
+    /// порядку схемы (отключенный пропускается со своей подсхемой), потом сам
+    /// получатель, даже если он отключен (сверено в Wine, verify_msg_children.py).
+    fn run_with_children(&mut self, index: usize) -> Result<(), RuntimeError> {
+        let kids = self.children.get(index).cloned().unwrap_or_default();
+        for kid in kids {
+            if self.stopped {
+                return Ok(());
+            }
+            if !self.is_disabled(kid) {
+                self.run_with_children(kid)?;
+            }
+        }
+        self.run_instance(index)
+    }
+
     fn run_instance(&mut self, index: usize) -> Result<(), RuntimeError> {
         if self.nesting >= MAX_NESTING {
             return Err(RuntimeError { message: format!("слишком глубокая вложенность вызовов (больше {MAX_NESTING})"), line: 0, instance: Some(index) });
@@ -950,7 +966,7 @@ impl Simulation {
                     self.set_var(target, to, v);
                 }
             }
-            self.run_instance(target)?;
+            self.run_with_children(target)?;
             for &cell in self.instances[target].vars.values() {
                 self.old[cell] = self.cells[cell].clone();
             }
