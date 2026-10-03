@@ -1,0 +1,15 @@
+# Размеры объектов 2D дробные или целые: GetObjectWidth2d / Height после SetObjectSize2d и у ломаной
+@ fixtures/PROJECTS/samples/BALLS WorkSpace
+% Wait = 1
+! hs := OpenSchemeWindow("W1", "WorkSpace", "")
+! p1 := CreatePen2d(~hs, 0, 0, Rgb(0,0,0), 13)
+! a := CreateLine2d(~hs, ~p1, #0, 0, 0)
+! r0 := AddPoint2d(~hs, ~a, -1, 10.7, 3.3)
+! b := CreateLine2d(~hs, ~p1, #0, 0, 0)
+! r1 := AddPoint2d(~hs, ~b, -1, 40, 40)
+! r := SetObjectSize2d(~hs, ~b, 20.7, 15.3)
+! g := CreateGroup2d(~hs)
+wa | GetObjectWidth2d(hs, a)
+ha | GetObjectHeight2d(hs, a)
+wb | GetObjectWidth2d(hs, b)
+hb | GetObjectHeight2d(hs, b)

@@ -260,7 +260,7 @@ impl Simulation {
             // собственный рисунок имиджа (0x0c): в окне схемы родителя он
             // встаёт на место значка экземпляра — у всех имиджей, а не только
             // с флагом 0x8000 (сверено в Wine: BALLS, tools/verify/zorder.txt)
-            if let Some(pic) = cls.scheme.as_ref().and_then(|b| crate::formats::vdr::parse(b, &cls.name).ok()) {
+            if let Some(pic) = cls.scheme.as_ref().filter(|_| cls.flags.unwrap_or(0) & 0x1000 == 0).and_then(|b| crate::formats::vdr::parse(b, &cls.name).ok()) {
                 sim.effects.gfx.scheme_pictures.insert(crate::lang::fold(&cls.name), pic);
             }
             if !cls.children.is_empty() {
