@@ -168,7 +168,7 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
             let name = s(args, 2);
             let group = h(args, 1);
             handle(gfx.space(h(args, 0)).and_then(|sp| if group != 0 { sp.find_in_group(group, &name) } else { sp.find_by_name(&name) })
-                .or_else(|| super::api3d::find_by_name(gfx, h(args, 0), &name))
+                .or_else(|| super::api3d::find_by_name(gfx, h(args, 0), group, &name))
                 .unwrap_or(0))
         }
         "getobjectname2d" => Value::Str(

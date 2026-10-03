@@ -623,8 +623,9 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx, ms: &mut Matrices, output
 
 /// Дескриптор трёхмерного объекта или камеры по имени (для `GetObject2dByName`
 /// с дескриптором трёхмерного пространства).
-pub fn find_by_name(gfx: &Gfx, space: Handle, name: &str) -> Option<Handle> {
-    gfx.spaces3d.get(&space)?.find_by_name(name)
+pub fn find_by_name(gfx: &Gfx, space: Handle, base: Handle, name: &str) -> Option<Handle> {
+    let s = gfx.spaces3d.get(&space)?;
+    if base == 0 { s.find_by_name(name) } else { s.find_in(base, name) }
 }
 
 pub fn set_name(gfx: &mut Gfx, space: Handle, obj: Handle, name: &str) -> bool {

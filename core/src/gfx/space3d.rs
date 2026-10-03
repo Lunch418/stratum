@@ -343,6 +343,26 @@ impl Space3d {
             .or_else(|| self.groups.values().find(|g| g.name.eq_ignore_ascii_case(name)).map(|g| g.handle))
     }
 
+    /// Поиск по имени внутри `base`: сам он, затем его дети по порядку, группы
+    /// рекурсивно; такого номера нет - ничего (сверено в Wine, name3d.txt).
+    pub fn find_in(&self, base: Handle, name: &str) -> Option<Handle> {
+        let name_of = |h: Handle| self.objects.get(&h).map(|o| o.name.as_str()).or_else(|| self.groups.get(&h).map(|g| g.name.as_str())).or_else(|| self.cameras.get(&h).map(|c| c.name.as_str()));
+        let mut stack = vec![base];
+        let mut seen = std::collections::HashSet::new();
+        while let Some(h) = stack.pop() {
+            if !seen.insert(h) {
+                continue;
+            }
+            if name_of(h).is_some_and(|n| n.eq_ignore_ascii_case(name)) {
+                return Some(h);
+            }
+            if let Some(g) = self.groups.get(&h) {
+                stack.extend(g.children.iter().rev().copied());
+            }
+        }
+        None
+    }
+
     /// Пространство из рисунка: объекты, камеры, группы и свет с номерами
     /// из файла; новые номера — после наибольшего.
     pub fn load(&mut self, data: &crate::formats::vdr::Space3dData) {

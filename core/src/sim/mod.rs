@@ -418,7 +418,9 @@ impl Simulation {
         }
 
         // связи схемы: пары переменных двух экземпляров делят ячейку
-        for link in cls.links.iter().filter(|l| !l.style.disabled) {
+        // flags == 1 - связь отключена (Wine, verify_link_flags.py); нечётные значения с другими битами
+        // (513 в EDS_IND) оригинал в траектории не отключает, их оставляем рабочими
+        for link in cls.links.iter().filter(|l| !l.style.disabled && l.flags != 1) {
             let source = by_handle.get(&link.source).copied();
             let target = by_handle.get(&link.target).copied();
             // handle корневого имиджа в его собственной схеме не встречается,
