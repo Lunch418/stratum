@@ -431,11 +431,10 @@ impl Space3d {
     pub fn meshes_of(&self, h: Handle) -> Vec<Handle> {
         let mut out = Vec::new();
         let mut todo = vec![h];
-        let mut guard = 0;
+        let mut seen = std::collections::HashSet::new();
         while let Some(x) = todo.pop() {
-            guard += 1;
-            if guard > 10_000 {
-                break;
+            if !seen.insert(x) {
+                continue;
             }
             if self.objects.contains_key(&x) {
                 out.push(x);
@@ -862,6 +861,16 @@ mod tests {
         let m = rotation([0.0; 3], [0.0, 0.0, 1.0], std::f64::consts::FRAC_PI_2);
         let p = apply([1.0, 0.0, 0.0], &m);
         assert!((p[0]).abs() < 1e-9 && (p[1] - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn group_cycle_and_shared_item_move_body_once() {
+        let mut sp = Space3d::new(1, 1);
+        let b = sp.add_object(make_bar(0xFF0000, 20.0, 20.0, 20.0));
+        let g1 = sp.add_group(vec![b]);
+        let g2 = sp.add_group(vec![b, g1]);
+        sp.groups.get_mut(&g1).unwrap().children.push(g2);
+        assert_eq!(sp.meshes_of(g2), vec![b]);
     }
 
     #[test]
