@@ -1270,7 +1270,7 @@ impl Vars for Frame<'_> {
                 Value::Str(dir)
             }
             // дескриптор экземпляра на схеме родителя
-            "gethobject" => Value::Handle(self.instance as f64),
+            "gethobject" => Value::Handle(self.sim.instances[self.instance].handle as f64),
             "gethobjectbyname" => match self.sim.find(&arg(0)) {
                 Some(i) => Value::Handle(i as f64),
                 None => Value::Handle(0.0),

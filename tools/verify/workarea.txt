@@ -1,0 +1,12 @@
+# Рабочая область экрана и размеры окна для центрирования (WindowRegion)
+@ fixtures/PROJECTS/samples/WindowRegion MainImage
+% Wait = 2
+! hs := OpenSchemeWindow("W1", "MainImage", "")
+wx | GetWorkAreaX()
+wy | GetWorkAreaY()
+ww | GetWorkAreaWidth()
+wh | GetWorkAreaHeight()
+sw | GetScreenWidth()
+sh | GetScreenHeight()
+cw | GetWindowWidth("W1")
+ch | GetWindowHeight("W1")

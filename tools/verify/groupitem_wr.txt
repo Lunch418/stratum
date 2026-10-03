@@ -1,0 +1,10 @@
+# GetGroupItem2d элементов схемы WindowRegion: кнопки obj (8) и btn (13) как значки-группы
+@ fixtures/PROJECTS/samples/WindowRegion MainImage
+% Wait = 1
+! hs := OpenSchemeWindow("W1", "MainImage", "")
+a | Float(GetGroupItem2d(hs, #8, 1))
+b | Float(GetGroupItem2d(hs, #13, 1))
+c | Float(GetGroupItem2d(hs, #8, 2))
+d | GetObjectType2d(hs, #8)
+e | GetObjectType2d(hs, #13)
+f | GetObjectType2d(hs, #5)
