@@ -33,6 +33,8 @@ export function ModelView() {
   // активное окно — последнее, по которому щёлкнули (для «Записать в VDR»)
   const [active, setActive] = useState<string | null>(null);
   const [saveVdr, setSaveVdr] = useState(false);
+  // "Вписать": окно больше вкладки уменьшается целиком (иначе - прокрутка вкладки)
+  const [fit, setFit] = useState(true);
   const activeName = frame?.windows.some(w => w.name === active) ? active : frame?.windows[0]?.name ?? null;
   // «Файл → Записать активное окно в VDR…»
   useEffect(() => {
@@ -71,6 +73,27 @@ export function ModelView() {
     for (const div of [...root.children]) if (!frame.windows.some(w => String(w.id) === (div as HTMLElement).dataset.win)) div.remove();
   }, [frame, activeName]);
 
+  useEffect(() => {
+    const root = host.current;
+    if (!root) return;
+    const apply = () => {
+      for (const div of root.querySelectorAll<HTMLDivElement>('.win')) {
+        const svg = div.querySelector('svg');
+        const w = svg ? Number(svg.getAttribute('width')) : 0, h = svg ? Number(svg.getAttribute('height')) : 0;
+        let z = 1;
+        if (fit && w > 0 && h > 0 && !div.classList.contains('max')) {
+          z = Math.min(1, (root.clientWidth - 30) / (w + 2), (root.clientHeight - 30) / (h + 28));
+          if (!(z > 0.1)) z = 0.1;
+        }
+        div.style.zoom = z < 1 ? String(z) : '';
+      }
+    };
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(root);
+    return () => ro.disconnect();
+  }, [frame, fit]);
+
   if (!frame?.windows.length) return <div className="model"><div className="empty">Модель ещё не открыла окон. Нажмите «Пуск» (F5) или «Шаг» (F10) — окна появятся здесь.</div>{frame?.dialog && <ModelDialogBox d={frame.dialog} />}</div>;
   const unsupported = frame.unsupported ?? [];
   return <div className="model-view">
@@ -84,6 +107,7 @@ export function ModelView() {
       {frame.windows.length > 1 && <select className="small" value={activeName ?? ''} onChange={e => setActive(e.target.value)} title="Активное окно">
         {frame.windows.map(w => <option key={w.id} value={w.name}>{w.name}</option>)}
       </select>}
+      <button className="small" aria-pressed={fit} onClick={() => setFit(f => !f)} title="Вписать окно модели во вкладку или показать в натуральную величину (с прокруткой)">{fit ? 'Вписано' : '100%'}</button>
       <button className="small" onClick={() => setSaveVdr(true)} title="Записать активное окно в VDR: рисунок окна как файл .vdr">Записать в VDR…</button>
       <button className="small" onClick={() => setDialog('print')} title="Печать окна модели (Ctrl+P)">Печать…</button>
     </div>
