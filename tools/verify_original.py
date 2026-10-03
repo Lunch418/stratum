@@ -35,6 +35,15 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 CORE = ROOT / 'core' / 'target' / 'debug' / 'stratum'
 PREFIX = pathlib.Path(os.environ.get('WINEPREFIX', pathlib.Path.home() / '.wine32'))
 EXE = os.environ.get('STRATUM_EXE', r'C:\Program Files\Stratum\SC200032.EXE')
+# настройки среды оригинала, с которыми велась вся сверка: главное окно не
+# развернуто, 960x1011 (от него зависят размеры окон модели по умолчанию)
+DESKTOP = ROOT / 'tools' / 'verify' / 'control.dsk'
+
+
+def reset_desktop(prefix=PREFIX):
+    """Возвращает control.dsk оригинала к эталону: оригинал перезаписывает его
+    сам, и после работы в его окне вручную меняются размеры окон модели."""
+    shutil.copy(DESKTOP, prefix / 'drive_c' / 'Program Files' / 'Stratum' / 'control.dsk')
 WORK = PREFIX / 'drive_c' / 'verify'
 
 
@@ -189,6 +198,7 @@ def run_original(items, work, timeout=60, compiler=False):
         (WORK / 'probe.mdl').write_bytes(text.replace('\n', '\r\n').encode('cp1251'))
     out = WORK / 'out.txt'
     env = dict(os.environ, WINEPREFIX=str(PREFIX), WINEDEBUG='-all')
+    reset_desktop()
     proc = subprocess.Popen(['wine', EXE, r'C:\verify\project.spj', '/run'], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     start = time.time()
     while time.time() - start < timeout:

@@ -45,6 +45,7 @@ def main():
     if r.returncode:
         sys.exit('экспорт не удался: ' + r.stderr)
     env = dict(os.environ, WINEPREFIX=str(vo.PREFIX), WINEDEBUG='-all')
+    vo.reset_desktop()
     proc = subprocess.Popen(['wine', vo.EXE, r'C:\verify\project.spj', '/run'], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     start = time.time()
     while time.time() - start < 60 and proc.poll() is None:

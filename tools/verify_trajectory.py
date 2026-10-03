@@ -10,6 +10,7 @@ stratum sttdiff снимков. Нужны Wine и Stratum 2000 (~/.wine32).
 import os, pathlib, shutil, subprocess, sys, time
 
 from wine_dialogs import Answerer
+import verify_original as vo
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CORE = ROOT / 'core' / 'target' / 'debug' / 'stratum'
@@ -33,6 +34,7 @@ def main():
     r = subprocess.run([str(CORE), 'instrument', str(project), str(WORK), '--ticks', str(ticks)], capture_output=True, text=True)
     if r.returncode:
         sys.exit(f'{project.name}: подготовка не удалась: {r.stderr.strip() or r.stdout.strip()}')
+    vo.reset_desktop(PREFIX)
     proc = subprocess.Popen(['wine', EXE, r'C:\verify\project.spj', '/run'], env=env, cwd='/tmp', stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     deadline = time.time() + max(60, ticks)
     # модальные окна (ввод значения, сообщение) получают Enter: ядро без
