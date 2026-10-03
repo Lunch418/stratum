@@ -141,6 +141,13 @@ fn check(path: &Path, data: &[u8]) {
                     picture(blob, &name);
                 }
                 let _ = stratum_core::lang::parse(&c.text);
+                // байт-код исполняется, если расходится с текстом: разбор
+                // его обратно в операторы - тоже ввод из чужого файла
+                if let Some(bc) = &c.bytecode {
+                    let code: Vec<u16> = bc.chunks(2).map(|w| u16::from_le_bytes([w[0], *w.get(1).unwrap_or(&0)])).collect();
+                    let names: Vec<String> = c.vars.iter().map(|v| v.name.clone()).collect();
+                    let _ = stratum_core::lang::decompile::decompile(&code, &names);
+                }
                 let _ = cls::write(&c);
             }
         }

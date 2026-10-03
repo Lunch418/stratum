@@ -37,7 +37,7 @@ pub fn decompile(code: &[u16], vars: &[String]) -> Result<Vec<Stmt>, String> {
     let name = |i: u16| vars.get(i as usize).cloned().ok_or_else(|| format!("нет переменной с номером {i}"));
     // адрес слова -> номер инструкции
     let index_of = |addr: usize| at.iter().position(|a| *a == addr).ok_or_else(|| format!("переход в середину инструкции: {addr}"));
-    let mut d = Decompiler { ins: &ins, at: &at, name: &name, index_of: &index_of, loops: Vec::new() };
+    let mut d = Decompiler { ins: &ins, at: &at, name: &name, index_of: &index_of, loops: Vec::new(), nesting: 0 };
     d.block(0, ins.len())
 }
 
@@ -165,13 +165,40 @@ struct Decompiler<'a> {
     index_of: &'a dyn Fn(usize) -> Result<usize, String>,
     /// Выходы охватывающих циклов (номер инструкции) - для `break`.
     loops: Vec<usize>,
+    /// Вложенность блоков (`if`, `while`).
+    nesting: usize,
+}
+
+/// Предел вложенности выражений и блоков - как у разбора текста.
+const MAX_DEPTH: usize = 200;
+
+fn deeper(d: usize) -> Result<usize, String> {
+    if d >= MAX_DEPTH {
+        Err("слишком глубокая вложенность выражения".into())
+    } else {
+        Ok(d + 1)
+    }
 }
 
 impl Decompiler<'_> {
     /// Операторы инструкций `[from, to)`.
     fn block(&mut self, from: usize, to: usize) -> Result<Vec<Stmt>, String> {
+        // байт-код из чужого .cls: вложенные блоки и выражения без предела
+        // переполняли стек (разбор, исполнение и удаление дерева рекурсивны)
+        if self.nesting >= MAX_DEPTH {
+            return Err("слишком глубокая вложенность блоков".into());
+        }
+        self.nesting += 1;
+        let result = self.block_inner(from, to);
+        self.nesting -= 1;
+        result
+    }
+
+    fn block_inner(&mut self, from: usize, to: usize) -> Result<Vec<Stmt>, String> {
         let mut out: Vec<(usize, Stmt)> = Vec::new();
         let mut stack: Vec<Expr> = Vec::new();
+        // глубина каждого выражения в стеке
+        let mut depth: Vec<usize> = Vec::new();
         // где началось текущее выражение (для `while`)
         let mut expr_start = from;
         let mut i = from;
@@ -187,33 +214,48 @@ impl Decompiler<'_> {
                 Ins::Push { var, new } => {
                     let v = Expr::Var((self.name)(*var)?);
                     stack.push(if *new { Expr::Unary(UnOp::Old, Box::new(v)) } else { v });
+                    depth.push(2);
                 }
-                Ins::ByRef(var) => stack.push(Expr::Var((self.name)(*var)?)),
-                Ins::Const(e) => stack.push(e.clone()),
+                Ins::ByRef(var) => {
+                    stack.push(Expr::Var((self.name)(*var)?));
+                    depth.push(1);
+                }
+                Ins::Const(e) => {
+                    stack.push(e.clone());
+                    depth.push(1);
+                }
                 Ins::Unary(op) => {
                     let a = stack.pop().ok_or("пустой стек")?;
+                    let d = deeper(depth.pop().unwrap_or(0))?;
                     stack.push(Expr::Unary(*op, Box::new(a)));
+                    depth.push(d);
                 }
                 Ins::Binary(op) => {
                     let b = stack.pop().ok_or("пустой стек")?;
                     let a = stack.pop().ok_or("пустой стек")?;
+                    let (db, da) = (depth.pop().unwrap_or(0), depth.pop().unwrap_or(0));
                     stack.push(Expr::Binary(*op, Box::new(a), Box::new(b)));
+                    depth.push(deeper(da.max(db))?);
                 }
                 Ins::Call { name, argc } => {
                     if stack.len() < *argc {
                         return Err(format!("{name}: в стеке меньше {argc} аргументов"));
                     }
                     let args = stack.split_off(stack.len() - argc);
+                    let d = depth.split_off(depth.len() - argc).into_iter().max().unwrap_or(0);
                     stack.push(Expr::Call(name.clone(), args));
+                    depth.push(deeper(d)?);
                 }
                 Ins::Assign(var) => {
                     let value = stack.pop().ok_or("пустой стек")?;
+                    depth.clear();
                     self.flush(&mut stack, &mut out, expr_start);
                     out.push((expr_start, Stmt::Assign { target: (self.name)(*var)?, value }));
                 }
                 Ins::Jz(addr) | Ins::Jnz(addr) => {
                     let negate = matches!(self.ins[i], Ins::Jnz(_));
                     let cond = stack.pop().ok_or("условие без выражения")?;
+                    depth.clear();
                     self.flush(&mut stack, &mut out, expr_start);
                     let target = (self.index_of)(*addr)?;
                     if target <= i {
@@ -251,6 +293,7 @@ impl Decompiler<'_> {
                     continue;
                 }
                 Ins::Jmp(addr) => {
+                    depth.clear();
                     self.flush(&mut stack, &mut out, expr_start);
                     let target = (self.index_of)(*addr)?;
                     if self.loops.last() == Some(&target) || self.loops.contains(&target) {
@@ -283,6 +326,36 @@ impl Decompiler<'_> {
 mod tests {
     use super::*;
     use crate::lang::compile::{compile, Env, Ty};
+
+    #[test]
+    fn hostile_bytecode_depth_is_an_error() {
+        let names = vec!["x".to_string(), "y".to_string()];
+        let bin = (0..1000).find(|&op| binary(op).is_some()).unwrap();
+        // x, затем 100000 раз "минус", присвоить y
+        let mut neg = vec![1u16, 0];
+        neg.extend(std::iter::repeat_n(113u16, 100_000));
+        neg.extend([10, 1, 0]);
+        // x, затем 50000 раз (x, операция): цепочка вглубь
+        let mut chain = vec![1u16, 0];
+        for _ in 0..50_000 {
+            chain.extend([1, 0, bin]);
+        }
+        chain.extend([10, 1, 0]);
+        // 15000 вложенных if (x) с общим концом
+        let k = 15_000u16;
+        let mut ifs = Vec::new();
+        for _ in 0..k {
+            ifs.extend([1, 0, 53, 4 * k]);
+        }
+        ifs.push(0);
+        for code in [neg, chain, ifs] {
+            let n = names.clone();
+            let r = std::thread::Builder::new().stack_size(2 << 20).spawn(move || decompile(&code, &n).is_err()).unwrap().join();
+            assert_eq!(r.ok(), Some(true));
+        }
+        // обычный код по-прежнему разбирается
+        assert!(decompile(&[1, 0, 113, 10, 1, 0], &names).is_ok());
+    }
 
     fn round_trip(text: &str, vars: &[&str]) -> Vec<Stmt> {
         let model = crate::lang::parser::parse(text).unwrap();
