@@ -760,10 +760,15 @@ fn cmd_sttdiff(args: &[String]) -> Result<(), String> {
     let mut paths = Vec::new();
     let mut tol = 1e-9f64;
     let mut all = false;
+    let mut show: Option<String> = None;
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
             "--all" => all = true,
+            "--show" => {
+                i += 1;
+                show = args.get(i).cloned();
+            }
             "--tol" => {
                 i += 1;
                 tol = args.get(i).and_then(|v| v.parse().ok()).ok_or("--tol: нужно число")?;
@@ -778,6 +783,14 @@ fn cmd_sttdiff(args: &[String]) -> Result<(), String> {
         formats::project::parse_state(&d, &p.display().to_string()).map_err(|e| e.to_string())
     };
     let (orig, ours) = (read(a)?, read(b)?);
+    if let Some(class) = &show {
+        for (which, st) in [("оригинал", &orig), ("ядро", &ours)] {
+            for img in st.images.iter().filter(|i| lang::same_name(&i.class_name, class)) {
+                let vars: Vec<String> = img.vars.iter().map(|(n, v)| format!("{n}={v}")).collect();
+                println!("{which} {}#{}: {}", img.class_name, img.handle, vars.join(" "));
+            }
+        }
+    }
     // экземпляры одного имиджа с тем же handle встречаются в разных ветвях
     // (у каждого шара свой Engine#3): сопоставляем k-е вхождение с k-м —
     // оба снимка пишутся в одном обходе дерева

@@ -1,0 +1,22 @@
+# FitToCamera3d: третий параметр - тело, камера, ноль, несуществующий номер; чужое представление
+@ fixtures/PROJECTS/samples/BALLS WorkSpace
+% Wait = 1
++ fixtures/PROJECTS/samples/ROBOT/ROBOT3.VDR
+! hs := OpenSchemeWindow("W1", "WorkSpace", "")
+! h2 := LoadSpaceWindow("W3", "C:\verify\ROBOT3.VDR", "")
+! s3 := Handle(Float(~h2) - 1)
+! cam := GetObject2dByName(~s3, #0, "Sc Default Camera")
+! body := MakeBar3d(~s3, Rgb(1,2,3), 10, 10, 10)
+! f0 := FitToCamera3d(~h2, #1, ~body, 1)
+! f1 := FitToCamera3d(~h2, #1, ~cam, 1)
+! f2 := FitToCamera3d(~h2, #1, #0, 1)
+! f3 := FitToCamera3d(~h2, #1, #99, 1)
+! f5 := FitToCamera3d(~h2, #77, ~body, 1)
+! f6 := FitToCamera3d(~hs, #1, ~body, 1)
+cam | Float(cam)
+f0 | f0
+f1 | f1
+f2 | f2
+f3 | f3
+f5 | f5
+f6 | f6

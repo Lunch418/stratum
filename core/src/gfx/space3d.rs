@@ -512,10 +512,15 @@ impl Space3d {
 
     /// Габарит всех объектов в мировых координатах: центр и радиус.
     pub fn bounds(&self) -> Option<(Vec3, f64)> {
+        self.bounds_of(None)
+    }
+
+    /// Габарит одного тела (`Some`) или всей сцены (`None`).
+    pub fn bounds_of(&self, only: Option<Handle>) -> Option<(Vec3, f64)> {
         let mut lo = [f64::INFINITY; 3];
         let mut hi = [f64::NEG_INFINITY; 3];
         let mut any = false;
-        for o in self.objects.values() {
+        for o in self.objects.values().filter(|o| only.is_none_or(|h| o.handle == h)) {
             for p in self.world_points(o) {
                 any = true;
                 for k in 0..3 {

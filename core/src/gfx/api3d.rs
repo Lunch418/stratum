@@ -245,15 +245,19 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx, ms: &mut Matrices, output
             });
             ok(done.is_some())
         }
-        // FitToCamera3d(hSpace2d, hView, hCamera, fit)
+        // FitToCamera3d(hSpace2d, hView, hObject3d, fit): 0 - вся сцена, иначе существующее
+        // тело (камера или несуществующий номер - 0), сверено в Wine, fitcamera.txt
         "fittocamera3d" => {
             let (space2d, view) = (h(args, 0), h(args, 1));
             let fit = f(args, 3);
             let fit = if fit > 0.0 { fit } else { 1.0 };
             let Some((space, camera)) = view_of(gfx, space2d, view) else { return Some(ok(false)) };
-            let camera = if h(args, 2) != 0 { h(args, 2) } else { camera };
+            let body = h(args, 2);
             let done = gfx.spaces3d.get_mut(&space).and_then(|s| {
-                let (center, radius) = s.bounds()?;
+                if body != 0 && !s.objects.contains_key(&body) {
+                    return None;
+                }
+                let (center, radius) = s.bounds_of((body != 0).then_some(body))?;
                 let cam = s.cameras.get_mut(&camera)?;
                 let dir = space3d::sub(cam.pos, cam.target);
                 cam.target = center;
@@ -294,12 +298,14 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx, ms: &mut Matrices, output
         "maketore3d" | "maketoreex3d" => handle(sp3(gfx, args, 0).map(|s| s.add_object(space3d::make_tore(f(args, 2) as u32, f(args, 3), f(args, 4), f(args, 6) as usize, f(args, 7) as usize))).unwrap_or(0)),
         // MakeGrid3d(hSpace3d, sizeX, countX, sizeY, countY, color)
         "makegrid3d" => handle(sp3(gfx, args, 0).map(|s| s.add_object(space3d::make_grid(f(args, 5) as u32, f(args, 1), f(args, 2) as usize, f(args, 3), f(args, 4) as usize))).unwrap_or(0)),
-        // CreateSurface3d(hSpace3d, Mvertex, Mcolors, defColor, [flags])
+        // CreateSurface3d(hSpace3d, hObject, Mvertex, Mcolors, defColor, flags): hObject = 0 -
+        // новая поверхность; иначе обновляется существующая и возвращается тот же номер
+        // (сверено в Wine, surface3d.txt): флаг 1 - точки, флаг 2 - цвета, число точек не меняется
         "createsurface3d" => {
-            let Some(m) = ms.get(data::idx(f(args, 1))) else { return Some(handle(0)) };
+            let Some(m) = ms.get(data::idx(f(args, 2))) else { return Some(handle(0)) };
             let (pts, rows, cols) = points_from(m);
             let colors: Vec<u32> = ms
-                .get(data::idx(f(args, 2)))
+                .get(data::idx(f(args, 3)))
                 .map(|cm| {
                     let mut out = Vec::new();
                     for i in 0..rows as i64 {
@@ -310,7 +316,23 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx, ms: &mut Matrices, output
                     out
                 })
                 .unwrap_or_default();
-            handle(sp3(gfx, args, 0).map(|s| s.add_object(space3d::make_surface(pts, rows, cols, &colors, f(args, 3) as u32))).unwrap_or(0))
+            let (target, default, flags) = (h(args, 1), f(args, 4) as u32, f(args, 5) as u32);
+            if target == 0 {
+                return Some(handle(sp3(gfx, args, 0).map(|s| s.add_object(space3d::make_surface(pts, rows, cols, &colors, default))).unwrap_or(0)));
+            }
+            if let Some(o) = sp3(gfx, args, 0).and_then(|s| s.objects.get_mut(&target)) {
+                if flags & 1 != 0 {
+                    for (i, p) in pts.into_iter().enumerate().take(o.points.len()) {
+                        o.points[i] = p;
+                    }
+                }
+                if flags & 2 != 0 {
+                    for (p, c) in o.prims.iter_mut().zip(&colors) {
+                        p.color = *c;
+                    }
+                }
+            }
+            handle(target)
         }
         "createobjectfromfile3d" | "sweepandextrude3d" => handle(sp3(gfx, args, 0).map(|s| s.add_object(space3d::empty(0xFFFFFF))).unwrap_or(0)),
         "setobjectcolor3d" => {
