@@ -5,6 +5,8 @@ import { api, type Variable } from '../api';
 import { classByName, useStore } from '../store';
 import { ObjectProps } from './ObjectProps';
 
+const NO_VALUES = new Map<string, string>();
+
 export function Inspector() {
   const project = useStore(s => s.project);
   const selected = useStore(s => s.selectedClass);
@@ -13,18 +15,19 @@ export function Inspector() {
   const updateClass = useStore(s => s.updateClass);
   const showToast = useStore(s => s.showToast);
   const klass = classByName(project, selected);
-  const [live, setLive] = useState<Map<string, string>>(new Map());
+  const [liveRaw, setLive] = useState<Map<string, string>>(new Map());
   const [changed, setChanged] = useState<Set<string>>(new Set());
   const prev = useRef<Map<string, string>>(new Map());
   const [renaming, setRenaming] = useState<string | null>(null);
   // выражения-наблюдения: считаются ядром в контексте выбранного экземпляра
   const [watches, setWatches] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('watches') ?? '[]'); } catch { return []; } });
-  const [watchValues, setWatchValues] = useState<Map<string, string>>(new Map());
+  const [watchRaw, setWatchValues] = useState<Map<string, string>>(new Map());
   const [newWatch, setNewWatch] = useState('');
+  const watchValues = instance === null || !watches.length ? NO_VALUES : watchRaw;
+  const live = instance === null ? NO_VALUES : liveRaw;
   useEffect(() => { try { localStorage.setItem('watches', JSON.stringify(watches)); } catch { /* приватный режим */ } }, [watches]);
   useEffect(() => {
-    // oxlint-disable-next-line react/set-state-in-effect -- intentional
-    if (instance === null || !watches.length) { setWatchValues(new Map()); return; }
+    if (instance === null || !watches.length) return;
     let alive = true;
     const run = async () => {
       const m = new Map<string, string>();
@@ -42,8 +45,8 @@ export function Inspector() {
   const reload = useStore(s => s.reload);
   const say = useStore(s => s.say);
   const select = useStore(s => s.select);
-  // oxlint-disable-next-line react/set-state-in-effect -- intentional
-  useEffect(() => { setRenaming(null); setConfirmDelete(false); }, [selected]);
+  const [seenSel, setSeenSel] = useState(selected);
+  if (seenSel !== selected) { setSeenSel(selected); setRenaming(null); setConfirmDelete(false); }
 
   async function doRename() {
     if (!klass || renaming === null) return;
@@ -60,8 +63,7 @@ export function Inspector() {
 
   // живые значения: при работе - часто, на паузе - при смене такта
   useEffect(() => {
-    // oxlint-disable-next-line react/set-state-in-effect -- intentional
-    if (instance === null) { setLive(new Map()); return; }
+    if (instance === null) return;
     let alive = true;
     const tickOnce = async () => {
       try {

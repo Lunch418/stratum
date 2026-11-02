@@ -43,8 +43,6 @@ export function Palette({ commands, onClose }: Props) {
     return scored.slice(0, 40).map(x => x.c);
   }, [query, commands]);
 
-  // oxlint-disable-next-line react/set-state-in-effect -- intentional
-  useEffect(() => { setCursor(0); }, [query]);
   useEffect(() => {
     list.current?.querySelector('.active')?.scrollIntoView({ block: 'nearest' });
   }, [cursor]);
@@ -59,7 +57,7 @@ export function Palette({ commands, onClose }: Props) {
   return (
     <div className="modal-backdrop palette-backdrop" onMouseDown={onClose}>
       <div className="modal palette" onMouseDown={e => e.stopPropagation()}>
-        <input ref={input} type="text" placeholder="Команда или имя имиджа..." value={query} onChange={e => setQuery(e.target.value)} onKeyDown={onKey} spellCheck={false} />
+        <input ref={input} type="text" placeholder="Команда или имя имиджа..." value={query} onChange={e => { setCursor(0); setQuery(e.target.value); }} onKeyDown={onKey} spellCheck={false} />
         <div className="list" ref={list}>
           {items.map((c, i) => (
             <div key={c.id} className={`row${i === cursor ? ' active' : ''}`} onMouseEnter={() => setCursor(i)} onClick={() => { onClose(); c.run(); }}>

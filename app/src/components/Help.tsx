@@ -40,12 +40,14 @@ export function Help() {
   const topic = useStore(s => s.helpTopic);
   const setHelpTopic = useStore(s => s.setHelpTopic);
   const [query, setQuery] = useState('');
-  const [hits, setHits] = useState<string[]>([]);
-  const [page, setPage] = useState<{ topic: string; html: string } | { error: string } | null>(null);
+  const [hitsRaw, setHits] = useState<string[]>([]);
+  const [pageRaw, setPage] = useState<{ topic: string; html: string } | { error: string } | null>(null);
+
+  const hits = query.trim().length < 2 ? [] : hitsRaw;
+  const page = topic ? pageRaw : null;
 
   useEffect(() => {
-    // oxlint-disable-next-line react/set-state-in-effect -- intentional
-    if (!topic) { setPage(null); return; }
+    if (!topic) return;
     let alive = true;
     fetch(`/api/help/${encodeURIComponent(topic)}`).then(async r => {
       const j = await r.json();
@@ -56,8 +58,7 @@ export function Help() {
   }, [topic]);
 
   useEffect(() => {
-    // oxlint-disable-next-line react/set-state-in-effect -- intentional
-    if (query.trim().length < 2) { setHits([]); return; }
+    if (query.trim().length < 2) return;
     const id = setTimeout(() => api.helpSearch(query.trim()).then(setHits).catch(() => setHits([])), 150);
     return () => clearTimeout(id);
   }, [query]);

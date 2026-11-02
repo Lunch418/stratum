@@ -10,11 +10,11 @@ export function ObjectProps() {
   const pickObject = useStore(s => s.pickObject);
   const frame = useStore(s => s.frame);
   const showToast = useStore(s => s.showToast);
-  const [o, setO] = useState<Props | null>(null);
+  const [oRaw, setO] = useState<Props | null>(null);
+  const o = picked ? oRaw : null;
 
   useEffect(() => {
-    // oxlint-disable-next-line react-hooks/exhaustive-deps, react/set-state-in-effect -- intentional
-    if (!picked) { setO(null); return; }
+    if (!picked) return;
     let alive = true;
     api.object(picked.win, picked.handle).then(r => alive && setO(r)).catch(() => alive && setO(null));
     return () => { alive = false; };

@@ -26,6 +26,8 @@ function loadOpts(): Opts {
   try { return { ...defaults, ...JSON.parse(localStorage.getItem('searchOpts') ?? '{}') as Partial<Opts> }; } catch { return defaults; }
 }
 
+const NO_HITS: Hit[] = [];
+
 export function Search() {
   const select = useStore(s => s.select);
   const setTab = useStore(s => s.setTab);
@@ -34,21 +36,22 @@ export function Search() {
   const setQuery = useStore(s => s.setSearchQuery);
   const [opts, setOpts] = useState<Opts>(loadOpts);
   const [showOpts, setShowOpts] = useState(false);
-  const [hits, setHits] = useState<Hit[]>([]);
+  const [hitsRaw, setHits] = useState<Hit[]>([]);
   const [busy, setBusy] = useState(false);
   const set = (p: Partial<Opts>) => setOpts(o => { const n = { ...o, ...p }; try { localStorage.setItem('searchOpts', JSON.stringify(n)); } catch { /* приватный режим */ } return n; });
   const minLen = opts.where.length === 1 && opts.where[0] === 'handles' ? 1 : 2;
+  const active = query.trim().length >= minLen && opts.where.length > 0;
+  const hits = active ? hitsRaw : NO_HITS;
 
   useEffect(() => {
-    // oxlint-disable-next-line react/set-state-in-effect -- intentional
-    if (query.trim().length < minLen || !opts.where.length) { setHits([]); return; }
-    setBusy(true);
+    if (!active) return;
+    setBusy(true); // oxlint-disable-line react/set-state-in-effect -- intentional: запрос уходит наружу
     const id = setTimeout(() => {
       const q = new URLSearchParams({ q: query.trim(), in: opts.where.join(','), libs: opts.libs ? '1' : '0', case: opts.case ? '1' : '0', word: opts.word ? '1' : '0' });
       fetch(`/api/search?${q}`).then(r => r.json()).then(h => { setHits(h); setBusy(false); }).catch(() => setBusy(false));
     }, 200);
     return () => clearTimeout(id);
-  }, [query, opts, minLen]);
+  }, [query, opts, active]);
 
   function open(h: Hit) {
     if (h.kind === 'instance') { useStore.setState({ schemePath: [h.class], selectedClass: h.class, selectedInstance: null, tab: 'scheme' }); return; }

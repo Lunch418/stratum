@@ -16,6 +16,7 @@ const COLORS = Array.from({ length: 8 }, (_, i) => `var(--series-${i + 1})`);
 const CHAR_W = 6.7, LABEL_H = 13;
 
 // "Показать всё": сверху место под панель, снизу - под легенду, справа - под подписи
+const NO_NODES: Node[] = [];
 function fitView(nodes: Node[], size: { w: number; h: number }) {
   if (!nodes.length) return { x: 0, y: 0, k: 1 };
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
@@ -29,7 +30,8 @@ export function Graph() {
   const path = useStore(s => s.schemePath);
   const klass = path[path.length - 1];
   const [data, setData] = useState<GraphData | null>(null);
-  const [nodes, setNodes] = useState<Node[]>([]);
+  const [nodesRaw, setNodes] = useState<Node[]>([]);
+  const nodes = data ? nodesRaw : NO_NODES;
   const [onlyLinked, setOnlyLinked] = useState(true);
   const [withText, setWithText] = useState(false);
   const box = useRef<HTMLDivElement>(null);
@@ -68,8 +70,7 @@ export function Graph() {
   // силовая раскладка: экземпляры - кластеры в узлах решётки, переменные
   // тянутся к своему; лист тем больше, чем больше узлов
   useEffect(() => {
-    // oxlint-disable-next-line react/set-state-in-effect -- intentional
-    if (!data) { setNodes([]); return; }
+    if (!data) return;
     const instOf = (id: string) => id.slice(0, id.indexOf('.'));
     const used = data.instances.map(i => i.id).filter(id => shown.nodes.some(n => instOf(n) === id));
     const aspect = Math.max(0.5, Math.min(3, size.w / Math.max(1, size.h)));
