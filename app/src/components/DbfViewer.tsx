@@ -21,7 +21,7 @@ export function DbfViewer({ onClose }: { onClose: () => void }) {
     let alive = true;
     api.dbf(file, offset, PAGE, query)
       .then(p => { if (alive) { setPage(p); setError(''); } })
-      .catch(e => { if (alive) { setPage(null); setError(String(e.message ?? e)); } });
+      .catch(e => { if (alive) { setPage(null); setError(/422\s*$/.test(String(e.message ?? e)) ? 'файл повреждён или это не таблица dBASE' : 'ядро не ответило'); } });
     return () => { alive = false; };
   }, [file, offset, query]);
 
@@ -39,7 +39,7 @@ export function DbfViewer({ onClose }: { onClose: () => void }) {
               <input type="search" placeholder="Поиск" value={query} onChange={e => { setQuery(e.target.value); setOffset(0); }} style={{ flex: 1 }} />
             </div>
           )}
-          {error && <div className="muted">{error}</div>}
+          {error && <div className="halt error" role="alert">Не удалось прочитать таблицу: {error}</div>}
           {page && (
             <div style={{ overflow: 'auto', maxHeight: '60vh' }}>
               <table className="mono small">
@@ -52,6 +52,7 @@ export function DbfViewer({ onClose }: { onClose: () => void }) {
                   ))}
                 </tbody>
               </table>
+              {page.rows.length === 0 && <div className="empty">{page.total === 0 ? 'В таблице нет записей.' : 'Ничего не найдено - измените запрос.'}</div>}
             </div>
           )}
         </div>
