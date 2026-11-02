@@ -13,7 +13,7 @@ export function Debug() {
   const [profile, setProfile] = useState<{ tick: number; total: number; items: { index: number; path: string; class: string; ns: number }[] } | null>(null);
   const [expr, setExpr] = useState('');
   const [scope, setScope] = useState<'instance' | 'class'>('instance');
-  // матрицы модели («Matrix editor» оригинала): список и выбранная с правкой ячеек
+  // матрицы модели ("Matrix editor" оригинала): список и выбранная с правкой ячеек
   const [matrices, setMatrices] = useState<{ q: number; minI: number; maxI: number; minJ: number; maxJ: number }[]>([]);
   const [matrix, setMatrix] = useState<{ q: number; minI: number; maxI: number; minJ: number; maxJ: number; rows: number[][] } | null>(null);
   const loadMatrix = (q: number) => fetch(`/api/matrix/${q}`).then(r => r.ok ? r.json() : null).then(setMatrix).catch(() => setMatrix(null));
@@ -88,8 +88,8 @@ export function Debug() {
       <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, borderLeft: '1px solid var(--border)' }}>
         <div className="panel-title">Матрицы
           <select value={matrix?.q ?? ''} onChange={e => e.target.value ? loadMatrix(Number(e.target.value)) : setMatrix(null)} style={{ marginLeft: 8, textTransform: 'none', letterSpacing: 0 }}>
-            <option value="">—</option>
-            {matrices.map(m => <option key={m.q} value={m.q}>#{m.q} · {m.maxI - m.minI + 1}×{m.maxJ - m.minJ + 1}</option>)}
+            <option value="">-</option>
+            {matrices.map(m => <option key={m.q} value={m.q}>#{m.q} | {m.maxI - m.minI + 1}×{m.maxJ - m.minJ + 1}</option>)}
           </select>
           <span className="spacer" /><span className="muted">{matrices.length}</span>
         </div>

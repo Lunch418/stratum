@@ -1,9 +1,9 @@
-// Граф зависимостей переменных схемы: узлы — переменные экземпляров
-// (сгруппированы по имиджу), дуги — связи схемы и присваивания в текстах.
+// Граф зависимостей переменных схемы: узлы - переменные экземпляров
+// (сгруппированы по имиджу), дуги - связи схемы и присваивания в текстах.
 // Раскладка силовая, считается в браузере на листе, размер которого растёт
 // с числом узлов; вид можно двигать мышью и масштабировать колесом. Подписи
 // не наезжают друг на друга: каждая ставится туда, где свободно, а если
-// места нет — прячется до наведения.
+// места нет - прячется до наведения.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../store';
 
@@ -11,11 +11,11 @@ interface GraphData { instances: { id: string; label: string; class: string }[];
 interface Node { id: string; inst: string; var: string; x: number; y: number; vx: number; vy: number }
 interface Label { x: number; y: number; anchor: 'start' | 'end' | 'middle' }
 
-// цвета экземпляров — токены темы, те же, что у рядов на графиках
+// цвета экземпляров - токены темы, те же, что у рядов на графиках
 const COLORS = Array.from({ length: 8 }, (_, i) => `var(--series-${i + 1})`);
 const CHAR_W = 6.7, LABEL_H = 13;
 
-// «Показать всё»: сверху место под панель, снизу — под легенду, справа — под подписи
+// "Показать всё": сверху место под панель, снизу - под легенду, справа - под подписи
 function fitView(nodes: Node[], size: { w: number; h: number }) {
   if (!nodes.length) return { x: 0, y: 0, k: 1 };
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
@@ -53,7 +53,7 @@ export function Graph() {
 
   const shown = useMemo(() => {
     if (!data) return { nodes: [] as string[], edges: [] as GraphData['edges'] };
-    // по умолчанию — переменные, участвующие в связях схемы; присваивания
+    // по умолчанию - переменные, участвующие в связях схемы; присваивания
     // из текстов добавляют дуги между уже показанными узлами
     const linkDeg = new Map<string, number>();
     for (const e of data.edges) if (e.kind === 'link') { linkDeg.set(e.from, 1); linkDeg.set(e.to, 1); }
@@ -65,7 +65,7 @@ export function Graph() {
     return { nodes, edges };
   }, [data, onlyLinked, withText]);
 
-  // силовая раскладка: экземпляры — кластеры в узлах решётки, переменные
+  // силовая раскладка: экземпляры - кластеры в узлах решётки, переменные
   // тянутся к своему; лист тем больше, чем больше узлов
   useEffect(() => {
     // oxlint-disable-next-line react/set-state-in-effect -- intentional
@@ -125,7 +125,7 @@ export function Graph() {
   const sx = (n: { x: number }) => n.x * view.k + view.x;
   const sy = (n: { y: number }) => n.y * view.k + view.y;
 
-  // подписи: справа, слева, сверху или снизу от точки — где не занято
+  // подписи: справа, слева, сверху или снизу от точки - где не занято
   // другими подписями и точками; иначе подпись видна только при наведении
   const labels = useMemo(() => {
     const sx = (n: { x: number }) => n.x * view.k + view.x;
@@ -133,7 +133,7 @@ export function Graph() {
     const out = new Map<string, Label>();
     const boxes: [number, number, number, number][] = nodes.map(n => [sx(n) - 5, sy(n) - 5, sx(n) + 5, sy(n) + 5]);
     const free = (b: [number, number, number, number]) => b[0] >= 0 && b[2] <= size.w && boxes.every(o => b[2] <= o[0] || b[0] >= o[2] || b[3] <= o[1] || b[1] >= o[3]);
-    // сначала подписи узлов со связями — они важнее
+    // сначала подписи узлов со связями - они важнее
     const deg = new Map<string, number>();
     for (const e of shown.edges) { deg.set(e.from, (deg.get(e.from) ?? 0) + 1); deg.set(e.to, (deg.get(e.to) ?? 0) + 1); }
     for (const n of [...nodes].sort((a, b) => (deg.get(b.id) ?? 0) - (deg.get(a.id) ?? 0))) {
@@ -173,12 +173,12 @@ export function Graph() {
           <input type="checkbox" checked={withText} onChange={e => setWithText(e.target.checked)} />присваивания в текстах
         </label>
         <button className="small" onClick={fit} title="Показать весь граф">Показать всё</button>
-        <span className="muted small graph-count" title={hidden ? `${hidden} подписей скрыто, чтобы не наезжали друг на друга — наведите на точку или приблизьте колесом` : undefined}>
-          {shown.nodes.length} перем. · {shown.edges.length} дуг{hidden ? ` · ${hidden} подп. скрыто` : ''}
+        <span className="muted small graph-count" title={hidden ? `${hidden} подписей скрыто, чтобы не наезжали друг на друга - наведите на точку или приблизьте колесом` : undefined}>
+          {shown.nodes.length} перем. | {shown.edges.length} дуг{hidden ? ` | ${hidden} подп. скрыто` : ''}
         </span>
       </div>
-      {!data && <div className="empty">Выберите имидж со схемой — здесь появится граф связей его переменных.</div>}
-      {data && !shown.nodes.length && <div className="empty">В схеме «{klass}» нет зависимостей между переменными.</div>}
+      {!data && <div className="empty">Выберите имидж со схемой - здесь появится граф связей его переменных.</div>}
+      {data && !shown.nodes.length && <div className="empty">В схеме "{klass}" нет зависимостей между переменными.</div>}
       <svg width={size.w} height={size.h} onWheel={onWheel} className={pan ? 'panning' : undefined}
         onMouseDown={e => { if (e.button === 0) setPan({ sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y }); }}
         onMouseMove={e => { if (pan) setView(v => ({ ...v, x: pan.vx + e.clientX - pan.sx, y: pan.vy + e.clientY - pan.sy })); }}

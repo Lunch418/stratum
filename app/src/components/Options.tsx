@@ -1,7 +1,7 @@
-// Диалоги параметров в структуре оригинала: «Параметры листа» (сетка, окно,
-// слои, разное), «Параметры проекта» (вычисления, методы, переменные,
-// информация), «Параметры среды», «Свойства имиджа», «Порядок вычислений»,
-// выбор файла и «О программе».
+// Диалоги параметров в структуре оригинала: "Параметры листа" (сетка, окно,
+// слои, разное), "Параметры проекта" (вычисления, методы, переменные,
+// информация), "Параметры среды", "Свойства имиджа", "Порядок вычислений",
+// выбор файла и "О программе".
 import { useEffect, useState } from 'react';
 import { api, type ProjectProperty, type Sheet } from '../api';
 import { classByName, useStore } from '../store';
@@ -62,7 +62,7 @@ export function SheetDialog({ onClose }: { onClose: () => void }) {
     markUnsaved(); await reload(); onClose();
   }
   return (
-    <Frame title={`Параметры листа — ${cls.name}`} width={560} onClose={onClose} onSubmit={submit}>
+    <Frame title={`Параметры листа - ${cls.name}`} width={560} onClose={onClose} onSubmit={submit}>
       <Tabs tabs={[['grid', 'Сетка'], ['window', 'Окно'], ['layers', 'Слои'], ['misc', 'Разное']]} value={tab} onChange={setTab} />
       <div className="modal-body dialog-page">
         {tab === 'grid' && (
@@ -101,7 +101,7 @@ export function SheetDialog({ onClose }: { onClose: () => void }) {
           </fieldset>
         </>}
         {tab === 'layers' && <>
-          <div className="muted small" style={{ marginBottom: 6 }}>Видимые слои листа (0–31). Объекты и связи со скрытого слоя не показываются в окне модели.</div>
+          <div className="muted small" style={{ marginBottom: 6 }}>Видимые слои листа (0-31). Объекты и связи со скрытого слоя не показываются в окне модели.</div>
           <div className="layer-grid">
             {Array.from({ length: 32 }, (_, i) => <Check key={i} label={String(i)} value={layerOn(i)} onChange={v => layersMask(v, i)} />)}
           </div>
@@ -171,7 +171,7 @@ export function ProjectOptionsDialog({ onClose }: { onClose: () => void }) {
         </div>}
         {tab === 'method' && <fieldset><legend>Решение уравнений</legend>
           <label className="prop"><span>Линейные уравнения</span><select value={t('lin_method') || 'gauss'} onChange={e => set('lin_method', e.target.value)}><option value="gauss">Метод Гаусса</option><option value="lsq">Наименьшие квадраты</option></select></label>
-          <label className="prop"><span>Нелинейные уравнения</span><select value={t('nl_method') || 'newton'} onChange={e => set('nl_method', e.target.value)}><option value="newton">Ньютон — Рафсон</option></select></label>
+          <label className="prop"><span>Нелинейные уравнения</span><select value={t('nl_method') || 'newton'} onChange={e => set('nl_method', e.target.value)}><option value="newton">Ньютон - Рафсон</option></select></label>
           <Num label="Максимальное число итераций" value={n('newton_iter', 50)} onChange={v => set('newton_iter', Math.max(1, v))} />
           <Num label="Допустимая ошибка, 10⁻ⁿ" value={n('newton_eps', 6)} onChange={v => set('newton_eps', v)} />
           <div className="muted small">Дифференциальные уравнения решаются методом Эйлера с шагом такта.</div>
@@ -199,17 +199,17 @@ export function ProjectOptionsDialog({ onClose }: { onClose: () => void }) {
 export interface UserInfo { name: string; org: string; email: string; addr: string; phone: string; notes: string }
 export interface EnvOptions {
   autosave: number; pollMs: number; circlePoints: number; gridAuto: boolean; fontSize: number; confirmClose: boolean;
-  /// «Параметры среды → Вычисления»: пройденные шаги и индикатор производительности в строке статуса
+  /// "Параметры среды -> Вычисления": пройденные шаги и индикатор производительности в строке статуса
   statusTicks: boolean; statusPerf: boolean;
-  /// «2D-редактор»: курсор-рука при перемещении объектов
+  /// "2D-редактор": курсор-рука при перемещении объектов
   handCursor: boolean;
-  /// «Редактор»: выделение синтаксиса, кегль, перенос строк, мини-карта
+  /// "Редактор": выделение синтаксиса, кегль, перенос строк, мини-карта
   syntax: boolean; editorFontSize: number; wordWrap: boolean; minimap: boolean;
-  /// «Пользователь»: данные автора и копирование их в новый проект
+  /// "Пользователь": данные автора и копирование их в новый проект
   user: UserInfo; copyUser: boolean;
-  /// «2D-редактор → Шаблоны»: файлы .vdr для рисунка и схемы нового имиджа
+  /// "2D-редактор -> Шаблоны": файлы .vdr для рисунка и схемы нового имиджа
   templates: { image: string; scheme: string };
-  /// «Методы» и «Переменные» по умолчанию — свойства нового проекта
+  /// "Методы" и "Переменные" по умолчанию - свойства нового проекта
   projectDefaults: ProjectDefaults;
 }
 export interface ProjectDefaults { lin_method: string; nl_method: string; newton_iter: number; newton_eps: number; vars_logset: number; vars_preload: number }
@@ -242,8 +242,8 @@ export function EnvOptionsDialog({ onClose }: { onClose: () => void }) {
   const [browse, setBrowse] = useState<'image' | 'scheme' | null>(null);
   const tplField = (label: string, k: 'image' | 'scheme') => (
     <label className="prop"><span>{label}</span><span style={{ display: 'flex', gap: 6, flex: 1 }}>
-      <input type="text" className="mono" value={env.templates[k]} placeholder="нет — пустой лист" onChange={e => setEnv(v => ({ ...v, templates: { ...v.templates, [k]: e.target.value } }))} />
-      <button type="button" className="small" onClick={() => setBrowse(k)}>Обзор…</button>
+      <input type="text" className="mono" value={env.templates[k]} placeholder="нет - пустой лист" onChange={e => setEnv(v => ({ ...v, templates: { ...v.templates, [k]: e.target.value } }))} />
+      <button type="button" className="small" onClick={() => setBrowse(k)}>Обзор...</button>
     </span></label>
   );
   const pd = env.projectDefaults;
@@ -267,10 +267,10 @@ export function EnvOptionsDialog({ onClose }: { onClose: () => void }) {
       <div className="modal-body dialog-page">
         {tab === 'calc' && <fieldset><legend>Вычисления</legend>
           <Num label="Опрос окна модели, мс" value={env.pollMs} onChange={v => set({ pollMs: Math.max(10, v) })} />
-          <Num label="Автосохранение проекта, с (0 — выключено)" value={env.autosave} onChange={v => set({ autosave: Math.max(0, v) })} />
+          <Num label="Автосохранение проекта, с (0 - выключено)" value={env.autosave} onChange={v => set({ autosave: Math.max(0, v) })} />
           <Check label="Пройденные шаги в строке статуса" value={env.statusTicks} onChange={v => set({ statusTicks: v })} />
           <Check label="Индикатор производительности (тактов в секунду) в строке статуса" value={env.statusPerf} onChange={v => set({ statusPerf: v })} />
-          <div className="muted small">Режим вычислений и обработка ошибок задаются на проект: «Параметры → Параметры проекта…».</div>
+          <div className="muted small">Режим вычислений и обработка ошибок задаются на проект: "Параметры {'->'} Параметры проекта...".</div>
         </fieldset>}
         {tab === '2d' && <fieldset><legend>Двумерный редактор</legend>
           <Num label="Точек в окружности" value={env.circlePoints} onChange={v => set({ circlePoints: Math.min(360, Math.max(8, v)) })} />
@@ -285,16 +285,16 @@ export function EnvOptionsDialog({ onClose }: { onClose: () => void }) {
           <Num label="Кегль текста" value={env.editorFontSize} onChange={v => set({ editorFontSize: Math.min(28, Math.max(9, v)) })} />
           <Check label="Переносить длинные строки" value={env.wordWrap} onChange={v => set({ wordWrap: v })} />
           <Check label="Мини-карта текста" value={env.minimap} onChange={v => set({ minimap: v })} />
-          <div className="muted small">Цветовая схема текста следует теме среды («Вид»).</div>
+          <div className="muted small">Цветовая схема текста следует теме среды ("Вид").</div>
         </fieldset>}
         {tab === 'method' && <fieldset><legend>По умолчанию для новых проектов</legend>
           <label className="prop"><span>Линейные уравнения</span><select value={pd.lin_method} onChange={e => setPd({ lin_method: e.target.value })}><option value="gauss">Метод Гаусса</option><option value="lsq">Наименьшие квадраты</option></select></label>
-          <label className="prop"><span>Нелинейные уравнения</span><select value={pd.nl_method} onChange={e => setPd({ nl_method: e.target.value })}><option value="newton">Ньютон — Рафсон</option></select></label>
+          <label className="prop"><span>Нелинейные уравнения</span><select value={pd.nl_method} onChange={e => setPd({ nl_method: e.target.value })}><option value="newton">Ньютон - Рафсон</option></select></label>
           <Num label="Максимальное число итераций" value={pd.newton_iter} onChange={v => setPd({ newton_iter: Math.max(1, v) })} />
           <Num label="Допустимая ошибка, 10⁻ⁿ" value={pd.newton_eps} onChange={v => setPd({ newton_eps: v })} />
-          <div className="muted small">Дифференциальные уравнения решаются методом Эйлера с шагом такта. Свои методы у проекта — «Параметры проекта → Методы».</div>
+          <div className="muted small">Дифференциальные уравнения решаются методом Эйлера с шагом такта. Свои методы у проекта - "Параметры проекта {'->'} Методы".</div>
         </fieldset>}
-        {tab === 'vars' && <fieldset><legend>Устанавливаемые переменные — для новых проектов</legend>
+        {tab === 'vars' && <fieldset><legend>Устанавливаемые переменные - для новых проектов</legend>
           <Check label="Запоминать устанавливаемые переменные" value={pdBit('vars_logset', 1)} onChange={v => setPdBit('vars_logset', 1, v)} />
           <Check label="Автоматически считывать при загрузке проекта" value={pdBit('vars_preload', 1)} onChange={v => setPdBit('vars_preload', 1, v)} />
           <Check label="Автоматически записывать при закрытии проекта" value={pdBit('vars_preload', 2)} onChange={v => setPdBit('vars_preload', 2, v)} />
@@ -307,25 +307,25 @@ export function EnvOptionsDialog({ onClose }: { onClose: () => void }) {
         </fieldset>}
         {tab === 'libs' && <fieldset><legend>Библиотеки</legend>
           {libs.length ? libs.map(l => <div key={l} className="mono small">{l}</div>) : <div className="muted">Библиотеки не подключены.</div>}
-          <div className="muted small" style={{ marginTop: 6 }}>Папки библиотек задаются при запуске ядра (<span className="mono">--lib</span>) и в <span className="mono">project.json → libraries</span>.</div>
+          <div className="muted small" style={{ marginTop: 6 }}>Папки библиотек задаются при запуске ядра (<span className="mono">--lib</span>) и в <span className="mono">project.json {'->'} libraries</span>.</div>
         </fieldset>}
         {tab === 'view' && <fieldset><legend>Вид</legend>
-          <label className="prop"><span>Тема</span><button type="button" className="small" onClick={toggleTheme}>{theme === 'light' ? 'Светлая → тёмная' : 'Тёмная → светлая'}</button></label>
+          <label className="prop"><span>Тема</span><button type="button" className="small" onClick={toggleTheme}>{theme === 'light' ? 'Светлая -> тёмная' : 'Тёмная -> светлая'}</button></label>
           <Num label="Размер шрифта интерфейса" value={env.fontSize} onChange={v => set({ fontSize: Math.min(20, Math.max(10, v)) })} />
           <Check label="Предупреждать о несохранённых правках при закрытии" value={env.confirmClose} onChange={v => set({ confirmClose: v })} />
           <label className="prop"><span>Раскладка панелей</span><button type="button" className="small" onClick={() => { try { localStorage.removeItem('layout'); } catch { /* */ } location.reload(); }}>Сбросить</button></label>
         </fieldset>}
       </div>
     </Frame>
-    {browse && <FilePickDialog title="Шаблон — файл .vdr" ext="vdr" onClose={() => setBrowse(null)}
+    {browse && <FilePickDialog title="Шаблон - файл .vdr" ext="vdr" onClose={() => setBrowse(null)}
       onPick={p => { const k = browse; setBrowse(null); setEnv(v => ({ ...v, templates: { ...v.templates, [k]: p } })); }} />}
     </>
   );
 }
 
 // ── Свойства имиджа ────────────────────────────────────────────────────────
-// Биты флагов имиджа — по корпусу проектов оригинала; названия из диалога
-// «Дополнительные свойства имиджа».
+// Биты флагов имиджа - по корпусу проектов оригинала; названия из диалога
+// "Дополнительные свойства имиджа".
 const CLASS_FLAGS: [number, string][] = [
   [0x40, 'Имидж нельзя менять'],
   [0x200, 'Системный имидж'],
@@ -362,7 +362,7 @@ export function ClassPropsDialog({ onClose }: { onClose: () => void }) {
     } catch (e) { say({ level: 'error', where: 'имидж', text: String(e) }); }
   }
   return (
-    <Frame title={`Свойства имиджа — ${cls.name}`} width={560} onClose={onClose} onSubmit={cls.library ? undefined : submit}>
+    <Frame title={`Свойства имиджа - ${cls.name}`} width={560} onClose={onClose} onSubmit={cls.library ? undefined : submit}>
       <Tabs tabs={[['main', 'Основное'], ['extra', 'Дополнительно'], ['icon', 'Иконка'], ['vars', 'Переменные']]} value={tab} onChange={setTab} />
       <div className="modal-body dialog-page">
         {tab === 'main' && <>
@@ -374,7 +374,7 @@ export function ClassPropsDialog({ onClose }: { onClose: () => void }) {
               <label className="prop" style={{ alignItems: 'start' }}><span>Примечания</span><textarea rows={4} value={desc} disabled={cls.library} onChange={e => setDesc(e.target.value)} /></label>
             </div>
           </div>
-          <div className="muted small">Переменных: {cls.vars.length} · блоков на схеме: {cls.children.length} · связей: {cls.links.length} · строк кода: {cls.text.split('\n').length}</div>
+          <div className="muted small">Переменных: {cls.vars.length} | блоков на схеме: {cls.children.length} | связей: {cls.links.length} | строк кода: {cls.text.split('\n').length}</div>
         </>}
         {tab === 'extra' && <fieldset><legend>Параметры</legend>
           {CLASS_FLAGS.map(([bit, label]) => <Check key={bit} label={label} value={(flags & bit) !== 0} disabled={cls.library} onChange={v => setFlags(f => v ? f | bit : f & ~bit)} />)}
@@ -384,7 +384,7 @@ export function ClassPropsDialog({ onClose }: { onClose: () => void }) {
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <img src={api.iconUrl(cls.name)} width={32} height={32} alt="" style={{ border: '1px solid var(--border)', borderRadius: 4 }} />
             <label className="prop" style={{ flex: 1 }}><span>Библиотека иконок</span>
-              <select value={set} onChange={e => setSet(e.target.value)}>{sets.map(x => <option key={x.file} value={x.file}>{x.file} · {x.count}</option>)}</select></label>
+              <select value={set} onChange={e => setSet(e.target.value)}>{sets.map(x => <option key={x.file} value={x.file}>{x.file} | {x.count}</option>)}</select></label>
             <button type="button" className="small ghost" disabled={cls.library} onClick={async () => { await api.setClassIcon(cls.name, '', 0); api.bumpIcons(); markUnsaved(); await reload(); }}>По умолчанию</button>
           </div>
           <div className="icon-grid">
@@ -424,7 +424,7 @@ export function CalcOrderDialog({ onClose }: { onClose: () => void }) {
   };
   async function submit() { await api.reorderChildren(cls!.name, order); markUnsaved(); await reload(); onClose(); }
   return (
-    <Frame title={`Порядок вычислений — ${cls.name}`} width={480} onClose={onClose} onSubmit={submit}>
+    <Frame title={`Порядок вычислений - ${cls.name}`} width={480} onClose={onClose} onSubmit={submit}>
       <div className="modal-body">
         <div className="muted small" style={{ marginBottom: 6 }}>Имиджи схемы вычисляются сверху вниз в каждом такте.</div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -432,7 +432,7 @@ export function CalcOrderDialog({ onClose }: { onClose: () => void }) {
             {order.map((h, i) => { const c = cls.children.find(c => c.handle === h)!; return (
               <div key={h} className={`row${sel === h ? ' selected' : ''}`} style={{ cursor: 'pointer' }} onClick={() => setSel(h)}>
                 <span className="muted mono" style={{ width: 28 }}>{i + 1}</span>
-                <span>{c.name || c.class}</span>{c.name && <span className="muted"> · {c.class}</span>}
+                <span>{c.name || c.class}</span>{c.name && <span className="muted"> | {c.class}</span>}
               </div>); })}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -478,7 +478,7 @@ export function AboutDialog({ onClose }: { onClose: () => void }) {
     <Frame title="О программе" width={440} onClose={onClose}>
       <div className="modal-body about">
         <div className="about-name">Stratum Modern</div>
-        <div className="muted">Среда визуального моделирования — современная реализация Stratum 2000.</div>
+        <div className="muted">Среда визуального моделирования - современная реализация Stratum 2000.</div>
         <div className="muted small" style={{ marginTop: 10 }}>Ядро на Rust: форматы <span className="mono">.cls/.spj/.stt/.vdr</span>, интерпретатор, 2D/3D-графика. Интерфейс: React, Monaco, Tauri.</div>
         <div className="muted small" style={{ marginTop: 6 }}>Исходный код: <span className="mono">github.com/Lunch418/stratum</span></div>
       </div>
@@ -498,8 +498,8 @@ export function DeleteClassesDialog({ onClose }: { onClose: () => void }) {
   const own = (project?.classes ?? []).filter(c => !c.library && c.name !== project?.root);
   const used = new Map<string, number>();
   for (const i of instances) used.set(i.class.toLowerCase(), (used.get(i.class.toLowerCase()) ?? 0) + 1);
-  // упоминание в схемах или текстах других имиджей (CreateObject, GetClassFile…)
-  // — тоже использование, такие имиджи заранее не отмечаются
+  // упоминание в схемах или текстах других имиджей (CreateObject, GetClassFile...)
+  // - тоже использование, такие имиджи заранее не отмечаются
   const mentioned = new Set<string>();
   for (const c of project?.classes ?? []) {
     for (const ch of c.children) mentioned.add(ch.class.toLowerCase());

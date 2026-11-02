@@ -25,7 +25,7 @@ const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replac
 /// Готовая к печати графика: содержимое SVG и его прямоугольник в координатах листа.
 interface Drawing { inner: string; box: [number, number, number, number]; className?: string }
 
-/// Графика вкладки «Схема» — берётся с холста как есть (блоки, связи, площадки).
+/// Графика вкладки "Схема" - берётся с холста как есть (блоки, связи, площадки).
 export function schemeDrawing(): Drawing | null {
   const svg = document.querySelector('.scheme svg.canvas');
   const scene = svg?.querySelector(':scope > g') as SVGGElement | null;
@@ -37,7 +37,7 @@ export function schemeDrawing(): Drawing | null {
   return { inner: defs + clone.outerHTML, box: [b.x - 8, b.y - 8, b.width + 16, b.height + 16], className: 'scheme' };
 }
 
-/// Рисунок или иконка имиджа — из ядра, в координатах пространства.
+/// Рисунок или иконка имиджа - из ядра, в координатах пространства.
 export async function pictureDrawing(cls: string, kind: 'image' | 'icon'): Promise<Drawing | null> {
   const r = await fetch(`/api/picture/${encodeURIComponent(cls)}?kind=${kind}`);
   if (!r.ok) return null;
@@ -62,7 +62,7 @@ export async function printWith(o: PrintOptions) {
   const [ml, mt, mr, mb] = o.margins;
   const areaW = pw - ml - mr, areaH = ph - mt - mb - (o.header ? 8 : 0);
   const title = { scheme: 'Схема', picture: 'Рисунок', icon: 'Иконка', model: 'Окно модели', code: 'Текст' }[o.source];
-  const header = o.header ? `<div class="print-header"><b>${esc(title)} · ${esc(o.source === 'model' ? s.frame?.windows[o.window]?.name ?? '' : cls)}</b><span>${esc(s.project?.dir ?? '')}</span><span>${new Date().toLocaleString('ru-RU')}</span></div>` : '';
+  const header = o.header ? `<div class="print-header"><b>${esc(title)} | ${esc(o.source === 'model' ? s.frame?.windows[o.window]?.name ?? '' : cls)}</b><span>${esc(s.project?.dir ?? '')}</span><span>${new Date().toLocaleString('ru-RU')}</span></div>` : '';
   let body = '';
   if (o.source === 'code') {
     const text = s.project?.classes.find(c => c.name === cls)?.text ?? '';
@@ -98,7 +98,7 @@ export async function printWith(o: PrintOptions) {
     window.removeEventListener('afterprint', done);
   };
   window.addEventListener('afterprint', done);
-  // браузер без afterprint (или печать отменена сразу) — убрать страницу позже
+  // браузер без afterprint (или печать отменена сразу) - убрать страницу позже
   setTimeout(() => { window.print(); setTimeout(done, 1000); }, 50);
 }
 

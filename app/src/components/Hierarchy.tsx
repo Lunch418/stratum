@@ -1,5 +1,5 @@
 // Иерархия проекта: дерево экземпляров с фильтром; выбор синхронен со
-// схемой и инспектором. Ниже — библиотечные имиджи.
+// схемой и инспектором. Ниже - библиотечные имиджи.
 import { useMemo, useState } from 'react';
 import { DRAG_CLASS } from './SchemeCanvas';
 import { api } from '../api';
@@ -33,7 +33,7 @@ export function Hierarchy() {
   }
 
   async function newClass() {
-    // имя формируется автоматически; переименование — позже, через инспектор
+    // имя формируется автоматически; переименование - позже, через инспектор
     let n = 1;
     while (project?.classes.some(c => c.name.toLowerCase() === `имидж${n}`)) n++;
     try { await api.newClass(`Имидж${n}`); await reload(); select(`Имидж${n}`, null); setTab('code'); }
@@ -85,7 +85,7 @@ export function Hierarchy() {
                   {kids ? (isCollapsed ? '▸' : '▾') : ''}
                 </span>
                 <img src={api.iconUrl(inst.class)} alt="" />
-                <span className="name">{inst.name}{inst.name !== inst.class && <span className="muted"> · {inst.class}</span>}</span>
+                <span className="name">{inst.name}{inst.name !== inst.class && <span className="muted"> | {inst.class}</span>}</span>
                 {kids > 0 && <span className="count">{kids}</span>}
               </div>
             );
@@ -126,17 +126,17 @@ export function Hierarchy() {
       </div>
       {menu && (
         <div className="context" style={{ left: menu.x, top: menu.y }} onMouseLeave={() => setMenu(null)} onMouseDown={e => e.stopPropagation()}>
-          <button onClick={() => { setMenu(null); setDialog('classProps'); }}>Свойства имиджа… <span className="muted">Enter</span></button>
-          <button onClick={() => { setMenu(null); setTab('code'); }}>Редактировать текст…</button>
-          <button onClick={() => { setMenu(null); enterScheme(menu.cls); }}>Редактировать схему…</button>
-          <button onClick={() => { setMenu(null); setTab('picture'); }}>Редактировать изображение…</button>
-          <button onClick={() => { setMenu(null); setTab('graph'); }}>Детальная информация (граф)…</button>
+          <button onClick={() => { setMenu(null); setDialog('classProps'); }}>Свойства имиджа... <span className="muted">Enter</span></button>
+          <button onClick={() => { setMenu(null); setTab('code'); }}>Редактировать текст...</button>
+          <button onClick={() => { setMenu(null); enterScheme(menu.cls); }}>Редактировать схему...</button>
+          <button onClick={() => { setMenu(null); setTab('picture'); }}>Редактировать изображение...</button>
+          <button onClick={() => { setMenu(null); setTab('graph'); }}>Детальная информация (граф)...</button>
           {!menu.library && <>
             <div className="menu-sep" />
             <button onClick={() => { setMenu(null); newClass(); }}>Новый имидж</button>
             {menu.confirm
-              ? <button onClick={() => { setMenu(null); deleteClass(menu.cls); }} style={{ color: 'var(--state-error)' }}>Точно удалить «{menu.cls}»</button>
-              : <button onClick={() => setMenu({ ...menu, confirm: true })} disabled={menu.cls === project?.root}>Удалить…</button>}
+              ? <button onClick={() => { setMenu(null); deleteClass(menu.cls); }} style={{ color: 'var(--state-error)' }}>Точно удалить "{menu.cls}"</button>
+              : <button onClick={() => setMenu({ ...menu, confirm: true })} disabled={menu.cls === project?.root}>Удалить...</button>}
           </>}
         </div>
       )}

@@ -1,5 +1,5 @@
-// Диалоги проекта: «Создание проекта» (папка и корневой имидж) и
-// «Информация» (сводка: имиджи, экземпляры, связи, уравнения, функции).
+// Диалоги проекта: "Создание проекта" (папка и корневой имидж) и
+// "Информация" (сводка: имиджи, экземпляры, связи, уравнения, функции).
 import { useEffect, useState } from 'react';
 import { loadEnv } from './Options';
 import { api } from '../api';
@@ -22,14 +22,14 @@ export function NewProjectDialog({ onClose }: { onClose: () => void }) {
       const r = await fetch(`/api/new?root=${encodeURIComponent(root.trim() || 'Main')}${inMemory ? '' : '&dir=' + encodeURIComponent(dir.trim())}`, { method: 'POST' });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error ?? r.statusText);
-      // «Параметры среды → Пользователь»: данные автора в новый проект
+      // "Параметры среды -> Пользователь": данные автора в новый проект
       const env = loadEnv();
       if (env.copyUser) {
         const u = env.user;
         const props: [string, string][] = [['user_name', [u.name, u.org].filter(Boolean).join(', ')], ['user_email', u.email], ['user_addr', [u.addr, u.phone].filter(Boolean).join('; ')], ['info', u.notes]];
         for (const [k, v] of props) if (v) await api.setProjectProperty(k, v);
       }
-      // «Параметры среды → Методы, Переменные»: свойства нового проекта
+      // "Параметры среды -> Методы, Переменные": свойства нового проекта
       const pd = env.projectDefaults;
       await api.setProjectProperty('lin_method', pd.lin_method);
       await api.setProjectProperty('nl_method', pd.nl_method);
@@ -49,7 +49,7 @@ export function NewProjectDialog({ onClose }: { onClose: () => void }) {
           <label className="prop"><span>Корневой имидж</span><input autoFocus type="text" value={root} onChange={e => setRoot(e.target.value)} /></label>
           <label className="prop"><span>Папка</span><input type="text" className="mono" value={dir} onChange={e => setDir(e.target.value)} disabled={inMemory} /></label>
           <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={inMemory} onChange={e => setInMemory(e.target.checked)} />только в памяти (папку задать при сохранении)</label>
-          <div className="muted small">Проект сохраняется в родном формате: <span className="mono">project.json</span> и папка <span className="mono">classes/</span>; экспорт в <span className="mono">.spj/.cls</span> — из меню «Проект».</div>
+          <div className="muted small">Проект сохраняется в родном формате: <span className="mono">project.json</span> и папка <span className="mono">classes/</span>; экспорт в <span className="mono">.spj/.cls</span> - из меню "Проект".</div>
         </div>
         <div className="modal-actions">
           <button type="button" className="ghost" onClick={onClose}>Отмена</button>
@@ -73,12 +73,12 @@ export function InfoDialog({ onClose }: { onClose: () => void }) {
     <div className="modal-backdrop" onMouseDown={onClose}>
       <div className="modal" style={{ width: 'min(760px, 94vw)' }} onMouseDown={e => e.stopPropagation()}>
         <div className="panel-title">Информация о проекте <span className="spacer" /><button aria-label="Закрыть" title="Закрыть (Esc)" className="small ghost icon-only" onClick={onClose}><Icon name="close" /></button></div>
-        {!info ? <div className="muted" style={{ padding: 12 }}>Загрузка…</div> : (
+        {!info ? <div className="muted" style={{ padding: 12 }}>Загрузка...</div> : (
           <div className="modal-body" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, maxHeight: '70vh', overflow: 'auto', fontSize: 12 }}>
             <div>
               <table className="vars"><tbody>
                 <tr><td className="muted">Корневой имидж</td><td>{info.root}</td></tr>
-                <tr><td className="muted">Папка</td><td className="mono">{info.dir || '— (в памяти)'}</td></tr>
+                <tr><td className="muted">Папка</td><td className="mono">{info.dir || '- (в памяти)'}</td></tr>
                 <tr><td className="muted">Имиджей проекта</td><td className="num">{info.classes}</td></tr>
                 <tr><td className="muted">Имиджей библиотек</td><td className="num">{info.libraryClasses}</td></tr>
                 <tr><td className="muted">Экземпляров в модели</td><td className="num">{info.instances}</td></tr>

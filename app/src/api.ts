@@ -6,11 +6,11 @@ export interface Variable {
 }
 export interface Child { handle: number; class: string; name: string; x: number; y: number }
 export interface LinkStyle { color: string; width: number; disabled: boolean; arrows: boolean; layer: number }
-/// pad — контактная площадка со стороны самого имиджа (handle 0); 0 — не указана
+/// pad - контактная площадка со стороны самого имиджа (handle 0); 0 - не указана
 export interface Link { handle: number; source: number; target: number; vars: [string, string][]; style: LinkStyle; pad: number }
 /// Контактная площадка схемы: через неё связи идут к переменным самого имиджа.
 export interface Pad { id: number; x: number; y: number }
-/// Параметры листа (диалог «Параметры листа»): сетка, окно модели, слои.
+/// Параметры листа (диалог "Параметры листа"): сетка, окно модели, слои.
 export interface Sheet {
   gridOrigin: [number, number]; gridStep: [number, number]; gridVisible: boolean; gridSnap: boolean;
   windowStyle: 'mdi' | 'dialog' | 'popup' | 'default'; windowSize: 'max' | 'min' | 'default' | 'space' | 'fixed'; windowWh: [number, number];
@@ -29,7 +29,7 @@ export interface Breakpoint { id: number; index: number | null; path: string; cl
 export interface ModelDialog { kind: 'message' | 'input' | 'open' | 'save' | 'folder' | 'color'; title: string; text: string; style: number; default: string }
 export interface Frame {
   tick: number; running: boolean; stopped: boolean; canBack: boolean; canHyperBack?: boolean; halt: Halt | null; dialog: ModelDialog | null;
-  /// вызовы, которые ядро не выполняет (базы данных, Ogre3D, анализатор текста…)
+  /// вызовы, которые ядро не выполняет (базы данных, Ogre3D, анализатор текста...)
   unsupported?: { name: string; count: number }[];
   windows: { id: number; name: string; w: number; h: number; size?: string; style?: string; svg: string; controls: Control[] }[];
   sounds: { cmd: 'play' | 'stop'; file: string; loop: boolean }[];
@@ -45,7 +45,7 @@ export interface ObjectProps {
   zorder: number | null; parent: number | null; pen?: { color: string; width: number; style: number }; brush?: { color: string; style: number };
   points?: [number, number][]; text?: string; class?: string; children?: number;
   font?: { face: string; size: number; bold: boolean; italic: boolean; underline: boolean; fg: string; bg: string }; enabled?: boolean; checked?: boolean;
-  /// гиперссылка (закладка «Гипербаза»): режим 0 окно, 1 приложение, 2 проект, 3 ничего, 4 команда
+  /// гиперссылка (закладка "Гипербаза"): режим 0 окно, 1 приложение, 2 проект, 3 ничего, 4 команда
   hyper?: { mode: number; target: string; window: string; object: string; effect: string };
   /// члены группы и исходный прямоугольник растра
   members?: number[]; src?: [number, number, number, number];
@@ -99,7 +99,7 @@ export const api = {
   },
   moveChild: (klass: string, handle: number, x: number, y: number) =>
     fetch(`/api/child/move?class=${encodeURIComponent(klass)}&handle=${handle}&x=${x}&y=${y}`, { method: 'POST' }),
-  // сохранить проект в родном формате (project.json); dir — новая папка
+  // сохранить проект в родном формате (project.json); dir - новая папка
   save: async (dir?: string) => {
     const r = await fetch('/api/save' + (dir ? '?dir=' + encodeURIComponent(dir) : ''), { method: 'POST' });
     const j = await r.json();
@@ -122,7 +122,7 @@ export const api = {
     fetch(`/api/child/remove?class=${encodeURIComponent(klass)}&handle=${handle}`, { method: 'POST' }),
   renameChild: (klass: string, handle: number, name: string) =>
     fetch(`/api/child/rename?class=${encodeURIComponent(klass)}&handle=${handle}&name=${encodeURIComponent(name)}`, { method: 'POST' }),
-  // handle 0 — новая связь; пустой список пар удаляет связь
+  // handle 0 - новая связь; пустой список пар удаляет связь
   setLink: async (klass: string, handle: number, source: number, target: number, pairs: [string, string][], pad = 0) => {
     const r = await fetch(`/api/link/set?class=${encodeURIComponent(klass)}&handle=${handle}&source=${source}&target=${target}${pad ? '&pad=' + pad : ''}`, { method: 'POST', body: pairs.map(p => p.join('\t')).join('\n') });
     return r.json() as Promise<{ ok: boolean; handle: number }>;
@@ -139,7 +139,7 @@ export const api = {
     const r = await fetch(`/api/class/new?name=${encodeURIComponent(name)}`, { method: 'POST' });
     const j = await r.json();
     if (!r.ok) throw new Error(j.error ?? r.statusText);
-    // «Параметры среды → 2D-редактор → Шаблоны»: рисунок и схема нового имиджа из .vdr
+    // "Параметры среды -> 2D-редактор -> Шаблоны": рисунок и схема нового имиджа из .vdr
     let tpl: { image?: string; scheme?: string } = {};
     try { tpl = (JSON.parse(localStorage.getItem('env') ?? '{}') as { templates?: typeof tpl }).templates ?? {}; } catch { /* нет настроек */ }
     for (const kind of ['image', 'scheme'] as const) {

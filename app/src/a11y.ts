@@ -1,7 +1,7 @@
 // Общее поведение модальных окон, чтобы каждый диалог не повторял его сам:
 // роль и заголовок для экранного диктора, фокус внутрь при открытии и назад
 // при закрытии, Tab не уходит за пределы окна, Escape закрывает верхнее окно
-// так же, как щелчок по подложке (окна модели подложку не закрывают — им
+// так же, как щелчок по подложке (окна модели подложку не закрывают - им
 // Escape тоже ничего не сделает).
 const FOCUSABLE = 'input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
 
@@ -28,10 +28,10 @@ function prepare(backdrop: HTMLElement) {
     modal.setAttribute('aria-labelledby', title.id);
   }
   returnTo.set(backdrop, document.activeElement instanceof HTMLElement ? document.activeElement : null);
-  // autoFocus диалога уже сработал — не перебиваем его
+  // autoFocus диалога уже сработал - не перебиваем его
   if (modal.contains(document.activeElement)) return;
   const list = focusables(modal);
-  // первое поле ввода, если диалог с него начинается; иначе — главная кнопка
+  // первое поле ввода, если диалог с него начинается; иначе - главная кнопка
   const first = list.find(el => !el.closest('.panel-title, .tabs'));
   const field = first?.matches('input[type="text"], input[type="number"], input[type="search"], input:not([type]), textarea') ? first : undefined;
   const target = field ??modal.querySelector<HTMLElement>('.modal-actions button[type="submit"], .modal-actions .primary') ?? [...modal.querySelectorAll<HTMLElement>('.modal-actions button')].pop() ?? list[0];
@@ -39,8 +39,8 @@ function prepare(backdrop: HTMLElement) {
 }
 
 // Деревья и списки строк (иерархия, библиотеки, справка, папки): в каждую
-// панель входят одной остановкой Tab, дальше ↑/↓, Home/End — по строкам,
-// пробел — выбрать (как щелчок); Enter оставлен за «Свойствами имиджа».
+// панель входят одной остановкой Tab, дальше ↑/↓, Home/End - по строкам,
+// пробел - выбрать (как щелчок); Enter оставлен за "Свойствами имиджа".
 function rovingTrees() {
   for (const row of document.querySelectorAll<HTMLElement>('.tree-row:not([tabindex])')) row.tabIndex = -1;
   for (const panel of document.querySelectorAll<HTMLElement>('.left, .right-bottom, .tree.browse')) {

@@ -1,4 +1,4 @@
-// Редактор связи: пары переменных «источник → приёмник». Пустой список
+// Редактор связи: пары переменных "источник -> приёмник". Пустой список
 // удаляет связь.
 import { useState } from 'react';
 import type { ClassInfo, LinkStyle } from '../api';
@@ -39,7 +39,7 @@ export function LinkDialog({ source, target, pairs: initial, style: initialStyle
   return (
     <div className="modal-backdrop" onMouseDown={onClose}>
       <form className="modal" onMouseDown={e => e.stopPropagation()} onSubmit={e => { e.preventDefault(); onSubmit(clean, style); }}>
-        <div className="panel-title">{isNew ? 'Новая связь' : 'Связь'}: {source.label} → {target.label}</div>
+        <div className="panel-title">{isNew ? 'Новая связь' : 'Связь'}: {source.label} {'->'} {target.label}</div>
         <div className="tabs small-tabs dialog-tabs">
           <button type="button" className={tab === 'main' ? 'active' : ''} onClick={() => setTab('main')}>Основное</button>
           <button type="button" className={tab === 'extra' ? 'active' : ''} onClick={() => setTab('extra')}>Дополнительно</button>
@@ -67,7 +67,7 @@ export function LinkDialog({ source, target, pairs: initial, style: initialStyle
               {pairs.map((p, i) => (
                 <tr key={i}>
                   <td><VarPick value={p[0]} vars={srcVars} onChange={v => update(i, 0, v)} /></td>
-                  <td className="muted">→</td>
+                  <td className="muted">{'->'}</td>
                   <td><VarPick value={p[1]} vars={dstVars} onChange={v => update(i, 1, v)} /></td>
                   <td><button aria-label="Убрать пару" type="button" className="small ghost" onClick={() => setPairs(ps => ps.filter((_, k) => k !== i))} title="Убрать пару">×</button></td>
                 </tr>
@@ -91,8 +91,8 @@ function VarPick({ value, vars, onChange }: { value: string; vars: { name: strin
   return (
     <span style={{ display: 'flex', gap: 4 }}>
       <select value={known ? value : ''} onChange={e => onChange(e.target.value)} style={{ flex: 1 }}>
-        <option value="">—</option>
-        {vars.map(v => <option key={v.name} value={v.name}>{v.name} · {v.type}</option>)}
+        <option value="">-</option>
+        {vars.map(v => <option key={v.name} value={v.name}>{v.name} | {v.type}</option>)}
       </select>
       {!known && value && <input type="text" className="mono" value={value} onChange={e => onChange(e.target.value)} style={{ width: 90 }} />}
     </span>

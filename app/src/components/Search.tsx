@@ -1,4 +1,4 @@
-// Поиск по всему проекту (диалог «Поиск» оригинала как панель): где искать —
+// Поиск по всему проекту (диалог "Поиск" оригинала как панель): где искать -
 // текст модели, комментарии, имена переменных, их значения, имена имиджей,
 // имена объектов (блоки схем и объекты рисунков), дескрипторы, описания;
 // различать регистр, только слова целиком. Щелчок ведёт к найденному.
@@ -58,7 +58,7 @@ export function Search() {
     if (h.line) setGotoLine({ class: h.class, line: h.line });
   }
 
-  // «Создавать группу»: найденные объекты рисунка одного имиджа — в группу
+  // "Создавать группу": найденные объекты рисунка одного имиджа - в группу
   const objectHits = hits.filter(h => h.kind === 'object' && h.handle !== undefined);
   async function makeGroups() {
     const byPic = new Map<string, Hit[]>();
@@ -91,8 +91,8 @@ export function Search() {
         <label className="search-opt" title="Только слова целиком"><input type="checkbox" checked={opts.word} onChange={e => set({ word: e.target.checked })} />слово</label>
         <label className="search-opt"><input type="checkbox" checked={opts.libs} onChange={e => set({ libs: e.target.checked })} />и в библиотеках</label>
         <button className={`small ghost${showOpts ? ' active' : ''}`} onClick={() => setShowOpts(v => !v)} title="Где искать">Где: {opts.where.length === WHERE.length ? 'везде' : opts.where.length}</button>
-        {objectHits.length > 1 && <button className="small ghost" onClick={makeGroups} title="«Создавать группу»: найденные объекты рисунка одного имиджа объединяются в группу с именем строки поиска">Создать группу</button>}
-        <span className="spacer" /><span className="muted">{busy ? '…' : hits.length}</span>
+        {objectHits.length > 1 && <button className="small ghost" onClick={makeGroups} title="Создавать группу: найденные объекты рисунка одного имиджа объединяются в группу с именем строки поиска">Создать группу</button>}
+        <span className="spacer" /><span className="muted">{busy ? '...' : hits.length}</span>
       </div>
       {showOpts && (
         <div className="search-where">

@@ -1,4 +1,4 @@
-// Редактор графики имиджа — панель «Рисование» оригинала: выбор и
+// Редактор графики имиджа - панель "Рисование" оригинала: выбор и
 // перемещение, линия, полилиния, прямоугольник, скруглённый прямоугольник,
 // эллипс, дуга, текст, группа, Z-порядок, правка точек, параметры листа.
 // Рисует ядро (SVG), страница держит только выбор и текущий инструмент.
@@ -20,13 +20,13 @@ const TOOLS: { id: Tool; label: string; hint: string }[] = [
   { id: 'select', label: '↖', hint: 'Выбор и перемещение (Esc)' },
   { id: 'pan', label: '✥', hint: 'Панорама (или средняя кнопка)' },
   { id: 'line', label: '╱', hint: 'Линия: две точки' },
-  { id: 'polyline', label: '⌇', hint: 'Полилиния: точки щелчками, правая кнопка или Enter — закончить' },
+  { id: 'polyline', label: '⌇', hint: 'Полилиния: точки щелчками, правая кнопка или Enter - закончить' },
   { id: 'rect', label: '▭', hint: 'Прямоугольник' },
   { id: 'roundrect', label: '▢', hint: 'Скруглённый прямоугольник' },
   { id: 'ellipse', label: '◯', hint: 'Эллипс' },
   { id: 'arc', label: '◜', hint: 'Дуга (четверть)' },
   { id: 'text', label: 'T', hint: 'Текст' },
-  { id: 'points', label: '⋯', hint: 'Правка точек выбранной линии (Ctrl+щелчок — добавить, Shift+перетащить — удалить)' },
+  { id: 'points', label: '⋯', hint: 'Правка точек выбранной линии (Ctrl+щелчок - добавить, Shift+перетащить - удалить)' },
 ];
 
 export function PictureEditor({ kind }: { kind: Kind }) {
@@ -39,7 +39,7 @@ export function PictureEditor({ kind }: { kind: Kind }) {
   const [state, setState] = useState<State | null>(null);
   const [tool, setTool] = useState<Tool>('select');
   const [sel, setSel] = useState<number[]>([]);
-  // иконка 32×32 в натуральную величину едва видна — открываем её крупно, по пикселям
+  // иконка 32×32 в натуральную величину едва видна - открываем её крупно, по пикселям
   const [view, setView] = useState(() => kind === 'icon' ? { x: 40, y: 40, k: 8 } : { x: 40, y: 40, k: 1 });
   const [pen, setPen] = useState({ color: '#000000', width: 1 });
   const [fill, setFill] = useState<{ color: string; on: boolean }>({ color: '#ffffff', on: false });
@@ -50,10 +50,10 @@ export function PictureEditor({ kind }: { kind: Kind }) {
   const [textAsk, setTextAsk] = useState<{ at: [number, number]; value: string } | null>(null);
   const [insertAsk, setInsertAsk] = useState(false);
   const [bitmapEdit, setBitmapEdit] = useState<number | null>(null);
-  // диалог «Параметры объекта» (двойной щелчок по объекту или «Свойства…»)
+  // диалог "Параметры объекта" (двойной щелчок по объекту или "Свойства...")
   const [objDialog, setObjDialog] = useState<number | null>(null);
   const sheet = klass?.sheet;
-  // «Сетка автоматически включается» (параметры среды): сетка видна и без флага листа
+  // "Сетка автоматически включается" (параметры среды): сетка видна и без флага листа
   const grid = sheet?.gridVisible ? { step: sheet.gridStep, origin: sheet.gridOrigin } : loadEnv().gridAuto ? { step: sheet?.gridStep ?? [10, 10] as [number, number], origin: sheet?.gridOrigin ?? [0, 0] as [number, number] } : null;
   const svgRef = useRef<SVGSVGElement>(null);
   const editable = !!klass && !klass.library;
@@ -65,7 +65,7 @@ export function PictureEditor({ kind }: { kind: Kind }) {
   };
   // oxlint-disable-next-line react-hooks/exhaustive-deps, react/set-state-in-effect -- intentional
   useEffect(() => { load(); setSel([]); setDraft([]); }, [klass?.name, kind]);
-  // «Вставка → Новый двухмерный объект / Формы» из главного меню
+  // "Вставка -> Новый двухмерный объект / Формы" из главного меню
   useEffect(() => {
     const on = (e: Event) => {
       const t = String((e as CustomEvent).detail);
@@ -80,7 +80,7 @@ export function PictureEditor({ kind }: { kind: Kind }) {
     return () => window.removeEventListener('draw-tool', on);
   // oxlint-disable-next-line react-hooks/exhaustive-deps -- intentional
   }, [editable, state, cursor, sel, klass?.name]);
-  // «Формат → Z-порядок» из главного меню
+  // "Формат -> Z-порядок" из главного меню
   useEffect(() => {
     const on = (e: Event) => { if (sel.length === 1 && editable) op({ op: 'zorder', handle: sel[0], to: (e as CustomEvent).detail }); };
     window.addEventListener('zorder', on);
@@ -107,7 +107,7 @@ export function PictureEditor({ kind }: { kind: Kind }) {
     const st = state!;
     return [(p[0] - st.view[0]) * view.k + view.x, (p[1] - st.view[1]) * view.k + view.y];
   };
-  // привязка к сетке листа («Параметры листа → Сетка → Привязка»)
+  // привязка к сетке листа ("Параметры листа -> Сетка -> Привязка")
   const snap = (p: [number, number]): [number, number] => {
     if (sheet?.gridSnap) {
       const [sx, sy] = sheet.gridStep, [ox, oy] = sheet.gridOrigin;
@@ -124,7 +124,7 @@ export function PictureEditor({ kind }: { kind: Kind }) {
       if (e.key === 'Escape') { setTool('select'); setDraft([]); setSel([]); setTextAsk(null); }
       else if ((e.key === 'Delete' || e.key === 'Backspace') && sel.length && editable) { e.preventDefault(); op(sel.map(h => ({ op: 'delete', handle: h }))).then(() => setSel([])); }
       else if (e.key.toLowerCase() === 'd' && e.ctrlKey && sel.length === 1 && editable) { e.preventDefault(); op({ op: 'duplicate', handle: sel[0] }).then(h => setSel([h])); }
-      // Z-порядок как в оригинале: PgUp/PgDn на одну, с Ctrl — на верх/вниз
+      // Z-порядок как в оригинале: PgUp/PgDn на одну, с Ctrl - на верх/вниз
       else if ((e.key === 'PageUp' || e.key === 'PageDown') && sel.length === 1 && editable) { e.preventDefault(); op({ op: 'zorder', handle: sel[0], to: e.key === 'PageUp' ? (e.ctrlKey ? 'top' : 'up') : (e.ctrlKey ? 'bottom' : 'down') }); }
       else if (e.key === 'Enter' && tool === 'polyline' && draft.length >= 2) finishPolyline();
       // инструменты как в редакторе оригинала: Ctrl+P ломаная, Ctrl+B прямоугольник,
@@ -232,7 +232,7 @@ export function PictureEditor({ kind }: { kind: Kind }) {
     }
   }
 
-  // масштаб относительно середины холста («Выбор масштаба»)
+  // масштаб относительно середины холста ("Выбор масштаба")
   function zoomTo(k: number) {
     const r = svgRef.current?.getBoundingClientRect();
     const mx = (r?.width ?? 0) / 2, my = (r?.height ?? 0) / 2;
@@ -247,8 +247,8 @@ export function PictureEditor({ kind }: { kind: Kind }) {
     setView({ k, x: mx - (mx - view.x) * (k / view.k), y: my - (my - view.y) * (k / view.k) });
   }
 
-  if (!klass) return <div className="empty">Выберите имидж в иерархии — здесь откроется его рисунок.</div>;
-  if (!state) return <div className="empty">Загрузка рисунка…</div>;
+  if (!klass) return <div className="empty">Выберите имидж в иерархии - здесь откроется его рисунок.</div>;
+  if (!state) return <div className="empty">Загрузка рисунка...</div>;
 
   const selObjs = state.objects.filter(o => sel.includes(o.handle));
   const one = selObjs.length === 1 ? selObjs[0] : null;
@@ -334,8 +334,8 @@ export function PictureEditor({ kind }: { kind: Kind }) {
           {one.brush && <label>Заливка <input type="color" value={one.brush.color} onChange={e => op({ op: 'set', handle: one.handle, field: 'brush.color', value: e.target.value })} />
             <select value={one.brush.style} onChange={e => op({ op: 'set', handle: one.handle, field: 'brush.style', value: Number(e.target.value) })}><option value={0}>сплошная</option><option value={1}>нет</option></select></label>}
           {one.points && <span className="muted">точек: {one.points.length}</span>}
-          {one.hyper && <span className="muted" title="Гиперссылка">↗ {one.hyper.target || '—'}</span>}
-          <button className="small" onClick={() => setObjDialog(one.handle)} title="Параметры объекта: положение, линия, заливка, текст, гипербаза (двойной щелчок)">Свойства…</button>
+          {one.hyper && <span className="muted" title="Гиперссылка">↗ {one.hyper.target || '-'}</span>}
+          <button className="small" onClick={() => setObjDialog(one.handle)} title="Параметры объекта: положение, линия, заливка, текст, гипербаза (двойной щелчок)">Свойства...</button>
         </div>
       )}
       {objDialog !== null && (() => {

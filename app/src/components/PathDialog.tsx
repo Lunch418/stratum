@@ -1,5 +1,5 @@
-// Ввод пути к папке: «Сохранить как» и «Экспорт в Stratum 2000».
-// Свой диалог вместо window.prompt — его нет в WebView Tauri.
+// Ввод пути к папке: "Сохранить как" и "Экспорт в Stratum 2000".
+// Свой диалог вместо window.prompt - его нет в WebView Tauri.
 import { useEffect, useRef, useState } from 'react';
 
 interface Props {

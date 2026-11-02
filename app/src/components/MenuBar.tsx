@@ -1,8 +1,8 @@
 // Строка меню в структуре оригинала (Файл, Правка, Вид, Вставка, Формат,
 // Моделирование, Параметры, Помощь). Открытое меню переключается наведением,
 // подменю раскрываются вправо, Escape закрывает. С клавиатуры: стрелки
-// ходят по заголовкам и пунктам, Enter/пробел выбирают, → и ← открывают
-// и закрывают подменю, Home/End — к первому и последнему пункту.
+// ходят по заголовкам и пунктам, Enter/пробел выбирают, -> и ← открывают
+// и закрывают подменю, Home/End - к первому и последнему пункту.
 import { useEffect, useRef, useState } from 'react';
 
 export interface MenuItem {
@@ -13,7 +13,7 @@ export interface MenuItem {
   checked?: boolean;
   sub?: MenuItem[];
   sep?: boolean;
-  /// Причина недоступности — в подсказке; пункты оригинала, которым в новой
+  /// Причина недоступности - в подсказке; пункты оригинала, которым в новой
   /// среде нет места, помечаются так, а не пропадают молча.
   why?: string;
 }
@@ -77,7 +77,7 @@ function MenuList({ items, close, autoFocus, label, side, back }: {
   close: (refocus: boolean) => void;
   autoFocus: boolean;
   label: string;
-  /// ← и → на верхнем уровне: к соседнему меню строки
+  /// ← и -> на верхнем уровне: к соседнему меню строки
   side?: (d: number) => void;
   /// ← в подменю: вернуться к пункту-родителю
   back?: () => void;
@@ -115,7 +115,7 @@ function MenuList({ items, close, autoFocus, label, side, back }: {
             <span className="menu-check" aria-hidden="true">{it.checked ? '✓' : ''}</span>
             <span className="menu-label">{it.label}</span>
             {it.hint && <span className="muted menu-hint">{it.hint}</span>}
-            {it.sub && <span className="muted menu-more" aria-hidden="true">›</span>}
+            {it.sub && <span className="muted menu-more" aria-hidden="true">{">"}</span>}
           </button>
           {it.sub && sub === i && (
             <div className="submenu">

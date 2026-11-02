@@ -1,9 +1,9 @@
-// Гиперпереходы из кадра ядра (закладка «Гипербаза» объектов рисунка).
+// Гиперпереходы из кадра ядра (закладка "Гипербаза" объектов рисунка).
 import type { Frame } from './api';
 import { useStore } from './store';
 
 /// Гиперпереходы из кадра: эффект смены страницы, запуск приложения
-/// (в браузере недоступен — сообщение), загрузка проекта (после подтверждения).
+/// (в браузере недоступен - сообщение), загрузка проекта (после подтверждения).
 export function handleHyper(events: Frame['hyper']) {
   for (const h of events ?? []) {
     const s = useStore.getState();
@@ -18,7 +18,7 @@ export function handleHyper(events: Frame['hyper']) {
         div.classList.add(fx);
       });
     } else if (h.mode === 1) {
-      s.say({ level: 'info', where: 'гипербаза', text: `ссылка запускает приложение «${h.target}» — из среды в браузере приложения не запускаются` });
+      s.say({ level: 'info', where: 'гипербаза', text: `ссылка запускает приложение "${h.target}" - из среды в браузере приложения не запускаются` });
       s.showToast('Запуск приложений из гиперссылки недоступен');
     } else if (h.mode === 2) {
       const dir = (s.project?.dir ?? '').replace(/[\\/]+$/, '');

@@ -18,7 +18,7 @@ export function handleSounds(sounds: { cmd: string; file: string; loop: boolean 
     playing.get(key)?.pause();
     const a = new Audio('/api/file?name=' + encodeURIComponent(snd.file));
     a.loop = snd.loop;
-    a.play().catch(() => { /* MIDI и запрет автозапуска — молча */ });
+    a.play().catch(() => { /* MIDI и запрет автозапуска - молча */ });
     playing.set(key, a);
   }
 }
@@ -31,13 +31,13 @@ export function ModelView() {
   const setDialog = useStore(s => s.setDialog);
   const last = useRef<Map<number, string>>(new Map());
   const host = useRef<HTMLDivElement>(null);
-  // активное окно — последнее, по которому щёлкнули (для «Записать в VDR»)
+  // активное окно - последнее, по которому щёлкнули (для "Записать в VDR")
   const [active, setActive] = useState<string | null>(null);
   const [saveVdr, setSaveVdr] = useState(false);
   // "Вписать": окно больше вкладки уменьшается целиком (иначе - прокрутка вкладки)
   const [fit, setFit] = useState(true);
   const activeName = frame?.windows.some(w => w.name === active) ? active : frame?.windows[0]?.name ?? null;
-  // «Файл → Записать активное окно в VDR…»
+  // "Файл -> Записать активное окно в VDR..."
   useEffect(() => {
     const open = () => { if (useStore.getState().frame?.windows.length) setSaveVdr(true); else useStore.getState().showToast('Нет открытых окон модели'); };
     window.addEventListener('model-save-vdr', open);
@@ -57,7 +57,7 @@ export function ModelView() {
         root.appendChild(div);
       }
       div.querySelector('.title')!.textContent = w.name;
-      // «Параметры листа → Окно → Размер»: развёрнутое окно занимает вкладку
+      // "Параметры листа -> Окно -> Размер": развёрнутое окно занимает вкладку
       div.classList.toggle('max', w.size === 'max');
       div.classList.toggle('min', w.size === 'min');
       div.classList.toggle('dialog', w.style === 'dialog');
@@ -95,31 +95,31 @@ export function ModelView() {
     return () => ro.disconnect();
   }, [frame, fit]);
 
-  if (!frame?.windows.length) return <div className="model"><div className="empty">Модель ещё не открыла окон. Нажмите «Пуск» (F5) или «Шаг» (F10) — окна появятся здесь.</div>{frame?.dialog && <ModelDialogBox d={frame.dialog} />}</div>;
+  if (!frame?.windows.length) return <div className="model"><div className="empty">Модель ещё не открыла окон. Нажмите "Пуск" (F5) или "Шаг" (F10) - окна появятся здесь.</div>{frame?.dialog && <ModelDialogBox d={frame.dialog} />}</div>;
   const unsupported = frame.unsupported ?? [];
   return <div className="model-view">
     {unsupported.length > 0 && <div className="unsupported" role="status"
-      title={unsupported.map(u => `${u.name} — ${u.count} раз`).join('\n')}>
+      title={unsupported.map(u => `${u.name} - ${u.count} раз`).join('\n')}>
       Модель вызывает функции, которых здесь нет: {unsupported.slice(0, 3).map(u => u.name).join(', ')}{unsupported.length > 3 ? ` и ещё ${unsupported.length - 3}` : ''}. Результат может отличаться от Stratum 2000.
     </div>}
     <div className="model-toolbar">
-      <button className="small" disabled={!frame.canHyperBack} onClick={() => api.event('type=hyperback')} title="Гипербаза: предыдущая страница">‹ Назад</button>
+      <button className="small" disabled={!frame.canHyperBack} onClick={() => api.event('type=hyperback')} title="Гипербаза: предыдущая страница">&lt; Назад</button>
       <span className="spacer" />
       {frame.windows.length > 1 && <select className="small" value={activeName ?? ''} onChange={e => setActive(e.target.value)} title="Активное окно">
         {frame.windows.map(w => <option key={w.id} value={w.name}>{w.name}</option>)}
       </select>}
       <button className="small" aria-pressed={fit} onClick={() => setFit(f => !f)} title="Вписать окно модели во вкладку или показать в натуральную величину (с прокруткой)">{fit ? 'Вписано' : '100%'}</button>
-      <button className="small" onClick={() => setSaveVdr(true)} title="Записать активное окно в VDR: рисунок окна как файл .vdr">Записать в VDR…</button>
-      <button className="small" onClick={() => setDialog('print')} title="Печать окна модели (Ctrl+P)">Печать…</button>
+      <button className="small" onClick={() => setSaveVdr(true)} title="Записать активное окно в VDR: рисунок окна как файл .vdr">Записать в VDR...</button>
+      <button className="small" onClick={() => setDialog('print')} title="Печать окна модели (Ctrl+P)">Печать...</button>
     </div>
-    {saveVdr && activeName && <FilePickDialog title={`Записать окно «${activeName}» в VDR`} ext="vdr" onClose={() => setSaveVdr(false)}
+    {saveVdr && activeName && <FilePickDialog title={`Записать окно "${activeName}" в VDR`} ext="vdr" onClose={() => setSaveVdr(false)}
       save={(project?.dir || '.').replace(/[\\/]+$/, '') + '/' + activeName.replace(/[<>:"/\\|?*]/g, '_') + '.vdr'}
       onPick={async p => {
         setSaveVdr(false);
         const r = await fetch(`/api/vdr/save?win=${encodeURIComponent(activeName)}&path=${encodeURIComponent(p)}`, { method: 'POST' });
         if (r.ok) showToast('Окно записано в ' + p); else say({ level: 'error', where: 'VDR', text: (await r.json()).error ?? 'ошибка записи' });
       }} />}
-    <div className="model" ref={host} tabIndex={0} title="Alt+щелчок — свойства объекта в инспекторе"
+    <div className="model" ref={host} tabIndex={0} title="Alt+щелчок - свойства объекта в инспекторе"
       onKeyDown={e => { e.preventDefault(); api.event(`type=key&msg=256&vk=${e.keyCode}`); }}
       onKeyUp={e => api.event(`type=key&msg=257&vk=${e.keyCode}`)} />
     {frame.dialog && <ModelDialogBox d={frame.dialog} />}
@@ -127,11 +127,11 @@ export function ModelView() {
 }
 
 // MessageBox / InputBox модели: такт откачен ядром и повторится с ответом.
-// Кнопки по стилю MB_*: 0 — OK, 1 — OK/Отмена, 3 — Да/Нет/Отмена, 4 — Да/Нет
+// Кнопки по стилю MB_*: 0 - OK, 1 - OK/Отмена, 3 - Да/Нет/Отмена, 4 - Да/Нет
 function ModelDialogBox({ d }: { d: import('../api').ModelDialog }) {
   const [value, setValue] = useState(d.default);
   const answer = (v: string | number) => api.event(`type=dialog&answer=${encodeURIComponent(String(v))}`);
-  // файловые диалоги — обзор папок ядра; фильтр расширений из «*.bmp;*.png»
+  // файловые диалоги - обзор папок ядра; фильтр расширений из "*.bmp;*.png"
   if (d.kind === 'open' || d.kind === 'save' || d.kind === 'folder') {
     const ext = (d.text.match(/\*\.(\w+)/g) ?? []).map(m => m.slice(2)).join(',');
     return <FilePickDialog title={d.title || (d.kind === 'save' ? 'Сохранить файл' : d.kind === 'folder' ? 'Выбор папки' : 'Открыть файл')} ext={ext || 'txt,bmp,vdr,stt,wav,dat'}
@@ -170,7 +170,7 @@ function ModelDialogBox({ d }: { d: import('../api').ModelDialog }) {
 }
 
 // Настоящие кнопки, флажки, поля ввода и списки поверх SVG: события уходят
-// в модель как WM_CONTROLNOTIFY (0 — нажатие, 768 — правка текста, 1 — выбор)
+// в модель как WM_CONTROLNOTIFY (0 - нажатие, 768 - правка текста, 1 - выбор)
 function syncControls(layer: HTMLDivElement, win: string, controls: Control[]) {
   const seen = new Set<string>();
   for (const c of controls) {
@@ -231,8 +231,8 @@ function createControl(kind: string, win: string, c: Control): HTMLElement {
   return el;
 }
 
-// Подпись контрола как в Windows: «&» подчёркивает следующую букву
-// (клавиша-ускоритель), «&&» — сам знак амперсанда
+// Подпись контрола как в Windows: "&" подчёркивает следующую букву
+// (клавиша-ускоритель), "&&" - сам знак амперсанда
 function setCaption(el: HTMLElement, text: string) {
   if (el.dataset.caption === text) return;
   el.dataset.caption = text;
@@ -286,14 +286,14 @@ function attach(div: HTMLDivElement, name: string, onActivate: () => void) {
   body.onmousedown = e => {
     onActivate();
     (div.closest('.model') as HTMLElement)?.focus();
-    // Alt+щелчок — выбрать объект для инспектора, не отдавая событие модели
+    // Alt+щелчок - выбрать объект для инспектора, не отдавая событие модели
     if (e.altKey && e.button === 0) {
       e.preventDefault();
       const svg = body.querySelector('svg');
       if (!svg) return;
       const r = svg.getBoundingClientRect();
       const vb = svg.viewBox.baseVal;
-      // координаты страницы → координаты пространства (как в svg::render)
+      // координаты страницы -> координаты пространства (как в svg::render)
       const px = (e.clientX - r.left) * (vb.width / r.width), py = (e.clientY - r.top) * (vb.height / r.height);
       const g = svg.querySelector('g[transform]');
       const m = g?.getAttribute('transform')?.match(/translate\(([-\d.e]+) ([-\d.e]+)\) scale\(([-\d.e]+)\)/);

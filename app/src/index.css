@@ -1,14 +1,14 @@
-/* Дизайн-система Stratum Modern — «чертёжный лист».
-   Среда — чертёжное бюро: графитовые нейтрали, синька (цвет чертёжных
-   чернил) для всего, что начерчено и выделено; сигнальные цвета — только
-   для состояния модели (пуск, пауза, ошибка). Одно яркое место — пульт
+/* Дизайн-система Stratum Modern - "чертёжный лист".
+   Среда - чертёжное бюро: графитовые нейтрали, синька (цвет чертёжных
+   чернил) для всего, что начерчено и выделено; сигнальные цвета - только
+   для состояния модели (пуск, пауза, ошибка). Одно яркое место - пульт
    модели; остальное спокойно и плотно. Шрифты свои, без сети:
    Golos Text (интерфейс, родная кириллица) и JetBrains Mono (код, числа). */
 @import '@fontsource-variable/golos-text';
 @import '@fontsource-variable/jetbrains-mono';
 
 :root {
-  /* поверхности: фон среды → панель → приподнятое (поля, меню, диалоги) */
+  /* поверхности: фон среды -> панель -> приподнятое (поля, меню, диалоги) */
   --bg-app: #e6eaed;
   --bg-surface: #f9fafb;
   --bg-raised: #ffffff;
@@ -39,7 +39,7 @@
   --state-error: #b3261e;
   --state-error-soft: rgba(179, 38, 30, 0.09);
   --state-warn-soft: rgba(226, 163, 43, 0.16);
-  /* типы переменных — одинаково в инспекторе, портах схемы и диалогах */
+  /* типы переменных - одинаково в инспекторе, портах схемы и диалогах */
   --type-float: #1d5b8f;
   --type-string: #7443ad;
   --type-handle: #0d7470;
@@ -54,14 +54,14 @@
 
   --font-ui: "Golos Text Variable", "Golos Text", "Segoe UI", system-ui, -apple-system, sans-serif;
   --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, "Cascadia Mono", Menlo, monospace;
-  /* шкала кегля: 11 · 12 · 13 · 14 · 16 · 20; базовый задаётся в параметрах среды */
+  /* шкала кегля: 11 | 12 | 13 | 14 | 16 | 20; базовый задаётся в параметрах среды */
   --fs-xs: 11px;
   --fs-sm: 12px;
   --fs-base: var(--font-size, 13px);
   --fs-md: 14px;
   --fs-lg: 16px;
   --fs-xl: 20px;
-  /* ритм отступов — шаг 4 */
+  /* ритм отступов - шаг 4 */
   --sp-1: 2px; --sp-2: 4px; --sp-3: 6px; --sp-4: 8px; --sp-5: 12px; --sp-6: 16px; --sp-7: 24px;
   /* радиусы по иерархии: метка < элемент управления < панель/меню < диалог */
   --r-xs: 3px;
@@ -149,7 +149,7 @@ input[type="checkbox"], input[type="radio"], input[type="range"], progress { acc
 button, input, select, textarea { font: inherit; color: inherit; }
 b, strong { font-weight: 600; }
 
-/* видимый фокус с клавиатуры — одинаково везде */
+/* видимый фокус с клавиатуры - одинаково везде */
 :focus { outline: none; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: var(--r-xs); }
 button:focus-visible, select:focus-visible, [tabindex]:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
@@ -259,7 +259,7 @@ input[type="range"] { height: 18px; }
 .topbar-actions > button.ghost.icon-only { color: var(--text-muted); }
 .topbar-actions > button.ghost.icon-only:hover { color: var(--text-primary); }
 
-/* пульт модели — единственное громкое место интерфейса */
+/* пульт модели - единственное громкое место интерфейса */
 .transport {
   display: flex; align-items: center; gap: 2px; white-space: nowrap;
   padding: 3px; border-radius: 999px; background: var(--bg-sunken); border: 1px solid var(--border-subtle);
@@ -279,7 +279,7 @@ input[type="range"] { height: 18px; }
 [data-theme="dark"] .transport > button.primary.paused:hover { background: color-mix(in srgb, var(--state-pause), #fff 10%); }
 .topbar .speed { display: flex; align-items: center; margin: 0 var(--sp-2) 0 var(--sp-4); }
 .topbar .speed input { width: 76px; }
-/* счётчик тактов — табло */
+/* счётчик тактов - табло */
 .topbar .counter {
   color: var(--text-primary); font-size: var(--fs-sm); font-weight: 500; padding: 0 10px; min-width: 96px;
   line-height: 26px; border-radius: 999px; background: var(--bg-raised); border: 1px solid var(--border-subtle);
@@ -345,7 +345,7 @@ label.check input { flex: none; margin: 0; }
 .list .row { display: flex; gap: var(--sp-4); padding: 5px 10px; border-bottom: 1px solid var(--border-subtle); }
 .list .row:last-child { border-bottom: 0; }
 .list .row.selected { background: var(--accent-soft); color: var(--accent-ink); }
-/* список выбора имиджа: имя — колонкой, описание — приглушённо, группы липнут к верху */
+/* список выбора имиджа: имя - колонкой, описание - приглушённо, группы липнут к верху */
 .choose-list { height: 340px; margin-top: var(--sp-4); border: 1px solid var(--border); border-radius: var(--r-md); background: var(--bg-surface); }
 .choose-list .row { align-items: center; cursor: pointer; min-height: 30px; padding: 3px 10px; }
 .choose-list .row:hover:not(.selected) { background: var(--bg-hover); }
@@ -361,7 +361,7 @@ label.check input { flex: none; margin: 0; }
 .modal > .panel-title > .muted { font-family: var(--font-ui); font-size: var(--fs-sm); font-weight: 400; }
 .about-name { font-size: var(--fs-xl); font-weight: 700; letter-spacing: -0.02em; }
 
-/* печать: страница собирается в #print-root (диалог «Печать»), остальное скрыто */
+/* печать: страница собирается в #print-root (диалог "Печать"), остальное скрыто */
 #print-root { display: none; }
 @media print {
   body.printing > :not(#print-root) { display: none !important; }
@@ -456,7 +456,7 @@ table.vars input:disabled:hover { border-color: transparent; }
 table.vars input:focus { border-color: var(--accent); background: var(--bg-raised); box-shadow: 0 0 0 2px var(--accent-soft); }
 table.vars button.small.ghost { min-height: 20px; padding: 0 5px; }
 
-/* ── холст схемы — чертёжный лист ───────────────────────────────────────── */
+/* ── холст схемы - чертёжный лист ───────────────────────────────────────── */
 .scheme { width: 100%; height: 100%; background: var(--bg-canvas); overflow: hidden; position: relative; }
 .scheme svg.canvas { width: 100%; height: 100%; display: block; }
 .scheme .grid { stroke: var(--grid-minor); stroke-width: 1; }
@@ -475,7 +475,7 @@ table.vars button.small.ghost { min-height: 20px; padding: 0 5px; }
 .scheme .port { cursor: crosshair; stroke-width: 1.5; }
 .scheme .port:hover { r: 6; }
 .picture-editor .page-grid line { stroke: var(--border-strong); stroke-width: .5; opacity: .5; }
-/* контактная площадка: кольцо тянет связь, середина — перемещает */
+/* контактная площадка: кольцо тянет связь, середина - перемещает */
 .scheme .pad { cursor: crosshair; }
 .scheme .pad .pad-ring { fill: var(--bg-raised); stroke: var(--accent); stroke-width: 2; }
 .scheme .pad .pad-core { fill: var(--accent); cursor: move; }
@@ -506,7 +506,7 @@ table.vars button.small.ghost { min-height: 20px; padding: 0 5px; }
 .breadcrumbs button:hover { background: var(--bg-hover); color: var(--text-primary); }
 .breadcrumbs > span:last-child button { color: var(--accent-ink); font-weight: 600; }
 
-/* ── окно модели: хром вокруг, содержимое — как в оригинале ─────────────── */
+/* ── окно модели: хром вокруг, содержимое - как в оригинале ─────────────── */
 .model {
   width: 100%; height: 100%; overflow: auto; background-color: var(--bg-sunken);
   background-image: radial-gradient(color-mix(in srgb, var(--text-muted) 28%, transparent) 1px, transparent 1.2px); background-size: 16px 16px;
@@ -541,7 +541,7 @@ table.vars button.small.ghost { min-height: 20px; padding: 0 5px; }
 /* недоступное поле Windows: серый фон, текст читается */
 .model .win input.ctl:disabled, .model .win textarea.ctl:disabled, .model .win select.ctl:disabled { opacity: 1; background: #f0f0f0; color: #6d6d6d; }
 .model .win label.ctl input:disabled { opacity: 1; }
-/* скрываемые полосы: «Вид → Строка состояния», «Вид → Панель инструментов» */
+/* скрываемые полосы: "Вид -> Строка состояния", "Вид -> Панель инструментов" */
 .ide.no-statusbar { grid-template-rows: auto 1fr; }
 .ide.no-statusbar > .statusbar { display: none; }
 .ide.no-toolbar .topbar-actions { display: none; }
@@ -679,7 +679,7 @@ table.vars button.small.ghost { min-height: 20px; padding: 0 5px; }
 .graph-view { position: relative; width: 100%; height: 100%; background: var(--bg-canvas); overflow: hidden; }
 .graph-view svg { display: block; cursor: grab; }
 .graph-view svg.panning { cursor: grabbing; }
-/* подпись с «ореолом» цвета листа — читается поверх дуг */
+/* подпись с "ореолом" цвета листа - читается поверх дуг */
 .graph-view .label { font-size: 11px; fill: var(--text-primary); font-family: var(--font-mono); pointer-events: none; paint-order: stroke; stroke: var(--bg-canvas); stroke-width: 3px; stroke-linejoin: round; }
 .graph-view .label.lit { font-weight: 600; }
 .graph-view .toolbar {
@@ -701,7 +701,7 @@ table.vars button.small.ghost { min-height: 20px; padding: 0 5px; }
 .picture-editor { position: relative; width: 100%; height: 100%; display: flex; flex-direction: column; background: var(--bg-canvas); overflow: hidden; }
 .picture-editor svg.canvas { flex: 1; width: 100%; min-height: 0; display: block; cursor: crosshair; }
 .picture-editor .page { fill: #fff; stroke: var(--border-strong); vector-effect: non-scaling-stroke; filter: drop-shadow(0 1px 2px rgba(27, 35, 40, .12)); }
-/* растры при увеличении — по пикселям, как в битовом редакторе */
+/* растры при увеличении - по пикселям, как в битовом редакторе */
 .picture-editor svg.canvas image { image-rendering: pixelated; }
 .picture-editor .sel-box, .picture-editor .draft, .picture-editor .page-grid line { vector-effect: non-scaling-stroke; }
 [data-theme="dark"] .picture-editor .page { fill: #fff; }
@@ -776,7 +776,7 @@ table.vars button.small.ghost { min-height: 20px; padding: 0 5px; }
 .tag.warn { background: var(--state-warn-soft); color: var(--state-warn); }
 .tag.accent { background: var(--accent-soft); color: var(--accent-ink); }
 
-/* колонки таблицы переменных инспектора: имя шире, тип и кнопка — по содержимому */
+/* колонки таблицы переменных инспектора: имя шире, тип и кнопка - по содержимому */
 .right-top table.vars thead th:nth-child(1) { width: 31%; }
 .right-top table.vars thead th:nth-child(2) { width: 66px; }
 .right-top table.vars thead th:nth-child(5) { width: 24px; }
@@ -784,7 +784,7 @@ table.vars button.small.ghost { min-height: 20px; padding: 0 5px; }
 .right-top table.vars td, .right-top table.vars th { padding-left: 6px; padding-right: 6px; }
 .right-top table.vars td:last-child:has(> button) { padding: 0; text-align: center; }
 /* узкий инспектор у работающего экземпляра: тип сжимается до буквы (полное
-   имя — в подсказке), место уходит под «По умолчанию» и «Сейчас» */
+   имя - в подсказке), место уходит под "По умолчанию" и "Сейчас" */
 .right-top { container-type: inline-size; }
 @container (max-width: 400px) {
   .right-top table.vars.live thead th:nth-child(1) { width: 34%; }
@@ -793,7 +793,7 @@ table.vars button.small.ghost { min-height: 20px; padding: 0 5px; }
   .right-top table.vars.live .chip::first-letter { font-size: 10px; }
 }
 
-/* узкое окно: полоса заголовка переносится в два ряда — разделитель там лишний */
+/* узкое окно: полоса заголовка переносится в два ряда - разделитель там лишний */
 @media (max-width: 1420px) {
   .topbar .sep { display: none; }
   .topbar .brand-accent { display: none; }
@@ -814,7 +814,7 @@ table.vars button.small.ghost { min-height: 20px; padding: 0 5px; }
   .topbar-actions { margin-left: auto; }
 }
 
-/* старый WebKitGTK без color-mix(): те же места — готовыми токенами, без смешения */
+/* старый WebKitGTK без color-mix(): те же места - готовыми токенами, без смешения */
 @supports not (color: color-mix(in srgb, red, blue)) {
   button:hover { background-color: var(--bg-raised); }
   .chip { background: var(--bg-sunken); box-shadow: inset 0 0 0 1px var(--border); }

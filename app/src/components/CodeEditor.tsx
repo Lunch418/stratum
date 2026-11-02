@@ -87,7 +87,7 @@ function registerLanguage(monaco: Monaco) {
       return null;
     },
   });
-  // цвета совпадают с токенами index.css: синька — ключевые слова, типы — как метки инспектора
+  // цвета совпадают с токенами index.css: синька - ключевые слова, типы - как метки инспектора
   monaco.editor.defineTheme('stratum-light', {
     base: 'vs', inherit: true,
     colors: {
@@ -125,7 +125,7 @@ function registerLanguage(monaco: Monaco) {
 }
 
 export function CodeEditor() {
-  // «Параметры среды → Редактор»: выделение синтаксиса, кегль, перенос, мини-карта
+  // "Параметры среды -> Редактор": выделение синтаксиса, кегль, перенос, мини-карта
   const [env, setEnv] = useState(loadEnv);
   useEffect(() => { const on = () => setEnv(loadEnv()); window.addEventListener('env-changed', on); return () => window.removeEventListener('env-changed', on); }, []);
   const project = useStore(s => s.project);
@@ -181,7 +181,7 @@ export function CodeEditor() {
       const markers = [];
       if (!r.ok && r.error) markers.push({ severity: 8, message: r.error.message, startLineNumber: r.error.line, startColumn: r.error.column, endLineNumber: r.error.line, endColumn: r.error.column + 1 });
       // ошибка компилятора в правилах Stratum 2000: ядро текст выполнит,
-      // но оригинал его не примет — предупреждение на всю строку
+      // но оригинал его не примет - предупреждение на всю строку
       if (r.ok && r.compileError && model) {
         const line = Math.max(1, r.compileError.line);
         markers.push({ severity: 4, message: `Stratum 2000 не примет этот текст: ${r.compileError.message}`, startLineNumber: line, startColumn: 1, endLineNumber: line, endColumn: model.getLineMaxColumn(line) });
@@ -195,10 +195,10 @@ export function CodeEditor() {
 
   const onMount: OnMount = (editor, monaco) => {
     editorRef.current = editor; monacoRef.current = monaco;
-    // свой шрифт грузится асинхронно — после загрузки Monaco должен перемерить знаки
+    // свой шрифт грузится асинхронно - после загрузки Monaco должен перемерить знаки
     document.fonts?.ready.then(() => monaco.editor.remeasureFonts());
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => void save());
-    // F1 — справка по слову под курсором
+    // F1 - справка по слову под курсором
     editor.addCommand(monaco.KeyCode.F1, () => {
       const pos = editor.getPosition();
       const word = pos && editor.getModel()?.getWordAtPosition(pos)?.word;
@@ -206,7 +206,7 @@ export function CodeEditor() {
     });
   };
 
-  if (!klass) return <div className="empty">Выберите имидж в иерархии — здесь откроется его текст.</div>;
+  if (!klass) return <div className="empty">Выберите имидж в иерархии - здесь откроется его текст.</div>;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div className="panel-title">

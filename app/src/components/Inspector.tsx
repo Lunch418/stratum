@@ -1,4 +1,4 @@
-// Инспектор: переменные имиджа (таблица как во вкладке «Переменные»
+// Инспектор: переменные имиджа (таблица как во вкладке "Переменные"
 // диалога имиджа) и живые значения выбранного экземпляра (Watch).
 import { useEffect, useRef, useState } from 'react';
 import { api, type Variable } from '../api';
@@ -29,7 +29,7 @@ export function Inspector() {
     const run = async () => {
       const m = new Map<string, string>();
       for (const w of watches) {
-        try { const r = await api.eval(instance, w); m.set(w, r.ok ? (r.value ?? '') : `⚠ ${r.error}`); } catch { m.set(w, '—'); }
+        try { const r = await api.eval(instance, w); m.set(w, r.ok ? (r.value ?? '') : `⚠ ${r.error}`); } catch { m.set(w, '-'); }
       }
       if (alive) setWatchValues(m);
     };
@@ -58,7 +58,7 @@ export function Inspector() {
     catch (e) { setConfirmDelete(false); say({ level: 'error', where: klass.name, text: String(e) }); }
   }
 
-  // живые значения: при работе — часто, на паузе — при смене такта
+  // живые значения: при работе - часто, на паузе - при смене такта
   useEffect(() => {
     // oxlint-disable-next-line react/set-state-in-effect -- intentional
     if (instance === null) { setLive(new Map()); return; }
@@ -79,7 +79,7 @@ export function Inspector() {
   // oxlint-disable-next-line react-hooks/exhaustive-deps -- intentional
   }, [instance, frame?.running, frame?.tick && !frame.running ? frame.tick : 0]);
 
-  if (!klass) return <><div className="panel-title">Инспектор</div><div className="empty">Выберите имидж в иерархии или блок на схеме — здесь появятся его переменные.</div></>;
+  if (!klass) return <><div className="panel-title">Инспектор</div><div className="empty">Выберите имидж в иерархии или блок на схеме - здесь появятся его переменные.</div></>;
 
   const vars: Variable[] = [
     ...klass.vars,
@@ -102,10 +102,10 @@ export function Inspector() {
       <div className="scroll">
         <div style={{ padding: '8px 10px', fontSize: 12 }}>
           {klass.description && <div className="muted" style={{ marginBottom: 6 }}>{klass.description}</div>}
-          <div className="muted">Детей на схеме: {klass.children.length} · связей: {klass.links.length}{klass.library ? ' · библиотечный, только чтение' : ''}</div>
+          <div className="muted">Детей на схеме: {klass.children.length} | связей: {klass.links.length}{klass.library ? ' | библиотечный, только чтение' : ''}</div>
           {!klass.library && (
             <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-              <button className="small" onClick={() => setRenaming(klass.name)}>Переименовать…</button>
+              <button className="small" onClick={() => setRenaming(klass.name)}>Переименовать...</button>
               <button className="small" onClick={() => setConfirmDelete(true)} disabled={project?.root.toLowerCase() === klass.name.toLowerCase()}>Удалить имидж</button>
             </div>
           )}
@@ -117,7 +117,7 @@ export function Inspector() {
           )}
           {confirmDelete && (
             <div style={{ marginTop: 8, display: 'flex', gap: 6, alignItems: 'center' }}>
-              <span>Удалить «{klass.name}»?</span>
+              <span>Удалить "{klass.name}"?</span>
               <button className="small" onClick={doDelete}>Да</button>
               <button className="small ghost" onClick={() => setConfirmDelete(false)}>Нет</button>
             </div>
@@ -132,7 +132,7 @@ export function Inspector() {
                 {watches.map(w => (
                   <tr key={w}>
                     <td className="mono" style={{ width: '50%' }}>{w}</td>
-                    <td className="num">{watchValues.get(w) ?? '…'}</td>
+                    <td className="num">{watchValues.get(w) ?? '...'}</td>
                     <td style={{ width: 28, padding: 0 }}><button aria-label="Убрать" className="small ghost" onClick={() => setWatches(ws => ws.filter(x => x !== w))} title="Убрать">×</button></td>
                   </tr>
                 ))}
@@ -148,13 +148,13 @@ export function Inspector() {
           </>
         )}
         <div className="panel-title">Переменные <span className="spacer" /><span className="muted">{vars.length}</span></div>
-        {!vars.length && <div className="empty">У имиджа нет переменных. Объявите их в тексте имиджа — они появятся здесь и станут портами на схеме.</div>}
+        {!vars.length && <div className="empty">У имиджа нет переменных. Объявите их в тексте имиджа - они появятся здесь и станут портами на схеме.</div>}
         {vars.length > 0 && <table className={`vars${instance !== null ? ' live' : ''}`}>
           <thead><tr><th>Имя</th><th>Тип</th><th>По умолчанию</th><th>{instance !== null ? 'Сейчас' : 'Описание'}</th>{instance !== null && <th></th>}</tr></thead>
           <tbody>
             {vars.map((v, i) => (
               <tr key={v.name}>
-                <td title={`${v.description || v.name}\nДвойной щелчок — где используется`} style={{ cursor: 'help' }}
+                <td title={`${v.description || v.name}\nДвойной щелчок - где используется`} style={{ cursor: 'help' }}
                   onDoubleClick={() => { const st = useStore.getState(); st.setSearchQuery(v.name); st.setBottomTab('search'); }}>
                   {v.name}{v.local && <span className="muted"> local</span>}</td>
                 <td><span className={`chip ${v.type.toUpperCase()}`} title={v.type.toUpperCase()}>{v.type.toUpperCase()}</span></td>

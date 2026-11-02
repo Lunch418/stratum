@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api, type Trace } from '../api';
 import { useStore } from '../store';
 
-// цвета рядов — токены темы (--series-1…8), в тёмной теме светлее
+// цвета рядов - токены темы (--series-1...8), в тёмной теме светлее
 const COLORS = Array.from({ length: 8 }, (_, i) => `var(--series-${i + 1})`);
 
 export function Graphs() {
@@ -63,7 +63,7 @@ export function Graphs() {
               <div key={t.id} className={`item${hidden.has(t.id) ? ' off' : ''}${focus === t.id ? ' focus' : ''}`} onMouseEnter={() => setFocus(t.id)} onMouseLeave={() => setFocus(null)} onClick={() => setHidden(h => { const n = new Set(h); if (!n.delete(t.id)) n.add(t.id); return n; })}>
                 <span className="swatch" style={{ background: COLORS[i % COLORS.length] }} />
                 <span className="name" title={`${t.path}.${t.var}`}>{t.path.split('\\').pop()}.{t.var}</span>
-                <span className="mono val">{last === null ? '—' : fmt(last)}</span>
+                <span className="mono val">{last === null ? '-' : fmt(last)}</span>
                 <button aria-label="Убрать" className="small ghost" title="Убрать" onClick={e => { e.stopPropagation(); api.traceRemove(t.id); }}>×</button>
               </div>
             );
@@ -84,7 +84,7 @@ export function Graphs() {
               return (
                 <g key={t.id}>
                   <path d={d} fill="none" style={{ stroke: COLORS[i % COLORS.length] }} strokeWidth={focus === t.id ? 2.25 : 1.5} strokeLinejoin="round" opacity={focus !== null && focus !== t.id ? 0.25 : 1} />
-                  {/* у каждого ряда своя шкала; подписи — только у выделенного (или единственного), иначе они наезжают друг на друга */}
+                  {/* у каждого ряда своя шкала; подписи - только у выделенного (или единственного), иначе они наезжают друг на друга */}
                   {(focus === t.id || (focus === null && shown.length === 1)) && <>
                     <text x={W - pad.r - 2} y={py(hi) + 10} textAnchor="end" style={{ fill: COLORS[i % COLORS.length] }} className="tick scale">{fmt(hi)}</text>
                     <text x={W - pad.r - 2} y={py(lo) - 3} textAnchor="end" style={{ fill: COLORS[i % COLORS.length] }} className="tick scale">{fmt(lo)}</text>

@@ -4,7 +4,7 @@ import { api, type ClassInfo, type Frame, type Instance, type Project } from './
 export type Tab = 'scheme' | 'code' | 'model' | 'graph' | 'picture' | 'icon';
 export type DialogId = 'saveAs' | 'export' | 'open' | 'stateSave' | 'stateLoad' | 'new' | 'info' | 'sheet' | 'projectOptions' | 'envOptions'
   | 'classProps' | 'calcOrder' | 'insertFile' | 'about' | 'newClass' | 'imageSave' | 'imageLoad' | 'linkStyle' | 'deleteClasses' | 'print' | 'exportVdr' | 'chooseClass' | 'dbf';
-/// Слои схемы (меню «Формат → Слои» оригинала): сетка, имиджи, связи, графика.
+/// Слои схемы (меню "Формат -> Слои" оригинала): сетка, имиджи, связи, графика.
 export interface Layers { grid: boolean; images: boolean; links: boolean; graphics: boolean }
 
 interface Message { level: 'info' | 'error'; where: string; text: string }
@@ -58,7 +58,7 @@ interface State {
   /// буфер обмена схемы: экземпляры (класс, имя, смещение)
   schemeClipboard: { class: string; name: string; x: number; y: number }[];
   setSchemeClipboard: (c: { class: string; name: string; x: number; y: number }[]) => void;
-  /// гиперссылка «загрузить новый проект» ждёт подтверждения
+  /// гиперссылка "загрузить новый проект" ждёт подтверждения
   hyperProject: string | null;
   setHyperProject: (p: string | null) => void;
   helpTopic: string | null;
@@ -89,7 +89,7 @@ export const useStore = create<State>((set, get) => ({
     await get().refreshInstances();
     get().checkProject();
   },
-  /// сводка проверки компилятором Stratum 2000 — в «Сообщения»
+  /// сводка проверки компилятором Stratum 2000 - в "Сообщения"
   checkProject: async () => {
     try {
       const list = await api.check();

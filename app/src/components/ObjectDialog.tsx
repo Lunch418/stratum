@@ -1,7 +1,7 @@
-// «Параметры двухмерного объекта» оригинала для объекта рисунка имиджа:
-// вкладки «Положение», «Линия», «Заливка», «Текст», «BMP», «Группа»,
-// «Гипербаза», «Переменные», «Точки», «Информация».
-// Правки уходят сразу (каждая — шаг Undo), как в панели инспектора.
+// "Параметры двухмерного объекта" оригинала для объекта рисунка имиджа:
+// вкладки "Положение", "Линия", "Заливка", "Текст", "BMP", "Группа",
+// "Гипербаза", "Переменные", "Точки", "Информация".
+// Правки уходят сразу (каждая - шаг Undo), как в панели инспектора.
 import { useState } from 'react';
 import type { ObjectProps } from '../api';
 import { useStore } from '../store';
@@ -9,8 +9,8 @@ import { Frame, Tabs } from './Options';
 
 type Tab = 'place' | 'pen' | 'brush' | 'text' | 'bmp' | 'group' | 'hyper' | 'vars' | 'points' | 'info';
 
-/// «Переменные» объекта: `a,x;b,y` — переменной a этого имиджа сопоставлена
-/// переменная (или псевдоним) x другого имиджа, b — y (так в «Роботе»:
+/// "Переменные" объекта: `a,x;b,y` - переменной a этого имиджа сопоставлена
+/// переменная (или псевдоним) x другого имиджа, b - y (так в "Роботе":
 /// `_HObject,_HPrev;out,in`).
 function parseVars(text: string): Map<string, string> {
   return new Map(text.split(';').map(p => p.split(',').map(x => x.trim())).filter(p => p[0]).map((p): [string, string] => [p[0].toLowerCase(), p[1] ?? '']));
@@ -39,7 +39,7 @@ export type SetField = (field: string, value: string | number) => void;
 
 const MODES: [number, string][] = [[0, 'Открыть окно'], [1, 'Запустить Windows-приложение'], [2, 'Загрузить новый проект'], [3, 'Ничего не делать'], [4, 'Выполнить системную команду']];
 
-/// Поля закладки «Гипербаза» — общие для диалога и инспектора окна модели.
+/// Поля закладки "Гипербаза" - общие для диалога и инспектора окна модели.
 export function HyperFields({ o, set }: { o: ObjectProps; set: SetField }) {
   const project = useStore(s => s.project);
   const h = o.hyper;
@@ -52,7 +52,7 @@ export function HyperFields({ o, set }: { o: ObjectProps; set: SetField }) {
   );
   return (
     <>
-      <label className="check"><input type="checkbox" checked={used} onChange={e => set('hyper.mode', e.target.checked ? 0 : -1)} />Используется — объект открывает страницу по щелчку в окне модели</label>
+      <label className="check"><input type="checkbox" checked={used} onChange={e => set('hyper.mode', e.target.checked ? 0 : -1)} />Используется - объект открывает страницу по щелчку в окне модели</label>
       <label className="prop"><span>Стиль</span>
         <select disabled={!used} value={h?.mode ?? 0} onChange={e => set('hyper.mode', Number(e.target.value))}>
           {MODES.map(([v, t]) => <option key={v} value={v}>{t}</option>)}
@@ -60,12 +60,12 @@ export function HyperFields({ o, set }: { o: ObjectProps; set: SetField }) {
       </label>
       {text(h?.mode === 4 ? 'Команда' : h?.mode === 1 ? 'Имя файла' : h?.mode === 2 ? 'Файл проекта' : 'Цель', 'target',
         h?.mode === 4 ? 'CM_PREVPAGE' : 'имидж или файл .vdr', h?.mode === 4 ? 'hyper-commands' : 'hyper-targets')}
-      {text('Окно', 'window', 'пусто — то же окно')}
+      {text('Окно', 'window', 'пусто - то же окно')}
       {text('Объект', 'object', 'имидж, получающий WM_HYPERJUMP', 'hyper-targets')}
       {text('Эффект', 'effect', 'смена страницы без эффекта')}
       <datalist id="hyper-targets">{(project?.classes ?? []).filter(c => !c.library).map(c => <option key={c.name} value={c.name} />)}</datalist>
       <datalist id="hyper-commands"><option value="CM_PREVPAGE">предыдущая страница</option></datalist>
-      <div className="muted small">Ссылки работают, пока модель запущена. «Назад» в окне модели возвращает предыдущую страницу.</div>
+      <div className="muted small">Ссылки работают, пока модель запущена. "Назад" в окне модели возвращает предыдущую страницу.</div>
     </>
   );
 }
@@ -74,7 +74,7 @@ export interface ObjectVars { text: string; classVars: string[]; onChange: (text
 
 export function ObjectDialog({ o, set, resize, onClose, vars, onOpen, all }: {
   o: ObjectProps; set: SetField; resize: (p: Partial<Record<'x' | 'y' | 'w' | 'h', number>>) => void; onClose: () => void;
-  /// закладка «Переменные» (только для рисунка имиджа)
+  /// закладка "Переменные" (только для рисунка имиджа)
   vars?: ObjectVars;
   /// открыть свойства другого объекта (член группы)
   onOpen?: (handle: number) => void;
@@ -98,7 +98,7 @@ export function ObjectDialog({ o, set, resize, onClose, vars, onOpen, all }: {
     </label>
   );
   return (
-    <Frame title={`Параметры объекта #${o.handle}${o.name ? ' · ' + o.name : ''}`} width={520} onClose={onClose}>
+    <Frame title={`Параметры объекта #${o.handle}${o.name ? ' | ' + o.name : ''}`} width={520} onClose={onClose}>
       <Tabs tabs={tabs} value={tab} onChange={setTab} />
       <div className="modal-body dialog-page">
         {tab === 'place' && <>
@@ -108,7 +108,7 @@ export function ObjectDialog({ o, set, resize, onClose, vars, onOpen, all }: {
             {num('Ширина', o.w, v => resize({ w: v }))}{num('Высота', o.h, v => resize({ h: v }))}
           </div>
           <label className="check"><input type="checkbox" checked={o.visible} onChange={e => set('visible', e.target.checked ? 1 : 0)} />Показан</label>
-          <div className="muted small">Тип: {o.kind}{o.parent !== null ? ` · в группе #${o.parent}` : ''}{o.zorder !== null ? ` · Z-порядок ${o.zorder}` : ''}</div>
+          <div className="muted small">Тип: {o.kind}{o.parent !== null ? ` | в группе #${o.parent}` : ''}{o.zorder !== null ? ` | Z-порядок ${o.zorder}` : ''}</div>
         </>}
         {tab === 'pen' && o.pen && <>
           <label className="prop"><span>Цвет</span><input type="color" value={o.pen.color} onChange={e => set('pen.color', e.target.value)} /></label>
@@ -151,7 +151,7 @@ export function ObjectDialog({ o, set, resize, onClose, vars, onOpen, all }: {
         {tab === 'group' && o.members && (
           <div className="scroll list" style={{ maxHeight: 280, border: '1px solid var(--border)', borderRadius: 6 }}>
             {o.members.map(h => { const m = all?.find(x => x.handle === h); return (
-              <div key={h} className="row" style={{ cursor: onOpen ? 'pointer' : undefined }} onDoubleClick={() => onOpen?.(h)} title="Двойной щелчок — свойства объекта">
+              <div key={h} className="row" style={{ cursor: onOpen ? 'pointer' : undefined }} onDoubleClick={() => onOpen?.(h)} title="Двойной щелчок - свойства объекта">
                 <span className="mono muted">#{h}</span><span>{m ? m.kind : 'объект'}</span>{m?.name && <span className="muted">{m.name}</span>}
               </div>
             ); })}
@@ -163,13 +163,13 @@ export function ObjectDialog({ o, set, resize, onClose, vars, onOpen, all }: {
           <table className="vars"><tbody>
             <tr><td className="muted">Тип</td><td>{o.kind}</td></tr>
             <tr><td className="muted">Дескриптор</td><td className="mono">{o.handle}</td></tr>
-            <tr><td className="muted">Z-порядок</td><td className="mono">{o.zorder ?? '— (член группы)'}</td></tr>
+            <tr><td className="muted">Z-порядок</td><td className="mono">{o.zorder ?? '- (член группы)'}</td></tr>
             {o.parent !== null && <tr><td className="muted">Группа</td><td className="mono">#{o.parent}</td></tr>}
-            <tr><td className="muted">Габарит</td><td className="mono">{o.x}, {o.y} · {o.w}×{o.h}</td></tr>
+            <tr><td className="muted">Габарит</td><td className="mono">{o.x}, {o.y} | {o.w}×{o.h}</td></tr>
             {o.points && <tr><td className="muted">Точек</td><td className="mono">{o.points.length}</td></tr>}
             {o.members && <tr><td className="muted">Членов группы</td><td className="mono">{o.members.length}</td></tr>}
             {o.src && <tr><td className="muted">Исходный прямоугольник</td><td className="mono">{o.src.join(', ')}</td></tr>}
-            {o.hyper && <tr><td className="muted">Гиперссылка</td><td>{o.hyper.target || '—'}</td></tr>}
+            {o.hyper && <tr><td className="muted">Гиперссылка</td><td>{o.hyper.target || '-'}</td></tr>}
           </tbody></table>
         )}
         {tab === 'points' && o.points && (
@@ -177,7 +177,7 @@ export function ObjectDialog({ o, set, resize, onClose, vars, onOpen, all }: {
             <table className="vars"><tbody>
               {o.points.map((p, i) => <tr key={i}><td className="muted">{i + 1}</td><td className="num">{p[0]}</td><td className="num">{p[1]}</td></tr>)}
             </tbody></table>
-            <div className="muted small">Точки правятся на листе: перетаскивание, Ctrl — добавить, Shift — удалить.</div>
+            <div className="muted small">Точки правятся на листе: перетаскивание, Ctrl - добавить, Shift - удалить.</div>
           </div>
         )}
       </div>

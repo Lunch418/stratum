@@ -1,6 +1,6 @@
 // Подписка на событие окна, которая всегда вызывает последнюю версию
 // обработчика: без неё обработчик клавиш видит состояние на момент
-// подписки (например, «копировать» брал бы старые координаты блоков).
+// подписки (например, "копировать" брал бы старые координаты блоков).
 import { useEffect, useLayoutEffect, useRef } from 'react';
 
 export function useWindowEvent<K extends keyof WindowEventMap>(type: K, handler: (e: WindowEventMap[K]) => void) {

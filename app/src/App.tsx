@@ -34,7 +34,7 @@ export default function App() {
   const dialog = s.dialog;
   const setDialog = s.setDialog;
   const env = loadEnv();
-  // «Вид → Панель инструментов / Строка состояния»
+  // "Вид -> Панель инструментов / Строка состояния"
   const [view, setView] = useState<{ toolbar: boolean; statusbar: boolean }>(() => {
     try { return { toolbar: true, statusbar: true, ...JSON.parse(localStorage.getItem('view') ?? '{}') as object }; } catch { return { toolbar: true, statusbar: true }; }
   });
@@ -74,8 +74,8 @@ export default function App() {
     return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); document.body.style.cursor = ''; document.body.style.userSelect = ''; };
   }, [dragging]);
 
-  // Сохранить: проект в родном формате уже на диске — в его же папку,
-  // проект Stratum 2000 — спросить новую папку (исходник не трогаем)
+  // Сохранить: проект в родном формате уже на диске - в его же папку,
+  // проект Stratum 2000 - спросить новую папку (исходник не трогаем)
   const save = () => {
     if (!s.project) return;
     if (s.project.native) s.saveProject().catch(e => s.say({ level: 'error', where: 'проект', text: String(e) }));
@@ -84,7 +84,7 @@ export default function App() {
 
   useEffect(() => {
     s.load().then(() => {
-      // #code/Имя, #model, #scheme — прямые ссылки на вкладку и имидж
+      // #code/Имя, #model, #scheme - прямые ссылки на вкладку и имидж
       const [tab, name] = location.hash.slice(1).split('/');
       if (tab === 'code' || tab === 'model' || tab === 'scheme' || tab === 'graph' || tab === 'picture' || tab === 'icon') s.setTab(tab);
       if (name) s.select(decodeURIComponent(name));
@@ -189,10 +189,10 @@ export default function App() {
         <label className="muted speed" title="Тактов в секунду">
           <input type="range" min={1} max={200} defaultValue={30} onChange={e => api.event('type=speed&fps=' + e.target.value)} />
         </label>
-        <span className="counter mono">такт {frame?.tick ?? 0}{frame?.stopped ? ' · стоп' : ''}</span>
+        <span className="counter mono">такт {frame?.tick ?? 0}{frame?.stopped ? ' | стоп' : ''}</span>
         </div>
         <span className="spacer" />
-        {/* кнопки проекта — одной группой: на узком окне уходят во второй ряд целиком */}
+        {/* кнопки проекта - одной группой: на узком окне уходят во второй ряд целиком */}
         <div className="topbar-actions" role="toolbar" aria-label="Проект">
         <button aria-label="Открыть проект" className="ghost icon-only" onClick={() => setDialog('open')} title="Открыть проект (Ctrl+O)"><Icon name="open" /></button>
         <button aria-label="Сохранить всё" onClick={save} title="Сохранить всё (Ctrl+S)" className={`icon-only${s.unsaved ? ' attention' : ' ghost'}`}><Icon name="save" /></button>
@@ -207,7 +207,7 @@ export default function App() {
       {s.paletteOpen && <Palette commands={commands} onClose={() => s.setPaletteOpen(false)} />}
       {dialog === 'saveAs' && s.project && (
         <PathDialog title="Сохранить проект как" action="Сохранить" initial={s.project.native ? s.project.dir : s.project.dir.replace(/[\\/]+$/, '') + '-modern'}
-          hint="Папка получит project.json и classes/ — текстовый формат Stratum Modern."
+          hint="Папка получит project.json и classes/ - текстовый формат Stratum Modern."
           onClose={() => setDialog(null)}
           onSubmit={dir => { setDialog(null); s.saveProject(dir).catch(e => s.say({ level: 'error', where: 'проект', text: String(e) })); }} />
       )}
@@ -231,7 +231,7 @@ export default function App() {
             <div className="panel-title">Гиперссылка: загрузить проект</div>
             <div className="modal-body">
               <div className="mono small" style={{ wordBreak: 'break-all' }}>{s.hyperProject}</div>
-              <div className="muted small" style={{ marginTop: 8 }}>{s.unsaved ? 'В текущем проекте есть несохранённые правки — они пропадут. ' : ''}Текущий проект будет закрыт.</div>
+              <div className="muted small" style={{ marginTop: 8 }}>{s.unsaved ? 'В текущем проекте есть несохранённые правки - они пропадут. ' : ''}Текущий проект будет закрыт.</div>
             </div>
             <div className="modal-actions">
               <button type="button" className="ghost" onClick={() => s.setHyperProject(null)}>Отмена</button>
@@ -274,7 +274,7 @@ export default function App() {
         <PathDialog title="Экспорт в Stratum 2000" action="Экспортировать" initial={s.project.dir.replace(/[\\/]+$/, '') + '-export'}
           hint="В папку будут записаны project.spj, _preload.stt и файлы .cls."
           onClose={() => setDialog(null)}
-          onSubmit={dir => { setDialog(null); api.exportProject(dir).then(r => { s.showToast('Экспортировано'); s.say({ level: 'info', where: 'проект', text: `экспорт: ${r.classes} имиджей → ${r.dir}` }); }).catch(e => s.say({ level: 'error', where: 'экспорт', text: String(e) })); }} />
+          onSubmit={dir => { setDialog(null); api.exportProject(dir).then(r => { s.showToast('Экспортировано'); s.say({ level: 'info', where: 'проект', text: `экспорт: ${r.classes} имиджей -> ${r.dir}` }); }).catch(e => s.say({ level: 'error', where: 'экспорт', text: String(e) })); }} />
       )}
       <div className="workspace" style={{ '--left-w': layout.left + 'px', '--right-w': layout.right + 'px', '--bottom-h': layout.bottom + 'px' } as React.CSSProperties}>
         <div className={`splitter v${dragging === 'left' ? ' active' : ''}`} style={{ left: layout.left }} onMouseDown={() => setDragging('left')} onDoubleClick={() => setLayout(l => ({ ...l, left: 260 }))} />
@@ -297,14 +297,14 @@ export default function App() {
               {frame.halt.class && <button className="small" onClick={() => { s.select(frame.halt!.class, frame.halt!.instance); s.setTab('code'); }}>К коду</button>}
               {frame.halt.kind === 'error' && <button className="small" onClick={() => api.event('type=back')} disabled={!frame.canBack}>Такт назад</button>}
               {frame.halt.kind === 'math' && <>
-                <button className="small" onClick={() => api.event('type=run')} title="Модель продолжит с подставленным значением, как «Пропустить» в оригинале">Продолжить</button>
+                <button className="small" onClick={() => api.event('type=run')} title="Модель продолжит с подставленным значением, как Пропустить в оригинале">Продолжить</button>
                 <button className="small" onClick={() => api.event('type=ignoremath')}>Больше не замечать</button>
               </>}
             </div>
           )}
           {s.tab === 'scheme' && (
             <div className="breadcrumbs">
-              {s.schemePath.map((p, i) => <span key={i}>{i > 0 && ' › '}<button onClick={() => s.goToScheme(i)}>{p}</button></span>)}
+              {s.schemePath.map((p, i) => <span key={i}>{i > 0 && ' > '}<button onClick={() => s.goToScheme(i)}>{p}</button></span>)}
             </div>
           )}
           <div className="tab-body">

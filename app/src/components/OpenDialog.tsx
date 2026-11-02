@@ -54,12 +54,12 @@ export function OpenDialog({ onClose, required }: { onClose: () => void; require
                 <span className="name">{p.split('/').filter(Boolean).pop()}</span>
               </div>
             ))}
-            <div className="muted small" style={{ marginTop: 10 }}>Проект Stratum 2000 — папка с <span className="mono">project.spj</span>; проект Stratum Modern — с <span className="mono">project.json</span>.</div>
+            <div className="muted small" style={{ marginTop: 10 }}>Проект Stratum 2000 - папка с <span className="mono">project.spj</span>; проект Stratum Modern - с <span className="mono">project.json</span>.</div>
           </div>
           <div style={{ minWidth: 0 }}>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 }}>
               <button type="button" className="small icon-only" onClick={() => listing?.parent && setDir(listing.parent)} disabled={!listing?.parent} title="На уровень выше" aria-label="На уровень выше"><Icon name="up" /></button>
-              <span className="mono small" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }} title={listing?.dir}>{listing?.dir ?? '…'}</span>
+              <span className="mono small" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }} title={listing?.dir}>{listing?.dir ?? '...'}</span>
             </div>
             <div className="tree browse">
               {listing?.entries.map(e => (
@@ -78,7 +78,7 @@ export function OpenDialog({ onClose, required }: { onClose: () => void; require
         </div>
         <div className="modal-actions">
           {!required && <button type="button" className="ghost" onClick={onClose}>Отмена</button>}
-          <button type="submit" className="primary" disabled={busy}>{busy ? 'Открываю…' : 'Открыть'}</button>
+          <button type="submit" className="primary" disabled={busy}>{busy ? 'Открываю...' : 'Открыть'}</button>
         </div>
       </form>
     </div>

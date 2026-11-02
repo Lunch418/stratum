@@ -1,7 +1,7 @@
-// «Печать» и «Параметры печати» (диалоги PRINT_MAIN, PRINT_BORDER и
+// "Печать" и "Параметры печати" (диалоги PRINT_MAIN, PRINT_BORDER и
 // PRINT_SOURCE оригинала): что печатать, масштаб, поля листа, исходный
 // прямоугольник. Принтер, число копий и диапазон страниц выбираются в
-// системном окне печати браузера — его открывает кнопка «Печать».
+// системном окне печати браузера - его открывает кнопка "Печать".
 import { useState } from 'react';
 import { useStore } from '../store';
 import { Check, Frame, Num, Radio, Tabs } from './Options';
@@ -14,7 +14,7 @@ export function PrintDialog({ onClose }: { onClose: () => void }) {
   const [tab, setTab] = useState<'main' | 'margins' | 'source'>('main');
   const [o, setO] = useState<PrintOptions>(() => {
     const saved = loadPrint();
-    // по умолчанию — активная вкладка
+    // по умолчанию - активная вкладка
     const source: Source = tab0 === 'code' ? 'code' : tab0 === 'model' ? 'model' : tab0 === 'picture' ? 'picture' : tab0 === 'icon' ? 'icon' : 'scheme';
     return { ...saved, source };
   });
@@ -24,7 +24,7 @@ export function PrintDialog({ onClose }: { onClose: () => void }) {
   const m = (i: number) => (v: number) => { const next = [...o.margins] as PrintOptions['margins']; next[i] = Math.max(0, v); set({ margins: next }); };
   const r = (i: number) => (v: number) => { const next = [...o.rect] as PrintOptions['rect']; next[i] = v; set({ rect: next }); };
   return (
-    <Frame title="Печать" width={560} onClose={onClose} action="Печать…" onSubmit={() => { save(); onClose(); printWith(o); }}>
+    <Frame title="Печать" width={560} onClose={onClose} action="Печать..." onSubmit={() => { save(); onClose(); printWith(o); }}>
       <Tabs tabs={[['main', 'Основное'], ['margins', 'Поля'], ['source', 'Исходный прямоугольник']]} value={tab} onChange={setTab} />
       <div className="modal-body dialog-page">
         {tab === 'main' && <>
@@ -83,7 +83,7 @@ export function PrintDialog({ onClose }: { onClose: () => void }) {
             const d = o.source === 'scheme' ? schemeDrawing() : o.source === 'model' ? modelDrawing(o.window) : cls ? await pictureDrawing(cls, o.source === 'icon' ? 'icon' : 'image') : null;
             if (d) set({ rect: [Math.round(d.box[0]), Math.round(d.box[1]), Math.round(d.box[0] + d.box[2]), Math.round(d.box[1] + d.box[3])] });
           }}>Обновить прямоугольник</button>
-          <div className="muted small">Координаты листа; «Обновить» берёт границы всего нарисованного.</div>
+          <div className="muted small">Координаты листа; "Обновить" берёт границы всего нарисованного.</div>
         </fieldset>}
       </div>
     </Frame>

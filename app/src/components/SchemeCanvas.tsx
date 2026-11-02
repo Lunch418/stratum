@@ -2,8 +2,8 @@
 // панорама, зум к курсору, перетаскивание блоков, вход в подсхему.
 // Правка: перетаскивание имиджа из иерархии добавляет экземпляр, тяга от
 // порта к блоку создаёт связь, контекстное меню и Delete удаляют.
-// Контактные площадки — точки, через которые связи идут к переменным самого
-// имиджа схемы («Вставка → Контактная площадка»).
+// Контактные площадки - точки, через которые связи идут к переменным самого
+// имиджа схемы ("Вставка -> Контактная площадка").
 import { useWindowEvent } from '../hooks';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, type ClassInfo } from '../api';
@@ -18,9 +18,9 @@ export const DRAG_CLASS = 'application/x-stratum-class';
 const NODE_W = 120;
 const NODE_H = 36;
 const ICON = 32;
-/// handle «самого» имиджа схемы в связях
+/// handle "самого" имиджа схемы в связях
 const SELF = 0;
-/// размер контактной площадки (в оригинале — растр 32×32, x/y — левый верх)
+/// размер контактной площадки (в оригинале - растр 32×32, x/y - левый верх)
 const PAD = 32;
 
 interface View { x: number; y: number; k: number }
@@ -50,13 +50,13 @@ export function SchemeCanvas() {
   const [background, setBackground] = useState<{ svg: string; bounds: { x: number; y: number; w: number; h: number } | null }>({ svg: '', bounds: null });
   const [drag, setDrag] = useState<{ handle: number; dx: number; dy: number; moved: boolean } | null>(null);
   const [pan, setPan] = useState<{ sx: number; sy: number; vx: number; vy: number } | null>(null);
-  // тяга связи; fromPad — от контактной площадки (со стороны самого имиджа)
+  // тяга связи; fromPad - от контактной площадки (со стороны самого имиджа)
   const [wire, setWire] = useState<{ from: number; fromPad?: number; x: number; y: number } | null>(null);
   const [selPad, setSelPad] = useState<number | null>(null);
   const [padDrag, setPadDrag] = useState<{ id: number; dx: number; dy: number; moved: boolean } | null>(null);
   const [padMenu, setPadMenu] = useState<{ x: number; y: number; id: number } | null>(null);
   const [padProps, setPadProps] = useState<number | null>(null);
-  // «Вставка → Контактная площадка»: следующий щелчок по листу ставит площадку
+  // "Вставка -> Контактная площадка": следующий щелчок по листу ставит площадку
   const [placingPad, setPlacingPad] = useState(false);
   const [selNode, setSelNode] = useState<number | null>(null);
   // групповое выделение: Shift+щелчок и рамка на пустом месте
@@ -91,8 +91,8 @@ export function SchemeCanvas() {
   // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [klass?.name, background.bounds?.w]);
 
-  // подгонка: за основу — графика листа (или медианный блок), к ней
-  // добавляются блоки неподалёку; «припаркованные» за тысячи пикселей
+  // подгонка: за основу - графика листа (или медианный блок), к ней
+  // добавляются блоки неподалёку; "припаркованные" за тысячи пикселей
   // экземпляры (в корпусе встречаются x = −9000) в кадр не тянем
   const bounds = useMemo(() => {
     if (!klass) return null;
@@ -116,7 +116,7 @@ export function SchemeCanvas() {
     return r;
   }, [klass, background.bounds]);
 
-  // «сам» имидж схемы — виртуальный блок слева от детей: к нему идут связи с handle 0
+  // "сам" имидж схемы - виртуальный блок слева от детей: к нему идут связи с handle 0
   // (если у всех таких связей есть контактная площадка, блок не нужен)
   const selfNode: NodeLike | null = useMemo(() => {
     if (!klass) return null;
@@ -174,7 +174,7 @@ export function SchemeCanvas() {
     return { x: (e.clientX - r.left - view.x) / view.k, y: (e.clientY - r.top - view.y) / view.k };
   }
 
-  // масштаб относительно середины холста («Выбор масштаба»)
+  // масштаб относительно середины холста ("Выбор масштаба")
   function zoomTo(k: number) {
     const r = svgRef.current?.getBoundingClientRect();
     const mx = (r?.width ?? 0) / 2, my = (r?.height ?? 0) / 2;
@@ -203,7 +203,7 @@ export function SchemeCanvas() {
     if (e.button === 1 || (e.button === 0 && empty && e.altKey)) {
       setPan({ sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y });
     } else if (e.button === 0 && empty) {
-      // рамка выделения (Alt — панорама)
+      // рамка выделения (Alt - панорама)
       const p = toScene(e);
       setBand({ x0: p.x, y0: p.y, x1: p.x, y1: p.y });
       if (!e.shiftKey) { select(klass?.name ?? null); setSelNode(null); setSelLink(null); setSelSet(new Set()); }
@@ -273,16 +273,16 @@ export function SchemeCanvas() {
       const target = el.closest('.node')?.getAttribute('data-handle');
       const toPad = el.closest('.pad')?.getAttribute('data-pad');
       if (wire.fromPad !== undefined) {
-        // от площадки к блоку: источник — сам имидж
+        // от площадки к блоку: источник - сам имидж
         if (target !== null && target !== undefined && Number(target) !== SELF) setLinkEdit({ handle: 0, source: SELF, target: Number(target), pairs: [], pad: wire.fromPad });
       } else if (toPad !== null && toPad !== undefined && wire.from !== SELF) {
         setLinkEdit({ handle: 0, source: wire.from, target: SELF, pairs: [], pad: Number(toPad) });
       } else if (target !== null && target !== undefined && Number(target) !== wire.from) {
         const from = wire.from, to = Number(target);
-        // «Переменные» объектов рисунка: совпавшие переменные соединяются сами
+        // "Переменные" объектов рисунка: совпавшие переменные соединяются сами
         suggestPairs(classOfHandle(from), classOfHandle(to)).then(pairs => {
           setLinkEdit({ handle: 0, source: from, target: to, pairs });
-          if (pairs.length) showToast(`Соединено по «Переменным» объектов: ${pairs.length}`);
+          if (pairs.length) showToast(`Соединено по "Переменным" объектов: ${pairs.length}`);
         });
       }
     }
@@ -344,7 +344,7 @@ export function SchemeCanvas() {
     useStore.getState().markUnsaved();
     await reload();
     setSelPad(r.id); setSelNode(null); setSelLink(null);
-    showToast('Контактная площадка поставлена — потяните от её края к блоку');
+    showToast('Контактная площадка поставлена - потяните от её края к блоку');
   }
   async function removePad(id: number) {
     if (!klass) return;
@@ -370,7 +370,7 @@ export function SchemeCanvas() {
   const pads = klass.pads ?? [];
   const centers = new Map(nodes.map(c => { const { w, h } = nodeSize(c); return [c.handle, { x: c.x + w / 2, y: c.y + h / 2 }]; }));
   const padCenter = (id: number) => { const p = pads.find(q => q.id === id); return p ? { x: p.x + PAD / 2, y: p.y + PAD / 2 } : undefined; };
-  // конец связи: со стороны самого имиджа — площадка, если она есть
+  // конец связи: со стороны самого имиджа - площадка, если она есть
   const endOf = (h: number, pad: number) => (h === SELF ? padCenter(pad) : undefined) ?? centers.get(h);
   const padVars = (id: number) => klass.links.filter(l => l.pad === id && (l.source === SELF || l.target === SELF)).flatMap(l => l.vars.map(([a, b]) => l.source === SELF ? a : b));
   const labelOf = (h: number) => {
@@ -388,7 +388,7 @@ export function SchemeCanvas() {
           <pattern id="grid" width={gridStep[0] * view.k} height={gridStep[1] * view.k} patternUnits="userSpaceOnUse" x={view.x + gridOrigin[0] * view.k} y={view.y + gridOrigin[1] * view.k}>
             <path className="grid" d={`M ${gridStep[0] * view.k} 0 L 0 0 0 ${gridStep[1] * view.k}`} fill="none" />
           </pattern>
-          {/* каждая пятая линия — основная, как на миллиметровке */}
+          {/* каждая пятая линия - основная, как на миллиметровке */}
           <pattern id="grid-major" width={gridStep[0] * 5 * view.k} height={gridStep[1] * 5 * view.k} patternUnits="userSpaceOnUse" x={view.x + gridOrigin[0] * view.k} y={view.y + gridOrigin[1] * view.k}>
             <path className="grid-major" d={`M ${gridStep[0] * 5 * view.k} 0 L 0 0 0 ${gridStep[1] * 5 * view.k}`} fill="none" />
           </pattern>
@@ -403,7 +403,7 @@ export function SchemeCanvas() {
           {layers.links && klass.links.map(l => {
             const a = endOf(l.source, l.pad), b = endOf(l.target, l.pad);
             if (!a || !b) return null;
-            const title = l.vars.map(([p, q]) => `${p} → ${q}`).join(', ');
+            const title = l.vars.map(([p, q]) => `${p} -> ${q}`).join(', ');
             const mx = (a.x + b.x) / 2;
             const d = `M ${a.x} ${a.y} C ${mx} ${a.y}, ${mx} ${b.y}, ${b.x} ${b.y}`;
             const st = l.style;
@@ -414,7 +414,7 @@ export function SchemeCanvas() {
                 onDoubleClick={e => { e.stopPropagation(); if (editable) setLinkEdit({ handle: l.handle, source: l.source, target: l.target, pairs: l.vars, style: l.style, pad: l.pad }); }}>
                 <path className="hit" d={d} />
                 <path className="wire" d={d} style={{ stroke: st?.color || undefined, strokeWidth: st?.width ? st.width / view.k : undefined }} markerEnd={st?.arrows ? 'url(#arrow)' : undefined} />
-                <title>{(title || 'связь без пар') + (st?.disabled ? ' · выключена' : '')}</title>
+                <title>{(title || 'связь без пар') + (st?.disabled ? ' | выключена' : '')}</title>
               </g>
             );
           })}
@@ -448,7 +448,7 @@ export function SchemeCanvas() {
                 {ports.map((v, i) => (
                   <circle key={v.name} className="port" cx={i % 2 ? w : 0} cy={8 + Math.floor(i / 2) * 10} r={4} fill={`var(--type-${v.type.toLowerCase()})`} stroke="var(--bg-surface)"
                     onMouseDown={e => { if (!editable) return; e.stopPropagation(); const p = toScene(e); setWire({ from: c.handle, x: p.x, y: p.y }); setSelNode(c.handle); }}>
-                    <title>{v.name}: {v.type}{editable ? ' — потяните к другому блоку, чтобы связать' : ''}</title>
+                    <title>{v.name}: {v.type}{editable ? ' - потяните к другому блоку, чтобы связать' : ''}</title>
                   </circle>
                 ))}
               </g>
@@ -465,7 +465,7 @@ export function SchemeCanvas() {
                   select(klass.name);
                   if (!editable) return;
                   const q = toScene(e);
-                  // от края площадки тянется связь, за середину — перемещение
+                  // от края площадки тянется связь, за середину - перемещение
                   const r = Math.hypot(q.x - p.x - PAD / 2, q.y - p.y - PAD / 2);
                   if (r > PAD * 0.3 || e.shiftKey) setWire({ from: SELF, fromPad: p.id, x: q.x, y: q.y });
                   else setPadDrag({ id: p.id, dx: q.x - p.x, dy: q.y - p.y, moved: false });
@@ -475,21 +475,21 @@ export function SchemeCanvas() {
                 <rect className="pad-ring" x={2} y={2} width={PAD - 4} height={PAD - 4} rx={PAD / 2} />
                 <rect className="pad-core" x={PAD / 2 - 5} y={PAD / 2 - 5} width={10} height={10} rx={2} transform={`rotate(45 ${PAD / 2} ${PAD / 2})`} />
                 {vars.length > 0 && (() => {
-                  const label = vars.slice(0, 3).join(', ') + (vars.length > 3 ? '…' : '');
+                  const label = vars.slice(0, 3).join(', ') + (vars.length > 3 ? '...' : '');
                   const w = label.length * 6.6 + 10;
                   return <g className="pad-label">
                     <rect x={PAD / 2 - w / 2} y={PAD + 2} width={w} height={15} rx={7.5} />
                     <text x={PAD / 2} y={PAD + 13} textAnchor="middle">{label}</text>
                   </g>;
                 })()}
-                <title>{`Контактная площадка${vars.length ? ': ' + vars.join(', ') : ''}${editable ? ' — потяните от края к блоку, чтобы связать; за середину — переместить' : ''}`}</title>
+                <title>{`Контактная площадка${vars.length ? ': ' + vars.join(', ') : ''}${editable ? ' - потяните от края к блоку, чтобы связать; за середину - переместить' : ''}`}</title>
               </g>
             );
           })}
         </g>
       </svg>
       <div className="toolbar">
-        {editable && <button className={`small${placingPad ? ' active' : ''}`} onClick={() => setPlacingPad(v => !v)} title="Вставка → Контактная площадка: щёлкните на листе">+ Площадка</button>}
+        {editable && <button className={`small${placingPad ? ' active' : ''}`} onClick={() => setPlacingPad(v => !v)} title="Вставка -> Контактная площадка: щёлкните на листе">+ Площадка</button>}
         <button className="small" onClick={fitAll} title="Shift+1">Показать всё</button>
         <button className="small" onClick={() => setView(v => ({ ...v, k: 1 }))} title="Shift+0">100%</button>
         <ZoomSelect k={view.k} onSet={zoomTo} onFit={fitAll} />
@@ -500,11 +500,11 @@ export function SchemeCanvas() {
       {menu && (
         <div className="context" style={{ left: menu.x, top: menu.y }} onMouseDown={e => e.stopPropagation()}>
           <button onClick={() => { const n = nodes.find(n => n.handle === menu.handle); setMenu(null); select(n?.class ?? null); setTab('code'); }}>Открыть код</button>
-          {menu.handle !== SELF && <button onClick={() => { const n = klass.children.find(n => n.handle === menu.handle); setMenu(null); setRenaming({ handle: menu.handle, value: n?.name ?? '' }); }}>Переименовать…</button>}
+          {menu.handle !== SELF && <button onClick={() => { const n = klass.children.find(n => n.handle === menu.handle); setMenu(null); setRenaming({ handle: menu.handle, value: n?.name ?? '' }); }}>Переименовать...</button>}
           {menu.handle !== SELF && <button onClick={() => { const c = klass.children.find(n => n.handle === menu.handle); setMenu(null); if (c) { setClipboard([{ class: c.class, name: c.name, x: c.x, y: c.y }]); showToast('Скопировано'); } }}>Копировать <span className="muted">Ctrl+C</span></button>}
           {menu.handle !== SELF && <button onClick={() => { const c = klass.children.find(n => n.handle === menu.handle); setMenu(null); if (c) pasteBlocks([{ class: c.class, name: c.name, x: c.x, y: c.y }]); }}>Дублировать <span className="muted">Ctrl+D</span></button>}
-          {menu.handle !== SELF && <button onClick={() => { const c = klass.children.find(n => n.handle === menu.handle); setMenu(null); setReplacing({ handle: menu.handle, value: c?.class ?? '' }); }}>Заменить другим…</button>}
-          {menu.handle !== SELF && <button onClick={() => { setMenu(null); let n = 1; while (project?.classes.some(c => c.name.toLowerCase() === `блок${n}`)) n++; setMerging({ picked: new Set(selSet.size ? [...selSet, menu.handle] : [menu.handle]), name: `Блок${n}` }); }}>Конвертировать в один имидж…</button>}
+          {menu.handle !== SELF && <button onClick={() => { const c = klass.children.find(n => n.handle === menu.handle); setMenu(null); setReplacing({ handle: menu.handle, value: c?.class ?? '' }); }}>Заменить другим...</button>}
+          {menu.handle !== SELF && <button onClick={() => { setMenu(null); let n = 1; while (project?.classes.some(c => c.name.toLowerCase() === `блок${n}`)) n++; setMerging({ picked: new Set(selSet.size ? [...selSet, menu.handle] : [menu.handle]), name: `Блок${n}` }); }}>Конвертировать в один имидж...</button>}
           {menu.handle !== SELF && <button onClick={() => { setMenu(null); removeChild(menu.handle); }}>Удалить <span className="muted">Del</span></button>}
         </div>
       )}
@@ -513,7 +513,7 @@ export function SchemeCanvas() {
           <form className="modal" onMouseDown={e => e.stopPropagation()} onSubmit={e => { e.preventDefault(); commitRename(); }}>
             <div className="panel-title">Имя экземпляра</div>
             <div className="modal-body">
-              <input autoFocus type="text" value={renaming.value} onChange={e => setRenaming({ ...renaming, value: e.target.value })} placeholder="пусто — как у класса" />
+              <input autoFocus type="text" value={renaming.value} onChange={e => setRenaming({ ...renaming, value: e.target.value })} placeholder="пусто - как у класса" />
               <div className="muted small" style={{ marginTop: 6 }}>Имя используется в путях сообщений и в иерархии.</div>
             </div>
             <div className="modal-actions">
@@ -525,7 +525,7 @@ export function SchemeCanvas() {
       )}
       {padMenu && (
         <div className="context" style={{ left: padMenu.x, top: padMenu.y }} onMouseDown={e => e.stopPropagation()} onMouseLeave={() => setPadMenu(null)}>
-          <button onClick={() => { setPadProps(padMenu.id); setPadMenu(null); }}>Свойства контактной площадки…</button>
+          <button onClick={() => { setPadProps(padMenu.id); setPadMenu(null); }}>Свойства контактной площадки...</button>
           <button onClick={() => { const id = padMenu.id; setPadMenu(null); removePad(id); }}>Удалить контактную площадку <span className="muted">Del</span></button>
         </div>
       )}
@@ -538,14 +538,14 @@ export function SchemeCanvas() {
             <div className="modal" style={{ width: 440 }} onMouseDown={e => e.stopPropagation()}>
               <div className="panel-title">Контактная площадка</div>
               <div className="modal-body">
-                <div className="muted small" style={{ marginBottom: 8 }}>Дескриптор {pad.id} · положение {pad.x}, {pad.y}. Через площадку связи идут к переменным имиджа {klass.name}.</div>
+                <div className="muted small" style={{ marginBottom: 8 }}>Дескриптор {pad.id} | положение {pad.x}, {pad.y}. Через площадку связи идут к переменным имиджа {klass.name}.</div>
                 {through.length === 0 && <div className="muted">Связей нет. Потяните от края площадки к блоку на схеме.</div>}
                 {through.map(l => {
                   const other = l.source === SELF ? l.target : l.source;
                   return (
                     <div key={l.handle} className="row" style={{ alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
                       <span style={{ flex: 1 }}><b>{labelOf(other)}</b> <span className="muted">· {l.vars.map(([a, b]) => l.source === SELF ? `${a} ↔ ${b}` : `${b} ↔ ${a}`).join(', ') || 'без пар'}</span></span>
-                      {editable && <button className="small ghost" onClick={() => { setPadProps(null); setLinkEdit({ handle: l.handle, source: l.source, target: l.target, pairs: l.vars, style: l.style, pad: l.pad }); }}>Связь…</button>}
+                      {editable && <button className="small ghost" onClick={() => { setPadProps(null); setLinkEdit({ handle: l.handle, source: l.source, target: l.target, pairs: l.vars, style: l.style, pad: l.pad }); }}>Связь...</button>}
                     </div>
                   );
                 })}
@@ -561,15 +561,15 @@ export function SchemeCanvas() {
       })()}
       {linkMenu && (
         <div className="context" style={{ left: linkMenu.x, top: linkMenu.y }} onMouseDown={e => e.stopPropagation()} onMouseLeave={() => setLinkMenu(null)}>
-          <button onClick={() => { const l = klass.links.find(l => l.handle === linkMenu.handle); setLinkMenu(null); if (l && editable) setLinkEdit({ handle: l.handle, source: l.source, target: l.target, pairs: l.vars, style: l.style, pad: l.pad }); }}>Свойства связи…</button>
+          <button onClick={() => { const l = klass.links.find(l => l.handle === linkMenu.handle); setLinkMenu(null); if (l && editable) setLinkEdit({ handle: l.handle, source: l.source, target: l.target, pairs: l.vars, style: l.style, pad: l.pad }); }}>Свойства связи...</button>
           <button onClick={() => { setLinkMenu(null); removeLink(linkMenu.handle); }} disabled={!editable}>Удалить эту связь <span className="muted">Del</span></button>
         </div>
       )}
       {sheetMenu && (
         <div className="context" style={{ left: sheetMenu.x, top: sheetMenu.y }} onMouseDown={e => e.stopPropagation()} onMouseLeave={() => setSheetMenu(null)}>
-          <button onClick={() => { setSheetMenu(null); select(klass.name); setDialog('sheet'); }}>Параметры листа…</button>
-          <button onClick={() => { setSheetMenu(null); select(klass.name); setDialog('calcOrder'); }}>Порядок вычислений…</button>
-          <button onClick={() => { setSheetMenu(null); select(klass.name); setDialog('classProps'); }}>Свойства имиджа…</button>
+          <button onClick={() => { setSheetMenu(null); select(klass.name); setDialog('sheet'); }}>Параметры листа...</button>
+          <button onClick={() => { setSheetMenu(null); select(klass.name); setDialog('calcOrder'); }}>Порядок вычислений...</button>
+          <button onClick={() => { setSheetMenu(null); select(klass.name); setDialog('classProps'); }}>Свойства имиджа...</button>
           <button onClick={async () => {
             setSheetMenu(null);
             const [sx, sy] = gridStep, [ox, oy] = gridOrigin;
@@ -600,7 +600,7 @@ export function SchemeCanvas() {
                 {klass.children.map(c => (
                   <label key={c.handle} className="row check" style={{ cursor: 'pointer' }}>
                     <input type="checkbox" checked={merging.picked.has(c.handle)} onChange={e => { const p = new Set(merging.picked); if (e.target.checked) p.add(c.handle); else p.delete(c.handle); setMerging({ ...merging, picked: p }); }} />
-                    <span>{c.name || c.class}</span>{c.name && <span className="muted"> · {c.class}</span>}
+                    <span>{c.name || c.class}</span>{c.name && <span className="muted"> | {c.class}</span>}
                   </label>
                 ))}
               </div>
@@ -624,7 +624,7 @@ export function SchemeCanvas() {
             <div className="panel-title">Заменить другим имиджем</div>
             <div className="modal-body">
               <select autoFocus value={replacing.value} onChange={e => setReplacing({ ...replacing, value: e.target.value })} style={{ width: '100%' }}>
-                {(project?.classes ?? []).map(c => <option key={c.name} value={c.name}>{c.name}{c.library ? ' · библиотека' : ''}</option>)}
+                {(project?.classes ?? []).map(c => <option key={c.name} value={c.name}>{c.name}{c.library ? ' | библиотека' : ''}</option>)}
               </select>
               <div className="muted small" style={{ marginTop: 6 }}>Положение, имя и связи сохраняются; пары с переменными, которых нет в новом имидже, снимаются.</div>
             </div>

@@ -16,14 +16,14 @@ export interface MenuContext {
   newClass: () => void;
   /// создать имидж и сразу поставить на текущую схему
   newClassOnScheme: () => void;
-  /// «Вид → Панель инструментов / Строка состояния»
+  /// "Вид -> Панель инструментов / Строка состояния"
   view: { toolbar: boolean; statusbar: boolean };
   toggleView: (k: 'toolbar' | 'statusbar') => void;
 }
 
-const MDI = 'В новой среде вместо окон MDI — панели с разделителями';
+const MDI = 'В новой среде вместо окон MDI - панели с разделителями';
 
-/// Пункты «Правка» работают через те же горячие клавиши, что и панели:
+/// Пункты "Правка" работают через те же горячие клавиши, что и панели:
 /// событие уходит в document.body, и его ловит активная вкладка.
 const key = (k: string, ctrl = false) => () => document.body.dispatchEvent(new KeyboardEvent('keydown', { key: k, code: k.length === 1 ? 'Key' + k.toUpperCase() : k, ctrlKey: ctrl, bubbles: true, cancelable: true }));
 
@@ -32,7 +32,7 @@ export function buildMenus(ctx: MenuContext): Menu[] {
   const cls = s.selectedClass;
   const lib = !!s.project?.classes.find(c => c.name === cls)?.library;
   const noProject = !s.project || s.project.empty;
-  const st = (action: 'default' | 'keep') => api.stateAction(action).then(() => { if (action === 'keep') s.markUnsaved(); s.showToast(action === 'default' ? 'Переменные — по умолчанию' : 'Текущее состояние стало стартовым'); });
+  const st = (action: 'default' | 'keep') => api.stateAction(action).then(() => { if (action === 'keep') s.markUnsaved(); s.showToast(action === 'default' ? 'Переменные - по умолчанию' : 'Текущее состояние стало стартовым'); });
   const tab = (t: typeof s.tab, label: string): MenuItem => ({ label, checked: s.tab === t, run: () => s.setTab(t) });
   const bottom = (t: typeof s.bottomTab, label: string): MenuItem => ({ label, checked: s.bottomTab === t, run: () => s.setBottomTab(t) });
   // инструмент рисования: переключить вкладку и выбрать инструмент в редакторе
@@ -40,7 +40,7 @@ export function buildMenus(ctx: MenuContext): Menu[] {
   const camera = (field: string) => {
     const p = s.pickedObject;
     if (!p) { s.setTab('model'); s.showToast('Выберите проекцию 3D в окне модели: Alt+щелчок'); return; }
-    api.objectSet(p.win, p.handle, field, 1).then(r => r.json()).then((j: { ok: boolean }) => s.showToast(j.ok ? 'Камера создана' : 'Выбранный объект — не проекция 3D'));
+    api.objectSet(p.win, p.handle, field, 1).then(r => r.json()).then((j: { ok: boolean }) => s.showToast(j.ok ? 'Камера создана' : 'Выбранный объект - не проекция 3D'));
   };
   // DEFAULT.STT в папке проекта (меню "Моделирование" оригинала)
   const defaultStt = (action: 'save' | 'load') => {
@@ -54,21 +54,21 @@ export function buildMenus(ctx: MenuContext): Menu[] {
   return [
     { title: 'Файл', items: [
       { label: 'Новый', sub: [
-        { label: 'Проект…', run: () => ctx.open('new') },
-        { label: 'Имидж…', run: ctx.newClass, disabled: noProject },
+        { label: 'Проект...', run: () => ctx.open('new') },
+        { label: 'Имидж...', run: ctx.newClass, disabled: noProject },
         { label: 'Векторный рисунок', run: () => s.setTab('picture'), disabled: noProject },
       ] },
-      { label: 'Открыть…', hint: 'Ctrl+O', run: () => ctx.open('open') },
+      { label: 'Открыть...', hint: 'Ctrl+O', run: () => ctx.open('open') },
       { sep: true },
       { label: 'Сохранить всё', hint: 'Ctrl+S', run: ctx.save, disabled: noProject },
-      { label: 'Сохранить проект как…', run: () => ctx.open('saveAs'), disabled: noProject },
-      { label: 'Экспорт в Stratum 2000…', run: () => ctx.open('export'), disabled: noProject },
-      { label: 'Экспорт рисунка имиджа в VDR…', run: () => ctx.open('exportVdr'), disabled: !cls },
-      { label: 'Записать активное окно в VDR…', run: () => { s.setTab('model'); setTimeout(() => window.dispatchEvent(new CustomEvent('model-save-vdr')), 50); }, disabled: noProject },
+      { label: 'Сохранить проект как...', run: () => ctx.open('saveAs'), disabled: noProject },
+      { label: 'Экспорт в Stratum 2000...', run: () => ctx.open('export'), disabled: noProject },
+      { label: 'Экспорт рисунка имиджа в VDR...', run: () => ctx.open('exportVdr'), disabled: !cls },
+      { label: 'Записать активное окно в VDR...', run: () => { s.setTab('model'); setTimeout(() => window.dispatchEvent(new CustomEvent('model-save-vdr')), 50); }, disabled: noProject },
       { label: 'Закрыть проект', run: () => api.newProject().then(() => s.load()), disabled: noProject },
       { sep: true },
-      { label: 'Печать…', hint: 'Ctrl+P', run: () => ctx.open('print'), disabled: noProject },
-      { label: 'Параметры печати…', run: () => ctx.open('print'), disabled: noProject },
+      { label: 'Печать...', hint: 'Ctrl+P', run: () => ctx.open('print'), disabled: noProject },
+      { label: 'Параметры печати...', run: () => ctx.open('print'), disabled: noProject },
       { sep: true },
       { label: 'Выход', run: () => window.close(), why: 'В браузере вкладка закрывается сама' },
     ] },
@@ -82,7 +82,7 @@ export function buildMenus(ctx: MenuContext): Menu[] {
       { label: 'Дублировать', hint: 'Ctrl+D', run: key('d', true) },
       { sep: true },
       { label: 'Удалить', hint: 'Delete', run: key('Delete') },
-      { label: 'Удаление имиджей…', run: () => ctx.open('deleteClasses'), disabled: noProject },
+      { label: 'Удаление имиджей...', run: () => ctx.open('deleteClasses'), disabled: noProject },
       { sep: true },
       { label: 'Поиск', hint: 'Ctrl+F', run: () => { s.setTab('code'); s.showToast('Ctrl+F в редакторе кода'); } },
       { label: 'Замена', hint: 'Ctrl+H', run: () => { s.setTab('code'); s.showToast('Ctrl+H в редакторе кода'); } },
@@ -92,7 +92,7 @@ export function buildMenus(ctx: MenuContext): Menu[] {
       { label: 'Панель инструментов', checked: ctx.view.toolbar, run: () => ctx.toggleView('toolbar') },
       { label: 'Строка состояния', checked: ctx.view.statusbar, run: () => ctx.toggleView('statusbar') },
       { sep: true },
-      { label: 'Библиотеки', checked: true, run: () => s.showToast('Библиотеки — раздел в иерархии слева') },
+      { label: 'Библиотеки', checked: true, run: () => s.showToast('Библиотеки - раздел в иерархии слева') },
       bottom('messages', 'Сообщения'),
       { sep: true },
       { label: 'Главная схема', run: () => { s.goToScheme(0); s.setTab('scheme'); } },
@@ -103,15 +103,15 @@ export function buildMenus(ctx: MenuContext): Menu[] {
       tab('graph', 'Граф зависимостей'),
       { sep: true },
       { label: 'Иерархия проекта', checked: true, disabled: true, why: 'Иерархия всегда слева' },
-      { label: 'Просмотр переменных', run: () => s.showToast('Переменные — в инспекторе справа; графики — внизу') },
+      { label: 'Просмотр переменных', run: () => s.showToast('Переменные - в инспекторе справа; графики - внизу') },
       bottom('graphs', 'Графики'),
       bottom('debug', 'Отладка'),
       { sep: true },
-      { label: 'Информация…', run: () => ctx.open('info'), disabled: noProject },
+      { label: 'Информация...', run: () => ctx.open('info'), disabled: noProject },
       { label: s.theme === 'light' ? 'Тёмная тема' : 'Светлая тема', run: s.toggleTheme },
     ] },
     { title: 'Вставка', items: [
-      { label: 'Имидж…', hint: 'или перетащить из иерархии', run: () => { s.setTab('scheme'); ctx.open('chooseClass'); }, disabled: noProject },
+      { label: 'Имидж...', hint: 'или перетащить из иерархии', run: () => { s.setTab('scheme'); ctx.open('chooseClass'); }, disabled: noProject },
       { label: 'Связь', run: () => { s.setTab('scheme'); s.showToast('Потяните от порта блока к другому блоку'); } },
       { label: 'Создать и вставить новый имидж', run: ctx.newClassOnScheme, disabled: noProject || lib },
       { label: 'Контактная площадка', hint: 'щелчок на схеме', disabled: noProject || lib, run: () => { if (s.tab !== 'scheme') s.setTab('scheme'); setTimeout(() => window.dispatchEvent(new CustomEvent('insert-pad')), 50); } },
@@ -123,7 +123,7 @@ export function buildMenus(ctx: MenuContext): Menu[] {
         drawTool('Битовая карта', 'bitmap'),
         { label: 'Двойная битовая карта', disabled: true, why: 'Растры с маской вставляются функцией CreateDoubleBitmap2d' },
         { label: 'Проекция 3d пространства', disabled: true, why: 'Создаётся функцией CreateView3d' },
-        drawTool('Группа', 'group', 'кнопка «Группа»'),
+        drawTool('Группа', 'group', 'кнопка "Группа"'),
       ] },
       { label: 'Формы', sub: [
         drawTool('Строка ввода (Edit)', 'control:EDIT'),
@@ -138,19 +138,19 @@ export function buildMenus(ctx: MenuContext): Menu[] {
         { label: 'Дублировать камеру', run: () => camera('camera.duplicate') },
       ] },
       { sep: true },
-      { label: 'OLE объект', disabled: true, why: 'OLE — технология Windows 98' },
-      { label: 'Из файла…', run: () => ctx.open('insertFile'), disabled: noProject || lib },
+      { label: 'OLE объект', disabled: true, why: 'OLE - технология Windows 98' },
+      { label: 'Из файла...', run: () => ctx.open('insertFile'), disabled: noProject || lib },
     ] },
     { title: 'Формат', items: [
-      { label: 'Свойства имиджа…', hint: 'Enter', run: () => ctx.open('classProps'), disabled: !cls },
-      { label: 'Актуальные размеры', hint: 'Ctrl+A', run: () => s.showToast('Масштаб 100 % — кнопка процентов на панели рисования') },
+      { label: 'Свойства имиджа...', hint: 'Enter', run: () => ctx.open('classProps'), disabled: !cls },
+      { label: 'Актуальные размеры', hint: 'Ctrl+A', run: () => s.showToast('Масштаб 100 % - кнопка процентов на панели рисования') },
       { sep: true },
-      { label: 'Добавить в группу', run: () => { s.setTab('picture'); s.showToast('Выделите объекты и нажмите «Группа»'); } },
-      { label: 'Разгруппировать', run: () => { s.setTab('picture'); s.showToast('Выделите группу и нажмите «Разгруппировать»'); } },
+      { label: 'Добавить в группу', run: () => { s.setTab('picture'); s.showToast('Выделите объекты и нажмите "Группа"'); } },
+      { label: 'Разгруппировать', run: () => { s.setTab('picture'); s.showToast('Выделите группу и нажмите "Разгруппировать"'); } },
       { sep: true },
-      { label: 'Редактировать схему…', run: () => { if (cls) s.enterScheme(cls); }, disabled: !cls },
-      { label: 'Редактировать текст…', run: () => s.setTab('code'), disabled: !cls },
-      { label: 'Редактировать изображение…', run: () => s.setTab('picture'), disabled: !cls },
+      { label: 'Редактировать схему...', run: () => { if (cls) s.enterScheme(cls); }, disabled: !cls },
+      { label: 'Редактировать текст...', run: () => s.setTab('code'), disabled: !cls },
+      { label: 'Редактировать изображение...', run: () => s.setTab('picture'), disabled: !cls },
       { sep: true },
       { label: 'Z-порядок', sub: [
         { label: 'На верх', hint: 'Ctrl+PgUp', run: () => window.dispatchEvent(new CustomEvent('zorder', { detail: 'top' })) },
@@ -164,17 +164,17 @@ export function buildMenus(ctx: MenuContext): Menu[] {
         { label: 'Связи', hint: 'Alt+3', checked: s.layers.links, run: () => s.toggleLayer('links') },
         { label: 'Другие 2d объекты', hint: 'Alt+4', checked: s.layers.graphics, run: () => s.toggleLayer('graphics') },
         { sep: true },
-        { label: 'Произвольно…', run: () => ctx.open('sheet'), disabled: !cls },
+        { label: 'Произвольно...', run: () => ctx.open('sheet'), disabled: !cls },
       ] },
       { sep: true },
-      { label: 'Параметры листа…', run: () => ctx.open('sheet'), disabled: !cls || lib },
-      { label: 'Редактировать порядок вычислений…', run: () => ctx.open('calcOrder'), disabled: !cls || lib },
+      { label: 'Параметры листа...', run: () => ctx.open('sheet'), disabled: !cls || lib },
+      { label: 'Редактировать порядок вычислений...', run: () => ctx.open('calcOrder'), disabled: !cls || lib },
     ] },
     { title: 'Моделирование', items: [
-      { label: ctx.running ? 'Пауза' : 'Запуск', hint: 'F5 · Ctrl+F9', run: () => { unlockAudio(); void api.event(ctx.running ? 'type=pause' : 'type=run'); } },
-      { label: 'Один шаг', hint: 'F10 · F7', run: () => api.event('type=step') },
+      { label: ctx.running ? 'Пауза' : 'Запуск', hint: 'F5 | Ctrl+F9', run: () => { unlockAudio(); void api.event(ctx.running ? 'type=pause' : 'type=run'); } },
+      { label: 'Один шаг', hint: 'F10 | F7', run: () => api.event('type=step') },
       { label: 'Такт назад', hint: 'Shift+F10', run: () => api.event('type=back'), disabled: !ctx.canBack || ctx.running },
-      { label: 'Стоп (сброс)', hint: 'Ctrl+F2 · Shift+F5', run: () => api.event('type=reset').then(() => s.refreshInstances()) },
+      { label: 'Стоп (сброс)', hint: 'Ctrl+F2 | Shift+F5', run: () => api.event('type=reset').then(() => s.refreshInstances()) },
       { sep: true },
       { label: 'Очистить', sub: [
         { label: 'Всё очистить и остановить', hint: 'Ctrl+F2', run: () => api.event('type=reset').then(() => s.refreshInstances()) },
@@ -185,25 +185,25 @@ export function buildMenus(ctx: MenuContext): Menu[] {
         { label: 'Закрыть все базы', disabled: true, why: 'Базы данных не поддерживаются' },
       ] },
       { label: 'По умолчанию', run: () => st('default') },
-      { label: 'Установить переменные…', run: () => s.showToast('Значения правятся в инспекторе справа на паузе') },
+      { label: 'Установить переменные...', run: () => s.showToast('Значения правятся в инспекторе справа на паузе') },
       { sep: true },
-      { label: 'Сохранить переменные…', hint: 'F2', run: () => ctx.open('stateSave'), disabled: noProject },
-      { label: 'Загрузить переменные…', hint: 'F3', run: () => ctx.open('stateLoad'), disabled: noProject },
+      { label: 'Сохранить переменные...', hint: 'F2', run: () => ctx.open('stateSave'), disabled: noProject },
+      { label: 'Загрузить переменные...', hint: 'F3', run: () => ctx.open('stateLoad'), disabled: noProject },
       { label: 'Запомнить как стартовое состояние', hint: 'Alt+F2', run: () => st('keep'), disabled: noProject },
       { label: 'Сохранить в DEFAULT.STT', run: () => defaultStt('save'), disabled: noProject },
       { label: 'Загрузить из DEFAULT.STT', run: () => defaultStt('load'), disabled: noProject },
       { label: 'Вернуть стартовое состояние', hint: 'Alt+F3', run: () => api.event('type=reset').then(() => s.refreshInstances()), disabled: noProject },
       { sep: true },
-      { label: 'Сохранить переменные имиджа…', run: () => ctx.open('imageSave'), disabled: !cls },
-      { label: 'Прочитать переменные имиджа…', run: () => ctx.open('imageLoad'), disabled: !cls },
+      { label: 'Сохранить переменные имиджа...', run: () => ctx.open('imageSave'), disabled: !cls },
+      { label: 'Прочитать переменные имиджа...', run: () => ctx.open('imageLoad'), disabled: !cls },
       { label: 'Установить по умолчанию', run: () => st('keep'), disabled: noProject },
     ] },
     { title: 'Параметры', items: [
-      { label: 'Параметры среды…', run: () => ctx.open('envOptions') },
-      { label: 'Параметры проекта…', run: () => ctx.open('projectOptions'), disabled: noProject },
+      { label: 'Параметры среды...', run: () => ctx.open('envOptions') },
+      { label: 'Параметры проекта...', run: () => ctx.open('projectOptions'), disabled: noProject },
       { sep: true },
-      { label: 'Дополнительные модули…', disabled: true, why: 'Плагины Ogre3D, видео и БД не переносятся' },
-      { label: 'Database Explorer…', run: () => ctx.open('dbf') },
+      { label: 'Дополнительные модули...', disabled: true, why: 'Плагины Ogre3D, видео и БД не переносятся' },
+      { label: 'Database Explorer...', run: () => ctx.open('dbf') },
     ] },
     { title: 'Окна', items: [
       { label: 'Каскадом', disabled: true, why: MDI },
@@ -212,8 +212,8 @@ export function buildMenus(ctx: MenuContext): Menu[] {
       { label: 'Упорядочить иконки', disabled: true, why: MDI },
       { sep: true },
       { label: 'Раскладка панелей по умолчанию', run: () => { try { localStorage.removeItem('layout'); } catch { /* */ } location.reload(); } },
-      { label: 'Таблицы DBF…', run: () => ctx.open('dbf') },
-      { label: 'Палитра команд…', hint: 'Ctrl+Shift+P', run: () => s.setPaletteOpen(true) },
+      { label: 'Таблицы DBF...', run: () => ctx.open('dbf') },
+      { label: 'Палитра команд...', hint: 'Ctrl+Shift+P', run: () => s.setPaletteOpen(true) },
     ] },
     { title: 'Помощь', items: [
       { label: 'Содержание', hint: 'F1', run: () => s.setHelpTopic('') },
@@ -223,18 +223,18 @@ export function buildMenus(ctx: MenuContext): Menu[] {
       { label: 'Системные библиотеки', run: () => s.setHelpTopic('библиотеки') },
       { label: 'Исходный код на GitHub', run: () => window.open('https://github.com/Lunch418/stratum', '_blank') },
       { sep: true },
-      { label: 'О программе…', run: () => ctx.open('about') },
+      { label: 'О программе...', run: () => ctx.open('about') },
     ] },
   ];
 }
 
-/// Палитра команд — плоский список тех же пунктов.
+/// Палитра команд - плоский список тех же пунктов.
 export function commandsFromMenus(menus: Menu[]): Command[] {
   const out: Command[] = [];
   const walk = (items: MenuItem[], group: string, prefix: string) => {
     for (const it of items) {
       if (it.sep || !it.label) continue;
-      if (it.sub) { walk(it.sub, group, prefix + it.label + ' › '); continue; }
+      if (it.sub) { walk(it.sub, group, prefix + it.label + ' > '); continue; }
       if (it.run && !it.disabled) out.push({ id: group + ':' + prefix + it.label, title: prefix + it.label, hint: it.hint, group, run: it.run });
     }
   };
