@@ -75,6 +75,8 @@ pub struct Space3d {
     pub groups: BTreeMap<Handle, Group3d>,
     /// Источники света из рисунка: номер → (имя, 88 байт записи как есть).
     pub lights: BTreeMap<Handle, (String, Vec<u8>)>,
+    /// Разобранные параметры источников света (по тому же номеру).
+    pub light_params: BTreeMap<Handle, LightParams>,
 }
 
 #[derive(Debug, Clone)]
@@ -111,6 +113,31 @@ pub struct CameraParams {
     pub flags: u8,
     pub perspective: u8,
     pub background: u32,
+}
+
+/// Источник света (тип 12, 88 байт): `u16 размер (88), u16 вид, u32 цвет
+/// (0x00BBGGRR), 3 x f64 положение, 3 x f64 вторая точка/направление (только
+/// у вида 1), 3 x f64 резерв (в корпусе нули)`. Вид 0 - точечный, 1 - с
+/// направлением; назначение параметров по корпусу, без сверки в оригинале.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct LightParams {
+    pub kind: u16,
+    pub color: u32,
+    pub pos: Vec3,
+    pub dir: Vec3,
+    pub params: Vec3,
+}
+
+impl LightParams {
+    pub fn parse(b: &[u8]) -> Option<Self> {
+        if b.len() < 88 {
+            return None;
+        }
+        let f = |o: usize| f64::from_le_bytes(b[o..o + 8].try_into().unwrap());
+        let kind = u16::from_le_bytes([b[2], b[3]]);
+        let color = u32::from_le_bytes(b[4..8].try_into().unwrap());
+        Some(LightParams { kind, color, pos: [f(8), f(16), f(24)], dir: [f(32), f(40), f(48)], params: [f(56), f(64), f(72)] })
+    }
 }
 
 impl CameraParams {
@@ -299,6 +326,7 @@ impl Space3d {
             crd: IDENTITY,
             stack: Vec::new(),
             materials: BTreeMap::new(),
+            light_params: BTreeMap::new(),
             camera_params: BTreeMap::new(),
             groups: BTreeMap::new(),
             lights: BTreeMap::new(),
@@ -394,6 +422,9 @@ impl Space3d {
                     self.camera_params.insert(h, params);
                 }
                 Object3dKind::Light(raw) => {
+                    if let Some(lp) = LightParams::parse(raw) {
+                        self.light_params.insert(h, lp);
+                    }
                     self.lights.insert(h, (o.name.clone(), raw.clone()));
                 }
                 Object3dKind::Group { children, .. } => {
@@ -900,6 +931,19 @@ fn inside(poly: &[(f64, f64)], x: f64, y: f64) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn light_params_are_bounds_checked_and_read() {
+        assert_eq!(LightParams::parse(&[0; 87]), None);
+        let mut b = vec![0u8; 88];
+        b[0] = 88;
+        b[2] = 1;
+        b[4..8].copy_from_slice(&0x00B4B4B4u32.to_le_bytes());
+        b[8..16].copy_from_slice(&(-460.0f64).to_le_bytes());
+        b[56..64].copy_from_slice(&825.0f64.to_le_bytes());
+        let l = LightParams::parse(&b).unwrap();
+        assert_eq!((l.kind, l.color, l.pos[0], l.params[0]), (1, 0xB4B4B4, -460.0, 825.0));
+    }
 
     #[test]
     fn rotation_about_z_turns_x_into_y() {

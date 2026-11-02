@@ -383,6 +383,20 @@ fn space3d_in_a_picture_is_read() {
 }
 
 #[test]
+fn lights_of_an_old_picture_are_parsed() {
+    use stratum_core::formats::vdr;
+    use stratum_core::gfx::space3d::Space3d;
+    let Some(root) = fixtures() else { return };
+    let data = std::fs::read(root.join("PROJECTS/samples/T80/TANK.VDR")).unwrap();
+    let pic = vdr::parse(&data, "TANK.VDR").unwrap();
+    let mut sp = Space3d::new(1, 1);
+    sp.load(&pic.spaces3d[0]);
+    assert_eq!(sp.light_params.len(), 3);
+    let l = &sp.light_params[&33];
+    assert_eq!((l.kind, l.color, l.pos, l.dir), (1, 0xB4B4B4, [-460.0, 255.0, 2475.0], [-330.0, 825.0, 130.0]));
+}
+
+#[test]
 fn space3d_in_a_v3_picture_is_read() {
     use stratum_core::formats::vdr::{self, ObjectKind};
     let Some(root) = fixtures() else { return };

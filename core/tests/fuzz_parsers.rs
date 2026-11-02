@@ -114,6 +114,14 @@ fn picture(data: &[u8], name: &str) {
         // рендер окна с ними, как у окна модели
         let mut gfx = gfx::Gfx::new();
         let map = gfx.create_spaces3d(&pic);
+        // источники света: разбор любых обрезков записи не паникует
+        for o in pic.spaces3d.iter().flat_map(|s| &s.objects) {
+            if let vdr::Object3dKind::Light(raw) = &o.kind {
+                for n in 0..raw.len() {
+                    let _ = stratum_core::gfx::space3d::LightParams::parse(&raw[..n]);
+                }
+            }
+        }
         gfx.spaces.insert(1000, sp);
         gfx.bind_views(1000, &map);
         if let Some(sp) = gfx.space(1000) {
