@@ -1004,7 +1004,7 @@ pub struct Gfx {
 /// Ширина строки Arial в пикселях по измеренным в оригинале таблицам (tools/measure_arial.py):
 /// размер вне 4..=72 масштабируется от ближайшего, символ вне cp1251 - как средний.
 pub fn text_width_px(text: &str, size: i32, bold: bool, face: &str) -> f64 {
-    let size = size.abs().max(1);
+    let size = (size.unsigned_abs().min(1 << 20) as i32).max(1);
     let near = size.clamp(arial::MIN_SIZE, arial::MAX_SIZE);
     // гарнитура «ARIAL CYR» в Wine даёт другие ширины, чем Arial (WindowRegion: кнопки)
     let cyr = face.eq_ignore_ascii_case("arial cyr");
@@ -1291,5 +1291,32 @@ mod hit_tests {
         assert_eq!(sp.object_at(150.0, 102.99), Some(2));
         assert_eq!(sp.object_at(150.0, 103.0), None);
         assert_eq!(sp.object_at(202.5, 102.5), Some(2));
+    }
+}
+
+#[cfg(test)]
+mod wine_parity_tests {
+    use super::*;
+    use crate::runtime::value::Value;
+
+    #[test]
+    fn text_width_survives_extreme_sizes() {
+        for size in [i32::MIN, i32::MAX, 0, -1, 3, 73, 100000] {
+            let w = text_width_px("Hello \u{44f}\u{4e2d}", size, true, "Arial");
+            assert!(w.is_finite() && w >= 0.0, "size {size}");
+        }
+    }
+
+    #[test]
+    fn video_writers_stay_bounded_and_end_releases() {
+        let mut g = Gfx::default();
+        let args = [Value::Float(0.0), Value::Str("a.avi".into())];
+        for _ in 0..1000 {
+            api::call("beginwritevideo2d", &args, &mut g);
+        }
+        assert!(g.video_writers.len() <= 64);
+        let hv = *g.video_writers.keys().next().unwrap();
+        api::call("endwritevideo2d", &[Value::Handle(hv as f64)], &mut g);
+        assert!(!g.video_writers.contains_key(&hv));
     }
 }

@@ -596,7 +596,7 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
             })).unwrap_or(0))
         }
         "getfontname2d" => Value::Str(gfx.space(h(args, 0)).and_then(|sp| sp.fonts.get(&h(args, 1))).map(|f| f.face.clone()).unwrap_or_default()),
-        "getfontsize2d" => num(gfx.space(h(args, 0)).and_then(|sp| sp.fonts.get(&h(args, 1))).map(|f| (f.height.abs() as f64 * 72.0 / 96.0).round()).unwrap_or(0.0)),
+        "getfontsize2d" => num(gfx.space(h(args, 0)).and_then(|sp| sp.fonts.get(&h(args, 1))).map(|f| (f.height.unsigned_abs() as f64 * 72.0 / 96.0).round()).unwrap_or(0.0)),
         "getfontstyle2d" => num(gfx.space(h(args, 0)).and_then(|sp| sp.fonts.get(&h(args, 1))).map(|f| {
             (if f.italic { 1.0 } else { 0.0 }) + (if f.underline { 2.0 } else { 0.0 }) + (if f.weight >= 700 { 8.0 } else { 0.0 })
         }).unwrap_or(0.0)),
@@ -882,15 +882,22 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
         "getschemeobject" => num(0.0),
         "openvideo" | "closevideo" | "createvideoframe2d" | "framegetvideo2d" | "videosetpos2d" | "videogetpos2d" | "framesetpos2d" | "framegetpos2d"
         | "videoplay2d" | "videopause2d" | "videoresume2d" | "videostop2d" | "framesetsrcrect2d" => super::video::call(&lower, args, gfx)?,
-        "audiosetvolume" | "audiosettone" | "endwritevideo2d" | "videocompressdialog" | "saverectarea2d" => ok(true),
+        "audiosetvolume" | "audiosettone" | "videocompressdialog" | "saverectarea2d" => ok(true),
         // запись видео: номера с 0x1000, WriteVideoFrame2d возвращает число записанных
         // кадров (сверено в Wine: WRITEAVI, hv = 4096, rez = 17 после 17 кадров)
         "beginwritevideo2d" => {
-            let hv = 0x1000 + gfx.video_writers.len() as Handle;
+            if gfx.video_writers.len() >= 64 {
+                return Some(handle(0 as Handle));
+            }
+            let hv = gfx.video_writers.keys().next_back().map_or(0x1000, |k| k + 1);
             gfx.video_writers.insert(hv, 0);
             handle(hv)
         }
-        "writevideoframe2d" => num(gfx.video_writers.get_mut(&h(args, 0)).map(|n| { *n += 1; *n as f64 }).unwrap_or(0.0)),
+        "endwritevideo2d" => {
+            gfx.video_writers.remove(&h(args, 0));
+            ok(true)
+        }
+        "writevideoframe2d" => num(gfx.video_writers.get_mut(&h(args, 0)).map(|n| { *n = n.saturating_add(1); *n as f64 }).unwrap_or(0.0)),
         // сенсор Kinect и сетевые объекты: устройств нет
         "nui_init" | "nui_initinstance" | "nui_createinstance" | "nui_getdevicecount" | "registernetobject" | "initanalyzer" => num(0.0),
         "getwindowtitle" => Value::Str(gfx.window_space(&s(args, 0)).and_then(|h| gfx.space(h)).map(|sp| sp.window.clone()).unwrap_or_default()),
@@ -1048,7 +1055,7 @@ fn text_extent(sp: &Space, text: Handle) -> (f64, f64) {
     let mut height: f64 = 0.0;
     for p in parts {
         let font = sp.fonts.get(&p.font);
-        let h = font.map(|f| f.height.abs() as f64).unwrap_or(12.0).max(1.0);
+        let h = font.map(|f| f.height.unsigned_abs() as f64).unwrap_or(12.0).max(1.0);
         let bold = font.is_some_and(|f| f.weight >= 600);
         let text = sp.strings.get(&p.string).map(|s| s.as_str()).unwrap_or("");
         width += super::text_width_px(text, h as i32, bold, font.map(|f| f.face.as_str()).unwrap_or(""));
