@@ -457,7 +457,7 @@ pub static FUNCTIONS: &[(&str, &str, &str, char, u16)] = &[
     ("createsurface3d", "HHFFCF", "", 'H', 668),
     ("createobjectfromfile3d", "HS", "", 'H', 197),
     ("createobject3d", "H", "", 'H', 638),
-    ("getspace3d", "", "", 'H', 652),
+    ("getspace3d", "HH", "", 'H', 652),
     ("create3dview2d", "", "", 'H', 662),
     ("createspace3d", "H", "", 'H', 660),
     ("deletespace3d", "H", "", 'F', 661),
@@ -1057,5 +1057,6 @@ pub static ALIASES: &[(&str, &str)] = &[
     ("getspaceorgy", "getspaceorg2dy"),
     ("setbitmapsrcrect", "setbitmapsrcrect2d"),
     ("setlogstring2d", "setstring2d"),
+    ("setspaceorg", "setspaceorg2d"),
     ("videocompressdialog", "videodialog"),
 ];

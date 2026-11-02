@@ -21,6 +21,8 @@ for x in items:
             args += ('&' if a['byref'] else '') + TY[a['type']]
         else:
             opt += ''.join(('&' if o['byref'] else '') + TY[o['type']] for o in a['optional'])
+    if x['name'] == 'GetSpace3d' and not args:
+        args = 'HH'  # шаблон без аргументов; модели вызывают GetSpace3d(окно, вид) (EDS_IND)
     rows.append((x['name'].lower(), args, opt, TY[x.get('ret')], x['opcode']))
 
 # функции внешних библиотек (.TDL): вызов — DLLFunction 479 и имя строкой

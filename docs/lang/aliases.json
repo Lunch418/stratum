@@ -6,6 +6,7 @@
   "getspaceorgx": "getspaceorg2dx",
   "getspaceorgy": "getspaceorg2dy",
   "setbitmapsrcrect": "setbitmapsrcrect2d",
+  "setspaceorg": "setspaceorg2d",
   "setlogstring2d": "setstring2d",
   "videocompressdialog": "videodialog"
 }
