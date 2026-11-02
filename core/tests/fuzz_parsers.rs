@@ -130,6 +130,33 @@ fn picture(data: &[u8], name: &str) {
     }
 }
 
+fn avi(data: &[u8]) {
+    if let Ok(mut a) = stratum_core::formats::avi::Avi::parse(data.to_vec()) {
+        let n = a.frame_count().min(8);
+        for i in (0..n).rev() {
+            let _ = a.frame_rgb(i);
+        }
+        let _ = a.frame_rgb(0);
+    }
+}
+
+/// Синтетические AVI: порча каждого байта и обрезки не паникуют.
+#[test]
+fn crafted_avi_do_not_panic() {
+    let f: Vec<Vec<u8>> = (0..3).map(|k| vec![k as u8 * 40; 6 * 4 * 3]).collect();
+    let good = stratum_core::formats::avi::build_rgb24(6, 4, &f, 10);
+    for cut in 0..good.len() {
+        assert!(catch_unwind(|| avi(&good[..cut])).is_ok(), "обрезка {cut}");
+    }
+    for at in 0..good.len() {
+        for v in [0u8, 0xff, 0x7f, 0x80] {
+            let mut m = good.clone();
+            m[at] = v;
+            assert!(catch_unwind(|| avi(&m)).is_ok(), "байт {at}={v}");
+        }
+    }
+}
+
 fn bitmap(data: &[u8]) {
     let _ = gfx::bmp_size(data);
     let _ = gfx::decode_bmp(data);
@@ -171,6 +198,7 @@ fn check(path: &Path, data: &[u8]) {
             }
         }
         "dbm" | "bmp" => bitmap(data),
+        "avi" => avi(data),
         _ => {}
     }
 }
@@ -182,7 +210,7 @@ fn damaged_files_do_not_panic() {
     collect(&root, &mut files);
     files.retain(|p| {
         let e = p.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
-        matches!(e.as_str(), "cls" | "vdr" | "stt" | "spj" | "prj" | "dbm" | "bmp")
+        matches!(e.as_str(), "cls" | "vdr" | "stt" | "spj" | "prj" | "dbm" | "bmp" | "avi")
     });
     files.sort();
     // STRATUM_FUZZ_SCALE=N - в N раз больше мутаций и все .cls (долгий прогон);

@@ -2,6 +2,7 @@
 //!
 //! Все форматы восстановлены по корпусу; спецификации - в `docs/formats/`.
 
+pub mod avi;
 pub mod cls;
 pub mod cp1251;
 pub mod dbf;
