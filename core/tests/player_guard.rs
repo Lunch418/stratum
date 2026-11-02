@@ -148,3 +148,25 @@ fn body_of_rejected_request_is_not_awaited() {
     // не-API без токена: тело тоже не ждётся
     assert_eq!(request_with_unsent_body(port, "POST", "/", &[], big).status, 405);
 }
+
+#[test]
+fn dbf_and_file_endpoints_need_token_and_host() {
+    let (port, token) = start();
+    for t in ["/api/dbf/files", "/api/dbf?file=a.dbf", "/api/file?name=a.wav"] {
+        assert_eq!(request(port, "GET", t, &[]).status, 401, "{t}");
+        assert_eq!(request(port, "GET", t, &[("Host", format!("evil.example:{port}")), token_header(&token)]).status, 403, "{t}");
+    }
+}
+
+#[test]
+fn dbf_and_audio_paths_do_not_leave_the_project() {
+    let (port, token) = start();
+    for f in ["../../etc/passwd.dbf", "/etc/passwd.dbf", "%2e%2e/%2e%2e/x.dbf", "a.txt", "C:%5Cx.dbf"] {
+        let r = request(port, "GET", &format!("/api/dbf?file={f}"), &[token_header(&token)]);
+        assert!(matches!(r.status, 400 | 403 | 404), "{f}: {}", r.status);
+    }
+    for f in ["../../etc/passwd", "/etc/passwd", "%2e%2e/x.wav", "/etc/hostname.wav"] {
+        let r = request(port, "GET", &format!("/api/file?name={f}"), &[token_header(&token)]);
+        assert_eq!(r.status, 404, "{f}");
+    }
+}

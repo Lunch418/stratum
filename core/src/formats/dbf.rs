@@ -7,6 +7,10 @@
 
 use super::cp1251;
 
+/// Наибольшее число ячеек в таблице: память под строки растёт с числом
+/// записей x полей, а не с размером файла.
+pub const MAX_CELLS: usize = 16 << 20;
+
 /// Наибольшее число полей (предел формата dBASE).
 pub const MAX_FIELDS: usize = 255;
 
@@ -174,9 +178,15 @@ impl Table {
         if total > rec_len {
             return err("поля не умещаются в запись");
         }
+        if fields.iter().any(|f| f.len == 0 && matches!(f.kind, b'C' | b'N' | b'F')) {
+            return err("поле нулевой длины");
+        }
         let declared = d.get(4..8).map_or(0, |b| u32::from_le_bytes([b[0], b[1], b[2], b[3]])) as usize;
         let room = (d.len() - header_len) / rec_len;
         let count = declared.min(room);
+        if count.saturating_mul(fields.len()) > MAX_CELLS {
+            return err("таблица слишком велика");
+        }
         let mut rows = Vec::new();
         for i in 0..count {
             let rec = &d[header_len + i * rec_len..header_len + (i + 1) * rec_len];
@@ -276,5 +286,29 @@ mod tests {
         b[10] = 0;
         b[11] = 0;
         assert!(Table::parse(&b).is_err());
+    }
+
+    #[test]
+    fn many_tiny_fields_do_not_amplify_memory() {
+        // 255 полей, запись из одного байта, 10 МБ записей: по ячейке на поле
+        let mut b = vec![0u8; 32 + 255 * 32 + 1];
+        b[0] = 3;
+        b[4..8].copy_from_slice(&u32::MAX.to_le_bytes());
+        let hl = b.len() as u16;
+        b[8..10].copy_from_slice(&hl.to_le_bytes());
+        b[10] = 256u16.to_le_bytes()[0];
+        b[11] = 1;
+        for i in 0..255 {
+            let o = 32 + i * 32;
+            b[o] = b'A';
+            b[o + 11] = b'C';
+            b[o + 16] = 1;
+        }
+        b[32 + 255 * 32] = 0x0d;
+        b.resize(b.len() + 256 * 100_000, b' ');
+        assert!(Table::parse(&b).is_err());
+        // нулевая длина текстового поля
+        b[32 + 16] = 0;
+        assert!(Table::parse(&b[..hl as usize + 256]).is_err());
     }
 }

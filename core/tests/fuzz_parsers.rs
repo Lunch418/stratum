@@ -398,3 +398,40 @@ fn damaged_dbf_does_not_panic() {
         let _ = Table::parse(&data[..n]);
     }
 }
+
+/// Cinepak и MSVC1/RLE8 поверх случайных и "почти верных" кадров: декодеры не паникуют.
+#[test]
+fn crafted_cinepak_msvc_rle_frames_do_not_panic() {
+    let mut x = 0x1234_5678u32;
+    let mut rnd = move || {
+        x ^= x << 13;
+        x ^= x >> 17;
+        x ^= x << 5;
+        x
+    };
+    for (fourcc, bpp) in [(*b"cvid", 24u16), (*b"cvid", 32), (*b"msvc", 8), (*b"msvc", 16), (*b"cram", 16), ([1, 0, 0, 0], 8)] {
+        for round in 0..300 {
+            let frames: Vec<Vec<u8>> = (0..3).map(|_| (0..9 * 7 * 3).map(|_| rnd() as u8).collect()).collect();
+            let mut a = stratum_core::formats::avi::build_rgb24(9, 7, &frames, 10);
+            if &fourcc == b"cvid" && round % 2 == 0 {
+                // заголовок кадра Cinepak: 1-3 полосы, полоса с кодовой книгой
+                let n = 1 + (rnd() % 3) as u8;
+                let mut from = 0;
+                while let Some(p) = a[from..].windows(4).position(|w| w == b"00db") {
+                    let b = from + p + 8;
+                    a[b + 8] = 0;
+                    a[b + 9] = n;
+                    a[b + 10] = 0x10;
+                    a[b + 11] = 0;
+                    a[b + 12] = 0;
+                    a[b + 13] = 120;
+                    from = b;
+                }
+            }
+            let at = a.windows(4).position(|w| w == b"strf").unwrap() + 8;
+            a[at + 14..at + 16].copy_from_slice(&bpp.to_le_bytes());
+            a[at + 16..at + 20].copy_from_slice(&fourcc);
+            assert!(catch_unwind(|| avi(&a)).is_ok(), "{fourcc:?} {bpp} {round}");
+        }
+    }
+}

@@ -8,6 +8,10 @@ use super::{encode_bmp24, Dib, Gfx, Handle, Object, Shape};
 use crate::formats::avi::Avi;
 use crate::runtime::value::Value;
 
+/// Наибольшее число открытых потоков и видеофреймов одного потока.
+pub const MAX_VIDEOS: usize = 16;
+pub const MAX_VIDEO_FRAMES: usize = 64;
+
 #[derive(Debug, Clone)]
 pub struct Video {
     pub avi: Avi,
@@ -45,6 +49,10 @@ impl Gfx {
             self.video_error = format!("file not found: {name}");
             return 0;
         };
+        if self.videos.len() >= MAX_VIDEOS {
+            self.video_error = "too many open videos".into();
+            return 0;
+        }
         let too_big = std::fs::metadata(&path).map(|m| m.len() > crate::formats::avi::MAX_FILE_BYTES as u64).unwrap_or(true);
         let data = if too_big { None } else { std::fs::read(&path).ok() };
         let Some(data) = data else {
@@ -142,6 +150,9 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
             if hh < 0.0 {
                 hh = vh;
             }
+            if gfx.videos.get(&a1).is_some_and(|v| v.frames.len() >= MAX_VIDEO_FRAMES) {
+                return Some(handle(0));
+            }
             let Some(sp) = gfx.space_mut(a0) else { return Some(handle(0)) };
             let dib = sp.add_dib(Dib::new(Vec::new(), Vec::new(), None));
             let obj = sp.add_object(Object::new(0, x, y, w, hh, Shape::Bitmap { dib, src: (0.0, 0.0, vw, vh), masked: false }));
@@ -192,4 +203,20 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
         }
         _ => return None,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn open_video_table_is_capped() {
+        let dir = std::env::temp_dir().join(format!("stratum_vid_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("a.avi"), crate::formats::avi::build_rgb24(2, 2, &[vec![0; 12]], 10)).unwrap();
+        let mut g = Gfx { project_dir: dir.clone(), ..Default::default() };
+        let opened = (0..MAX_VIDEOS + 8).filter(|_| g.open_video("a.avi") != 0).count();
+        assert_eq!(opened, MAX_VIDEOS);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

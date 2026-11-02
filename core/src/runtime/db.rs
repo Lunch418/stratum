@@ -116,6 +116,10 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
                 return Some(Value::Handle(0.0));
             };
             let flags = arg_s(args, 6).to_ascii_uppercase();
+            if std::fs::metadata(&path).map_or(true, |m| m.len() > 256 << 20) {
+                fail(fx, 1);
+                return Some(Value::Handle(0.0));
+            }
             let Ok(data) = std::fs::read(&path) else {
                 fail(fx, 1);
                 return Some(Value::Handle(0.0));

@@ -73,6 +73,9 @@ pub fn wav_info(head: &[u8]) -> Option<(f64, f64)> {
     None
 }
 
+/// Предел позиции без известной длины (секунды), чтобы позиция в кадрах была конечной.
+const MAX_SEC: f64 = 1e9;
+
 impl Sound {
     fn position_sec(&self) -> f64 {
         let mut p = self.base;
@@ -163,7 +166,7 @@ impl Audios {
 
     pub fn seek_sec(&mut self, id: u32, sec: f64) {
         if let Some(s) = self.items.get_mut(&id) {
-            let max = if s.length > 0.0 { s.length } else { f64::MAX };
+            let max = if s.length > 0.0 { s.length } else { MAX_SEC };
             s.base = if sec.is_finite() { sec.clamp(0.0, max) } else { 0.0 };
             if s.playing {
                 s.since = Some(Instant::now());
@@ -205,6 +208,14 @@ mod tests {
         v.extend_from_slice(b"data");
         v.extend_from_slice(&(rate * 2 * secs).to_le_bytes());
         v
+    }
+
+    #[test]
+    fn huge_seek_keeps_position_finite() {
+        let mut a = Audios::default();
+        let id = a.open("x.mp3".into(), 44100.0, 0.0).unwrap();
+        a.seek_sec(id, 1e308);
+        assert!(a.items.get_mut(&id).unwrap().position().is_finite());
     }
 
     #[test]

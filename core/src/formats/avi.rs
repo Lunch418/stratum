@@ -10,6 +10,9 @@ use std::fmt;
 /// Потолок размера кадра (RGB, байт): 64 МБ.
 pub const MAX_FRAME_BYTES: usize = 64 << 20;
 /// Потолок размера файла, читаемого целиком.
+/// Наибольшее число кадров и полос Cinepak в кадре (память растёт с числом).
+pub const MAX_FRAMES: usize = 1 << 20;
+pub const MAX_STRIPS: usize = 256;
 pub const MAX_FILE_BYTES: usize = 256 << 20;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -370,6 +373,9 @@ impl Avi {
         let bad = AviError::Malformed("Cinepak data");
         let flags = *d.first().ok_or(bad.clone())?;
         let nstrips = u16be(d, 8).ok_or(bad.clone())? as usize;
+        if nstrips > MAX_STRIPS {
+            return Err(bad);
+        }
         let (w, h) = (self.width as usize, self.height as usize);
         let mut pos = 10usize;
         let mut y0 = 0usize;
@@ -572,7 +578,7 @@ fn scan(d: &[u8], mut pos: usize, end: usize, depth: u32, st: &mut Scan) {
             }
             _ if id[0..2].iter().all(|b| b.is_ascii_digit()) && matches!(&id[2..4], b"db" | b"dc") => {
                 let stream = ((id[0] - b'0') * 10 + (id[1] - b'0')) as u16;
-                if Some(stream) == st.video_stream.or(Some(0)) {
+                if Some(stream) == st.video_stream.or(Some(0)) && st.frames.len() < MAX_FRAMES {
                     st.frames.push((body, size.min(d.len().saturating_sub(body))));
                 }
             }
@@ -636,4 +642,41 @@ pub fn build_rgb24(width: u32, height: u32, frames: &[Vec<u8>], fps: u32) -> Vec
     body.extend(chunk(b"LIST", &hdrl));
     body.extend(chunk(b"LIST", &movi));
     chunk(b"RIFF", &body)
+}
+
+#[cfg(test)]
+mod limits {
+    use super::*;
+
+    #[test]
+    fn frame_list_and_strips_are_capped() {
+        let one = build_rgb24(2, 2, &[vec![0; 12]], 10);
+        let mut a = one.clone();
+        // много пустых кусков "00dc" в конец movi: список кадров не растёт без предела
+        let at = a.windows(4).position(|w| w == b"movi").unwrap();
+        a.truncate(at + 4);
+        for _ in 0..(MAX_FRAMES + 1000) {
+            a.extend_from_slice(b"00dc\0\0\0\0");
+        }
+        let n = a.len() as u32 - 8;
+        a[4..8].copy_from_slice(&n.to_le_bytes());
+        // внешний LIST movi охватывает весь хвост
+        let lp = a.windows(4).position(|w| w == b"movi").unwrap() - 8;
+        let ln = (a.len() - lp - 8) as u32;
+        a[lp + 4..lp + 8].copy_from_slice(&ln.to_le_bytes());
+        if let Ok(v) = Avi::parse(a) {
+            assert!(v.frame_count() <= MAX_FRAMES);
+        }
+        // 3000 пустых полос Cinepak: у каждой свои таблицы кодов
+        let mut c = vec![0u8; 10];
+        c[8] = 0x0b;
+        c[9] = 0xb8;
+        for _ in 0..3000 {
+            c.extend_from_slice(&[0x10, 0, 0, 12, 0, 0, 0, 0, 0, 2, 0, 2]);
+        }
+        let mut av = Avi::parse(one).unwrap();
+        av.codec = Codec::Cinepak;
+        av.canvas = vec![0; 2 * 2 * 3];
+        assert!(av.cinepak(&c).is_err());
+    }
 }
