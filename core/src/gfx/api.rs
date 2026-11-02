@@ -1041,15 +1041,17 @@ fn rotate(sp: &mut Space, obj: Handle, cx: f64, cy: f64, angle: f64) -> bool {
     true
 }
 
-/// Оценка габаритов текста: точных метрик шрифта в ядре нет.
+/// Габариты текста: ширина по таблицам Arial, измеренным в оригинале (шрифты других гарнитур - как Arial).
 fn text_extent(sp: &Space, text: Handle) -> (f64, f64) {
     let Some(parts) = sp.texts.get(&text) else { return (0.0, 0.0) };
     let mut width = 0.0;
     let mut height: f64 = 0.0;
     for p in parts {
-        let h = sp.fonts.get(&p.font).map(|f| f.height.abs() as f64).unwrap_or(12.0).max(1.0);
-        let chars = sp.strings.get(&p.string).map(|s| s.chars().count()).unwrap_or(0) as f64;
-        width += chars * h * 0.55;
+        let font = sp.fonts.get(&p.font);
+        let h = font.map(|f| f.height.abs() as f64).unwrap_or(12.0).max(1.0);
+        let bold = font.is_some_and(|f| f.weight >= 600);
+        let text = sp.strings.get(&p.string).map(|s| s.as_str()).unwrap_or("");
+        width += super::text_width_px(text, h as i32, bold, font.map(|f| f.face.as_str()).unwrap_or(""));
         height = height.max(h);
     }
     (width, height)

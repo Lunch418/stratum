@@ -5,6 +5,7 @@
 
 pub mod api;
 pub mod api3d;
+mod arial;
 pub mod space3d;
 pub mod svg;
 pub mod video;
@@ -998,6 +999,31 @@ pub struct Gfx {
     pub video_writers: BTreeMap<Handle, u32>,
     /// Порядок открытия окон — для стабильного вывода.
     pub window_order: Vec<String>,
+}
+
+/// Ширина строки Arial в пикселях по измеренным в оригинале таблицам (tools/measure_arial.py):
+/// размер вне 4..=72 масштабируется от ближайшего, символ вне cp1251 - как средний.
+pub fn text_width_px(text: &str, size: i32, bold: bool, face: &str) -> f64 {
+    let size = size.abs().max(1);
+    let near = size.clamp(arial::MIN_SIZE, arial::MAX_SIZE);
+    // гарнитура «ARIAL CYR» в Wine даёт другие ширины, чем Arial (WindowRegion: кнопки)
+    let cyr = face.eq_ignore_ascii_case("arial cyr");
+    let table = match (cyr, bold) {
+        (false, false) => &arial::REGULAR,
+        (false, true) => &arial::BOLD,
+        (true, false) => &arial::CYR_REGULAR,
+        (true, true) => &arial::CYR_BOLD,
+    };
+    let row = &table[(near - arial::MIN_SIZE) as usize];
+    let mut total = 0.0;
+    for ch in text.chars() {
+        let code = crate::formats::cp1251::encode(&ch.to_string()).first().copied().unwrap_or(b'?');
+        total += match code {
+            32..=255 => row[(code - 32) as usize] as f64,
+            _ => near as f64 * 0.5,
+        };
+    }
+    total * size as f64 / near as f64
 }
 
 impl Gfx {
