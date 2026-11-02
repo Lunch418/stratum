@@ -26,6 +26,7 @@ export function Graphs() {
     };
     poll();
     return () => { alive = false; };
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- intentional
   }, [frame?.running]);
 
   useEffect(() => {
@@ -59,7 +60,7 @@ export function Graphs() {
           {traces.map((t, i) => {
             const last = t.points.length ? t.points[t.points.length - 1][1] : null;
             return (
-              <div key={t.id} className={`item${hidden.has(t.id) ? ' off' : ''}${focus === t.id ? ' focus' : ''}`} onMouseEnter={() => setFocus(t.id)} onMouseLeave={() => setFocus(null)} onClick={() => setHidden(h => { const n = new Set(h); n.has(t.id) ? n.delete(t.id) : n.add(t.id); return n; })}>
+              <div key={t.id} className={`item${hidden.has(t.id) ? ' off' : ''}${focus === t.id ? ' focus' : ''}`} onMouseEnter={() => setFocus(t.id)} onMouseLeave={() => setFocus(null)} onClick={() => setHidden(h => { const n = new Set(h); if (!n.delete(t.id)) n.add(t.id); return n; })}>
                 <span className="swatch" style={{ background: COLORS[i % COLORS.length] }} />
                 <span className="name" title={`${t.path}.${t.var}`}>{t.path.split('\\').pop()}.{t.var}</span>
                 <span className="mono val">{last === null ? '—' : fmt(last)}</span>

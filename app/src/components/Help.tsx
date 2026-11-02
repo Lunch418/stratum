@@ -44,6 +44,7 @@ export function Help() {
   const [page, setPage] = useState<{ topic: string; html: string } | { error: string } | null>(null);
 
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- intentional
     if (!topic) { setPage(null); return; }
     let alive = true;
     fetch(`/api/help/${encodeURIComponent(topic)}`).then(async r => {
@@ -55,6 +56,7 @@ export function Help() {
   }, [topic]);
 
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- intentional
     if (query.trim().length < 2) { setHits([]); return; }
     const id = setTimeout(() => api.helpSearch(query.trim()).then(setHits).catch(() => setHits([])), 150);
     return () => clearTimeout(id);

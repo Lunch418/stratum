@@ -63,6 +63,7 @@ export function PictureEditor({ kind }: { kind: Kind }) {
     const r = await fetch(`/api/picture/${encodeURIComponent(klass.name)}?kind=${kind}`);
     if (r.ok) setState(await r.json());
   };
+  // oxlint-disable-next-line react-hooks/exhaustive-deps, react/set-state-in-effect -- intentional
   useEffect(() => { load(); setSel([]); setDraft([]); }, [klass?.name, kind]);
   // «Вставка → Новый двухмерный объект / Формы» из главного меню
   useEffect(() => {
@@ -77,12 +78,14 @@ export function PictureEditor({ kind }: { kind: Kind }) {
     };
     window.addEventListener('draw-tool', on);
     return () => window.removeEventListener('draw-tool', on);
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- intentional
   }, [editable, state, cursor, sel, klass?.name]);
   // «Формат → Z-порядок» из главного меню
   useEffect(() => {
     const on = (e: Event) => { if (sel.length === 1 && editable) op({ op: 'zorder', handle: sel[0], to: (e as CustomEvent).detail }); };
     window.addEventListener('zorder', on);
     return () => window.removeEventListener('zorder', on);
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- intentional
   }, [sel, editable, klass?.name]);
 
   async function op(body: unknown): Promise<number> {
@@ -133,6 +136,7 @@ export function PictureEditor({ kind }: { kind: Kind }) {
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- intentional
   }, [sel, tool, draft, editable, klass?.name]);
 
   async function finishPolyline() {

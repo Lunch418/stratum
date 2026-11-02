@@ -10,6 +10,7 @@ interface Entry { name: string; path: string; kind: 'dir' | 'project' | 'file' }
 function loadRecent(): string[] {
   try { return JSON.parse(localStorage.getItem('recent') ?? '[]'); } catch { return []; }
 }
+// oxlint-disable-next-line react/only-export-components -- intentional
 export function rememberRecent(path: string) {
   try {
     const list = [path, ...loadRecent().filter(p => p !== path)].slice(0, 10);

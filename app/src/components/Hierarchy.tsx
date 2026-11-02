@@ -81,7 +81,7 @@ export function Hierarchy() {
                 onDoubleClick={() => setTab('code')}
                 onContextMenu={e => openMenu(e, inst.class, false, inst.index)}
                 title={inst.path}>
-                <span className="twisty" onClick={e => { e.stopPropagation(); setCollapsed(s => { const n = new Set(s); n.has(inst.index) ? n.delete(inst.index) : n.add(inst.index); return n; }); }}>
+                <span className="twisty" onClick={e => { e.stopPropagation(); setCollapsed(s => { const n = new Set(s); if (!n.delete(inst.index)) n.add(inst.index); return n; }); }}>
                   {kids ? (isCollapsed ? '▸' : '▾') : ''}
                 </span>
                 <img src={api.iconUrl(inst.class)} alt="" />

@@ -6,6 +6,7 @@ import { FilePickDialog } from './Options';
 
 // звук модели: SndPlaySound и MCI приходят в кадре как команды
 const playing = new Map<string, HTMLAudioElement>();
+// oxlint-disable-next-line react/only-export-components -- intentional
 export function handleSounds(sounds: { cmd: string; file: string; loop: boolean }[] | undefined) {
   for (const snd of sounds ?? []) {
     const key = snd.file.toLowerCase();

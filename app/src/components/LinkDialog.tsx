@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { ClassInfo, LinkStyle } from '../api';
 
+// oxlint-disable-next-line react/only-export-components -- intentional
 export const defaultLinkStyle: LinkStyle = { color: '', width: 0, disabled: false, arrows: false, layer: 0 };
 
 interface Props {

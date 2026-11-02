@@ -23,6 +23,7 @@ export function Inspector() {
   const [newWatch, setNewWatch] = useState('');
   useEffect(() => { try { localStorage.setItem('watches', JSON.stringify(watches)); } catch { /* приватный режим */ } }, [watches]);
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- intentional
     if (instance === null || !watches.length) { setWatchValues(new Map()); return; }
     let alive = true;
     const run = async () => {
@@ -35,11 +36,13 @@ export function Inspector() {
     run();
     const id = setInterval(run, frame?.running ? 300 : 1500);
     return () => { alive = false; clearInterval(id); };
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- intentional
   }, [instance, watches.join('\n'), frame?.running, frame?.tick && !frame.running ? frame.tick : 0]);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const reload = useStore(s => s.reload);
   const say = useStore(s => s.say);
   const select = useStore(s => s.select);
+  // oxlint-disable-next-line react/set-state-in-effect -- intentional
   useEffect(() => { setRenaming(null); setConfirmDelete(false); }, [selected]);
 
   async function doRename() {
@@ -57,6 +60,7 @@ export function Inspector() {
 
   // живые значения: при работе — часто, на паузе — при смене такта
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- intentional
     if (instance === null) { setLive(new Map()); return; }
     let alive = true;
     const tickOnce = async () => {
@@ -72,6 +76,7 @@ export function Inspector() {
     tickOnce();
     const id = setInterval(tickOnce, frame?.running ? 200 : 1000);
     return () => { alive = false; clearInterval(id); };
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- intentional
   }, [instance, frame?.running, frame?.tick && !frame.running ? frame.tick : 0]);
 
   if (!klass) return <><div className="panel-title">Инспектор</div><div className="empty">Выберите имидж в иерархии или блок на схеме — здесь появятся его переменные.</div></>;

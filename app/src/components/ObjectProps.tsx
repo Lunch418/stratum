@@ -13,10 +13,12 @@ export function ObjectProps() {
   const [o, setO] = useState<Props | null>(null);
 
   useEffect(() => {
+    // oxlint-disable-next-line react-hooks/exhaustive-deps, react/set-state-in-effect -- intentional
     if (!picked) { setO(null); return; }
     let alive = true;
     api.object(picked.win, picked.handle).then(r => alive && setO(r)).catch(() => alive && setO(null));
     return () => { alive = false; };
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- intentional
   }, [picked?.win, picked?.handle, frame?.tick]);
 
   if (!picked) return null;

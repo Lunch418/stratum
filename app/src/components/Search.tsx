@@ -40,6 +40,7 @@ export function Search() {
   const minLen = opts.where.length === 1 && opts.where[0] === 'handles' ? 1 : 2;
 
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- intentional
     if (query.trim().length < minLen || !opts.where.length) { setHits([]); return; }
     setBusy(true);
     const id = setTimeout(() => {

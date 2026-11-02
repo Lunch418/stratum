@@ -43,6 +43,7 @@ export function Palette({ commands, onClose }: Props) {
     return scored.slice(0, 40).map(x => x.c);
   }, [query, commands]);
 
+  // oxlint-disable-next-line react/set-state-in-effect -- intentional
   useEffect(() => { setCursor(0); }, [query]);
   useEffect(() => {
     list.current?.querySelector('.active')?.scrollIntoView({ block: 'nearest' });

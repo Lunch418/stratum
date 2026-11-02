@@ -68,6 +68,7 @@ export function Graph() {
   // силовая раскладка: экземпляры — кластеры в узлах решётки, переменные
   // тянутся к своему; лист тем больше, чем больше узлов
   useEffect(() => {
+    // oxlint-disable-next-line react/set-state-in-effect -- intentional
     if (!data) { setNodes([]); return; }
     const instOf = (id: string) => id.slice(0, id.indexOf('.'));
     const used = data.instances.map(i => i.id).filter(id => shown.nodes.some(n => instOf(n) === id));
@@ -116,6 +117,7 @@ export function Graph() {
     }
     setNodes(ns);
     setView(fitView(ns, size));
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- intentional
   }, [shown, size.w, size.h]);
 
   const fit = () => setView(fitView(nodes, size));

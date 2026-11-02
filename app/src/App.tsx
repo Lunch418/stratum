@@ -88,6 +88,7 @@ export default function App() {
       if (name) s.select(decodeURIComponent(name));
       if (useStore.getState().project?.empty) setDialog('open');
     }).catch(e => s.say({ level: 'error', where: 'ядро', text: String(e) }));
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- intentional
   }, []);
   useEffect(() => { document.documentElement.dataset.theme = s.theme; }, [s.theme]);
 
@@ -100,6 +101,7 @@ export default function App() {
     };
     poll();
     return () => { alive = false; };
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- intentional
   }, [s.tab]);
 
   // горячие клавиши транспорта и переключения вкладок
@@ -140,6 +142,7 @@ export default function App() {
     }, env.autosave * 1000);
     return () => clearInterval(id);
   }, [env.autosave]);
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- intentional
   useEffect(() => { document.documentElement.style.setProperty('--font-size', env.fontSize + 'px'); }, []);
 
   useEffect(() => {

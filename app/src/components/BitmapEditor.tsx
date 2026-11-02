@@ -40,6 +40,7 @@ export function BitmapEditor({ klass, kind, handle, onClose, onSaved }: Props) {
       }).catch(e => setError(String(e)));
   }, [klass, kind, handle]);
 
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- intentional
   useEffect(() => { draw(); }, [size, zoom, grid, cropBox]);
 
   function draw() {

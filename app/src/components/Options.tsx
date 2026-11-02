@@ -41,6 +41,7 @@ export const Num = ({ label, value, onChange, step = 1 }: { label: string; value
   <label className="prop"><span>{label}</span><input type="number" step={step} value={value} onChange={e => onChange(Number(e.target.value))} /></label>
 );
 
+// oxlint-disable-next-line react/only-export-components -- intentional
 export const defaultSheet: Sheet = { gridOrigin: [0, 0], gridStep: [10, 10], gridVisible: false, gridSnap: false, windowStyle: 'default', windowSize: 'space', windowWh: [0, 0], windowFixed: false, hscroll: false, vscroll: false, autoOrigin: true, layers: 0xffffffff, noSubwindows: false };
 
 // ── Параметры листа ────────────────────────────────────────────────────────
@@ -213,6 +214,7 @@ export interface EnvOptions {
 }
 export interface ProjectDefaults { lin_method: string; nl_method: string; newton_iter: number; newton_eps: number; vars_logset: number; vars_preload: number }
 const defaultProjectDefaults: ProjectDefaults = { lin_method: 'gauss', nl_method: 'newton', newton_iter: 50, newton_eps: 6, vars_logset: 0, vars_preload: 0 };
+// oxlint-disable-next-line react/only-export-components -- intentional
 export const defaultEnv: EnvOptions = {
   autosave: 30, pollMs: 40, circlePoints: 32, gridAuto: false, fontSize: 13, confirmClose: true,
   statusTicks: true, statusPerf: false, handCursor: true, syntax: true, editorFontSize: 13, wordWrap: false, minimap: false,
@@ -220,6 +222,7 @@ export const defaultEnv: EnvOptions = {
   templates: { image: '', scheme: '' },
   projectDefaults: defaultProjectDefaults,
 };
+// oxlint-disable-next-line react/only-export-components -- intentional
 export function loadEnv(): EnvOptions {
   try {
     const saved = JSON.parse(localStorage.getItem('env') ?? '{}') as Partial<EnvOptions>;
@@ -346,6 +349,7 @@ export function ClassPropsDialog({ onClose }: { onClose: () => void }) {
   const [newName, setNewName] = useState(cls?.name ?? '');
   const [sets, setSets] = useState<{ file: string; count: number; cols: number }[]>([]);
   const [set, setSet] = useState('');
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- intentional
   useEffect(() => { api.iconSets().then(l => { setSets(l); if (l.length && !set) setSet(l.find(x => /default/i.test(x.file))?.file ?? l[0].file); }).catch(() => {}); }, []);
   const [desc, setDesc] = useState(cls?.description ?? '');
   const [flags, setFlags] = useState(cls?.flags ?? 0);

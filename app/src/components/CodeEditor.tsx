@@ -149,6 +149,7 @@ export function CodeEditor() {
     editor.setPosition({ lineNumber: gotoLine.line, column: 1 });
     editor.focus();
     setGotoLine(null);
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- intentional
   }, [gotoLine, klass?.name, text]);
   const decorations = useRef<string[]>([]);
 
@@ -162,8 +163,10 @@ export function CodeEditor() {
       options: { isWholeLine: true, className: halt.kind === 'error' ? 'line-error' : 'line-halt', glyphMarginClassName: 'glyph-halt' },
     }] : []);
     if (mine) editor.revealLineInCenter(halt.line);
+  // oxlint-disable-next-line react-hooks/exhaustive-deps -- intentional
   }, [halt?.message, halt?.line, klass?.name]);
 
+  // oxlint-disable-next-line react-hooks/exhaustive-deps, react/set-state-in-effect -- intentional
   useEffect(() => { setText(klass?.text ?? ''); setDirty(false); }, [klass?.name]);
 
   async function save() {
