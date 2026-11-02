@@ -432,7 +432,7 @@ export function SchemeCanvas() {
                   e.stopPropagation(); setMenu(null);
                   if (e.button === 2) return;
                   setSelNode(c.handle); setSelLink(null);
-                  if (e.shiftKey && !isSelf) setSelSet(prev => { const n = new Set(prev); n.has(c.handle) ? n.delete(c.handle) : n.add(c.handle); return n; });
+                  if (e.shiftKey && !isSelf) setSelSet(prev => { const n = new Set(prev); if (n.has(c.handle)) n.delete(c.handle); else n.add(c.handle); return n; });
                   else if (!selSet.has(c.handle)) setSelSet(new Set());
                   if (!isSelf) { const p = toScene(e); setDrag({ handle: c.handle, dx: p.x - c.x, dy: p.y - c.y, moved: false }); }
                   select(c.class, isSelf ? null : instanceIndexFor(c.handle));
@@ -596,7 +596,7 @@ export function SchemeCanvas() {
               <div className="scroll list" style={{ maxHeight: 240, border: '1px solid var(--border)', borderRadius: 6 }}>
                 {klass.children.map(c => (
                   <label key={c.handle} className="row check" style={{ cursor: 'pointer' }}>
-                    <input type="checkbox" checked={merging.picked.has(c.handle)} onChange={e => { const p = new Set(merging.picked); e.target.checked ? p.add(c.handle) : p.delete(c.handle); setMerging({ ...merging, picked: p }); }} />
+                    <input type="checkbox" checked={merging.picked.has(c.handle)} onChange={e => { const p = new Set(merging.picked); if (e.target.checked) p.add(c.handle); else p.delete(c.handle); setMerging({ ...merging, picked: p }); }} />
                     <span>{c.name || c.class}</span>{c.name && <span className="muted"> · {c.class}</span>}
                   </label>
                 ))}

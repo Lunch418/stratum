@@ -519,7 +519,7 @@ export function DeleteClassesDialog({ onClose }: { onClose: () => void }) {
         <div className="scroll list" style={{ maxHeight: 340, border: '1px solid var(--border)', borderRadius: 6 }}>
           {own.map(c => { const n = used.get(c.name.toLowerCase()) ?? 0; return (
             <label key={c.name} className="row check" style={{ cursor: 'pointer' }}>
-              <input type="checkbox" checked={picked.has(c.name)} onChange={e => setPicked(p => { const s = new Set(p); e.target.checked ? s.add(c.name) : s.delete(c.name); return s; })} />
+              <input type="checkbox" checked={picked.has(c.name)} onChange={e => setPicked(p => { const s = new Set(p); if (e.target.checked) s.add(c.name); else s.delete(c.name); return s; })} />
               <img src={api.iconUrl(c.name)} width={16} height={16} alt="" />
               <span style={{ flex: 1 }}>{c.name}</span>
               <span className="muted" style={{ color: n || mentioned.has(c.name.toLowerCase()) ? undefined : 'var(--state-error)' }}>{n ? `экземпляров: ${n}` : mentioned.has(c.name.toLowerCase()) ? 'упоминается' : 'не используется'}</span>
