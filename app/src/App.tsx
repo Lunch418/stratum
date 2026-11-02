@@ -338,7 +338,7 @@ export default function App() {
         {env.statusPerf && <span className="mono" title="Тактов в секунду">{tps} т/с</span>}
         <span>{s.selectedClass ?? ''}</span>
         <span className="spacer" style={{ flex: 1 }} />
-        <span>{s.project?.dir ?? ''}</span>
+        <span title={s.project?.dir ?? ""}><bdi dir="ltr">{s.project?.dir ?? ""}</bdi></span>
       </footer>
       {s.toast && <div className="toast">{s.toast}</div>}
     </div>
