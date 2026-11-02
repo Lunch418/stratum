@@ -54,7 +54,7 @@ export function Graphs() {
         </label>
         <span className="muted">{traces.length}</span>
       </div>
-      {!traces.length && <div className="empty">Графиков пока нет. Нажмите ∿ у переменной в инспекторе, чтобы следить за её значением по тактам.</div>}
+      {!traces.length && <div className="empty">Графиков пока нет. Нажмите кнопку с волной у переменной в инспекторе, чтобы следить за её значением по тактам.</div>}
       <div className="graphs" style={{ display: traces.length ? 'grid' : 'none' }}>
         <div className="legend">
           {traces.map((t, i) => {

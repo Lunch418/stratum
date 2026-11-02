@@ -767,6 +767,7 @@ table.vars button.small.ghost { min-height: 20px; padding: 0 5px; }
 /* ── пустые состояния и метки ───────────────────────────────────────────── */
 .empty { padding: var(--sp-7) var(--sp-6); color: var(--text-muted); font-size: var(--fs-sm); line-height: 1.55; max-width: 46ch; }
 .tab-body > .empty, .center .empty:only-child { margin: 12vh auto 0; text-align: center; }
+.workspace > .bottom .tab-body > .empty { margin: 0; padding: var(--sp-4) var(--sp-6); text-align: left; max-width: none; }
 .model > .empty { margin: 10vh auto 0; text-align: center; background: var(--bg-raised); border: 1px solid var(--border-subtle); border-radius: var(--r-md); box-shadow: var(--shadow-1); padding: var(--sp-6) var(--sp-7); }
 .graph-view > .empty { margin: 12vh auto 0; text-align: center; }
 .tag {
