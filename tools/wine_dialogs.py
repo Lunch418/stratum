@@ -50,8 +50,17 @@ class Answerer:
                     w.set_input_focus(X.RevertToParent, X.CurrentTime)
                     d.sync()
                     time.sleep(0.2)
-                    xtest.fake_input(d, X.KeyPress, key)
-                    xtest.fake_input(d, X.KeyRelease, key)
+                    if name == 'Video configure':
+                        # Enter не нажимает ОК этого окна: клик по кнопке (278, 15)
+                        g = w.translate_coords(d.screen().root, 0, 0)
+                        xtest.fake_input(d, X.MotionNotify, False, x=-g.x + 278, y=-g.y + 15)
+                        d.sync()
+                        time.sleep(0.2)
+                        xtest.fake_input(d, X.ButtonPress, 1)
+                        xtest.fake_input(d, X.ButtonRelease, 1)
+                    else:
+                        xtest.fake_input(d, X.KeyPress, key)
+                        xtest.fake_input(d, X.KeyRelease, key)
                     d.sync()
                     self.answered.append(f'{name or hex(w.id)} ({"Enter" if key == enter else "Escape"})')
             except Exception:
@@ -91,7 +100,8 @@ class Answerer:
                 # менеджера окон (override_redirect) - их трогать нельзя;
                 # диалоги - окна типа DIALOG или с владельцем
                 if ('sc200032.exe' in cls and attrs.map_state == 2
-                        and not attrs.override_redirect and Answerer.is_dialog(d, c)):
+                        and not attrs.override_redirect
+                        and (Answerer.is_dialog(d, c) or name == 'Video configure')):
                     text = name if isinstance(name, str) else (name or b'').decode('latin-1')
                     if not any(m in text for m in MAIN_MARKS):
                         out.append(c)

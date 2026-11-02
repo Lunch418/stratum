@@ -762,7 +762,8 @@ fn read_object3d(r: &mut Reader, ctx: &Ctx) -> Result<Object3dData> {
                 for _ in 0..k {
                     idx.push(r.u16()?);
                 }
-                let uv_len = 2 * k * layers as usize;
+                // поле «слои» - маска: данные текстуры лежат по одному слою на бит (Example.33: 2 -> один слой)
+                let uv_len = 2 * k * layers.count_ones() as usize;
                 if uv_len > room(r, 8) {
                     return r.err("координаты текстуры 3D за концом данных");
                 }

@@ -994,6 +994,8 @@ pub struct Gfx {
     pub project_dir: std::path::PathBuf,
     pub library_dirs: Vec<std::path::PathBuf>,
     next_space: Handle,
+    /// Открытые записи видео: номер -> записанных кадров (кадры не пишутся, движка нет).
+    pub video_writers: BTreeMap<Handle, u32>,
     /// Порядок открытия окон — для стабильного вывода.
     pub window_order: Vec<String>,
 }

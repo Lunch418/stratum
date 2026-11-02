@@ -36,7 +36,8 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
     let v = match lower.as_str() {
         // ── окна ──────────────────────────────────────────────────────────
         "getwindowspace" => handle(gfx.window_space(&s(args, 0)).unwrap_or(0)),
-        "iswindowexist" => ok(gfx.window_space(&s(args, 0)).is_some()),
+        // главное окно Stratum существует всегда (MENU: LoadMenu("@StratumFrame@") даёт _enable = 0)
+        "iswindowexist" => ok(gfx.window_space(&s(args, 0)).is_some() || s(args, 0).eq_ignore_ascii_case("@StratumFrame@")),
         "openschemewindow" => {
             let sp = open_scheme_window(gfx, &s(args, 0), &s(args, 1));
             // окно с полосами прокрутки пересчитывает клиентскую область уже
@@ -881,7 +882,15 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
         "getschemeobject" => num(0.0),
         "openvideo" | "closevideo" | "createvideoframe2d" | "framegetvideo2d" | "videosetpos2d" | "videogetpos2d" | "framesetpos2d" | "framegetpos2d"
         | "videoplay2d" | "videopause2d" | "videoresume2d" | "videostop2d" | "framesetsrcrect2d" => super::video::call(&lower, args, gfx)?,
-        "audiosetvolume" | "audiosettone" | "beginwritevideo2d" | "endwritevideo2d" | "writevideoframe2d" | "videocompressdialog" | "saverectarea2d" => ok(true),
+        "audiosetvolume" | "audiosettone" | "endwritevideo2d" | "videocompressdialog" | "saverectarea2d" => ok(true),
+        // запись видео: номера с 0x1000, WriteVideoFrame2d возвращает число записанных
+        // кадров (сверено в Wine: WRITEAVI, hv = 4096, rez = 17 после 17 кадров)
+        "beginwritevideo2d" => {
+            let hv = 0x1000 + gfx.video_writers.len() as Handle;
+            gfx.video_writers.insert(hv, 0);
+            handle(hv)
+        }
+        "writevideoframe2d" => num(gfx.video_writers.get_mut(&h(args, 0)).map(|n| { *n += 1; *n as f64 }).unwrap_or(0.0)),
         // сенсор Kinect и сетевые объекты: устройств нет
         "nui_init" | "nui_initinstance" | "nui_createinstance" | "nui_getdevicecount" | "registernetobject" | "initanalyzer" => num(0.0),
         "getwindowtitle" => Value::Str(gfx.window_space(&s(args, 0)).and_then(|h| gfx.space(h)).map(|sp| sp.window.clone()).unwrap_or_default()),
