@@ -80,6 +80,7 @@ export function SchemeCanvas() {
   useEffect(() => {
     if (!klass) return;
     api.scheme(klass.name).then(setBackground).catch(() => setBackground({ svg: '', bounds: null }));
+  // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [klass?.name]);
 
   // показать всё при смене схемы
@@ -87,6 +88,7 @@ export function SchemeCanvas() {
     if (!klass || !svgRef.current) return;
     fitAll();
     setSelNode(null); setSelLink(null); setMenu(null);
+  // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [klass?.name, background.bounds?.w]);
 
   // подгонка: за основу — графика листа (или медианный блок), к ней
@@ -122,6 +124,7 @@ export function SchemeCanvas() {
     if (!klass.links.some(l => (l.source === SELF || l.target === SELF) && !pads.has(l.pad))) return null;
     const b = bounds ?? { x0: 0, y0: 0, x1: 0, y1: 0 };
     return { handle: SELF, class: klass.name, name: '', x: b.x0 - nodeSize({ name: '', class: klass.name }).w - 60, y: b.y0 };
+  // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [klass, bounds?.x0, bounds?.y0]);
 
   useEffect(() => {
