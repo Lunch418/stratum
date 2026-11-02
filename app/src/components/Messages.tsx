@@ -15,7 +15,7 @@ export function Messages() {
     <>
       <div className="panel-title">Сообщения
         <input type="search" placeholder="фильтр" value={filter} onChange={e => setFilter(e.target.value)} style={{ marginLeft: 8, width: 160, textTransform: 'none', letterSpacing: 0, fontSize: 12 }} />
-        <label style={{ textTransform: 'none', letterSpacing: 0, display: 'flex', gap: 4, alignItems: 'center' }}><input type="checkbox" checked={onlyErrors} onChange={e => setOnlyErrors(e.target.checked)} />только ошибки</label>
+        <label style={{ textTransform: 'none', letterSpacing: 0, display: 'flex', whiteSpace: 'nowrap', flex: 'none', gap: 4, alignItems: 'center' }}><input type="checkbox" checked={onlyErrors} onChange={e => setOnlyErrors(e.target.checked)} />только ошибки</label>
         <span className="spacer" /><span className="muted">{own.length + log.length}</span>
       </div>
       <div className="scroll messages">

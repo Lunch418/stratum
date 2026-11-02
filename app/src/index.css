@@ -712,7 +712,7 @@ table.vars button.small.ghost { min-height: 20px; padding: 0 5px; }
 .picture-editor .draft { fill: none; stroke: var(--accent); stroke-width: 1; stroke-dasharray: 3 3; pointer-events: none; }
 .draw-tools {
   display: flex; align-items: center; gap: 2px; min-height: 36px; padding: 0 var(--sp-4); border-bottom: 1px solid var(--border-subtle);
-  background: var(--bg-surface); flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; flex: none;
+  background: var(--bg-surface); flex-wrap: wrap; row-gap: 2px; padding-block: 2px; flex: none;
 }
 .draw-tools > * { flex: none; }
 .draw-tools input[type="number"] { width: 52px !important; min-height: 24px; padding: 0 4px; }
@@ -812,6 +812,13 @@ table.vars button.small.ghost { min-height: 20px; padding: 0 5px; }
   .topbar .brand { font-size: 0; gap: 0; margin-right: var(--sp-2); }
   .topbar > .spacer { flex: 0 0 0; }
   .topbar-actions { margin-left: auto; }
+}
+
+/* узкое окно: боковые панели сжимаются, чтобы рабочая область не стала полосой */
+@media (max-width: 1100px) {
+  .workspace { grid-template-columns: min(var(--left-w, 260px), 170px) minmax(0, 1fr) min(var(--right-w, 300px), 230px); }
+  .splitter.h { left: min(var(--left-w, 260px), 170px); right: min(var(--right-w, 300px), 230px); }
+  .splitter.v { display: none; }
 }
 
 /* старый WebKitGTK без color-mix(): те же места - готовыми токенами, без смешения */
