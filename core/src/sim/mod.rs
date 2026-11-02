@@ -627,6 +627,7 @@ impl Simulation {
         }
         self.deliver_resized()?;
         self.tick += 1;
+        self.effects.gfx.advance_videos();
         self.effects.gfx.flush_dibs();
         Ok(())
     }

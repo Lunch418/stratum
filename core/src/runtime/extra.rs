@@ -579,8 +579,7 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
         "mcisendstringstr" | "mcisendstringex" | "getmcierrorstr" => text(""),
         "getlastmcierror" | "getlastmcieerror" => num(0.0),
         // видео: кадры не показываем
-        "openvideo" | "createvideoframe2d" | "framegetvideo2d" => Value::Handle(0.0),
-        "videosetpos2d" | "framesetpos2d" | "videoplay2d" | "videopause2d" | "videoresume2d" | "videostop2d" | "framesetsrcrect2d" | "videogetpos2d" | "getvideomarker" => num(0.0),
+        "getvideomarker" => num(0.0),
 
         // ── базы данных, анализатор текста, ключи, NUI: подсистем нет ─────
         // Отвечаем неудачей и считаем вызовы — плеер покажет их списком

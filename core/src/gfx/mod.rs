@@ -7,6 +7,7 @@ pub mod api;
 pub mod api3d;
 pub mod space3d;
 pub mod svg;
+pub mod video;
 
 use crate::formats::vdr::{self, ObjectKind, Picture};
 use std::collections::BTreeMap;
@@ -986,6 +987,9 @@ pub struct Gfx {
     /// Пространства, чьё окно сменило размер: имиджам, подписанным на
     /// WM_SIZE, сообщение уходит в конце такта (сверено в Wine, LGSpace).
     pub resized: Vec<Handle>,
+    /// Открытые видеопотоки (`OpenVideo`) и причина последнего отказа.
+    pub videos: BTreeMap<Handle, video::Video>,
+    pub video_error: String,
     /// Папка проекта — здесь ищутся `.vdr`, `.bmp` и наборы иконок.
     pub project_dir: std::path::PathBuf,
     pub library_dirs: Vec<std::path::PathBuf>,

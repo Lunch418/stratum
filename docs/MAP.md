@@ -13,6 +13,7 @@
 - cp1251.rs - перекодировка CP1251: decode, encode
 - dbf.rs - таблицы dBASE: Table, Field, Row, Codepage (cp866/cp1251), parse, to_bytes
 - json.rs - свой JSON без крейтов: Json, parse, write_string, object
+- avi.rs - чтение AVI (RIFF): BI_RGB, RLE8, MSVC1, Cinepak: Avi, AviError
 - cls.rs - имидж .cls (секции, переменные, связи): Variable, Child, Link, section
 - project.rs - project.spj и _preload.stt: Project, parse_project, write_project, write_state
 - vdr.rs - векторная графика .vdr и секции иконки/рисунка/схемы, 3D-данные: Picture, Space3dData, Object3dData, Hyper, parse_hyper
@@ -47,6 +48,7 @@
 - api.rs - 2D-функции языка: call, insert_picture, bitmap_src
 - api3d.rs - 3D-функции языка: call, find_by_name, set_visible
 - space3d.rs - 3D-пространства, камеры, группы: Space3d, Object3d, Camera, Group3d, Prim
+- video.rs - OpenVideo, видеофреймы как растры, проигрывание: Video, call
 - svg.rs - рендер в SVG для снимков и проверки: render, render_in
 
 ### player/ - локальный HTTP-сервер IDE

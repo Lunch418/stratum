@@ -878,8 +878,10 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
         }
         "getobjectsize2dx" | "getactualwidth2d" => num(object(gfx, args).map(|o| o.w).unwrap_or(0.0)),
         "getobjectsize2dy" | "getactualheight2d" => num(object(gfx, args).map(|o| o.h).unwrap_or(0.0)),
-        "getschemeobject" | "framegetpos2d" => num(0.0),
-        "audiosetvolume" | "audiosettone" | "beginwritevideo2d" | "endwritevideo2d" | "writevideoframe2d" | "closevideo" | "videocompressdialog" | "saverectarea2d" => ok(true),
+        "getschemeobject" => num(0.0),
+        "openvideo" | "closevideo" | "createvideoframe2d" | "framegetvideo2d" | "videosetpos2d" | "videogetpos2d" | "framesetpos2d" | "framegetpos2d"
+        | "videoplay2d" | "videopause2d" | "videoresume2d" | "videostop2d" | "framesetsrcrect2d" => super::video::call(&lower, args, gfx)?,
+        "audiosetvolume" | "audiosettone" | "beginwritevideo2d" | "endwritevideo2d" | "writevideoframe2d" | "videocompressdialog" | "saverectarea2d" => ok(true),
         // сенсор Kinect и сетевые объекты: устройств нет
         "nui_init" | "nui_initinstance" | "nui_createinstance" | "nui_getdevicecount" | "registernetobject" | "initanalyzer" => num(0.0),
         "getwindowtitle" => Value::Str(gfx.window_space(&s(args, 0)).and_then(|h| gfx.space(h)).map(|sp| sp.window.clone()).unwrap_or_default()),

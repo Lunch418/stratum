@@ -57,7 +57,7 @@ enum Codec {
     Cinepak,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Avi {
     data: Vec<u8>,
     width: u32,

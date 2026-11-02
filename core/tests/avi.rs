@@ -102,3 +102,64 @@ fn sample_scene_avi_decodes() {
         std::fs::write(out, ppm).unwrap();
     }
 }
+
+mod model {
+    use super::*;
+    use stratum_core::gfx::{api, Gfx, Shape, Space};
+    use stratum_core::runtime::value::Value;
+
+    fn call(g: &mut Gfx, n: &str, a: &[f64]) -> f64 {
+        let args: Vec<Value> = a.iter().map(|x| Value::Float(*x)).collect();
+        api::call(n, &args, g).unwrap().as_float()
+    }
+
+    fn open(g: &mut Gfx, name: &str) -> f64 {
+        api::call("OpenVideo", &[Value::Str(name.into()), Value::Float(16.0)], g).unwrap().as_float()
+    }
+
+    #[test]
+    fn frames_follow_position() {
+        let dir = std::env::temp_dir().join(format!("stratum_avi_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("t.avi"), build_rgb24(4, 2, &frames(4, 2, 3), 10)).unwrap();
+        std::fs::write(dir.join("bad.avi"), b"RIFF\0\0\0\0AVI junk").unwrap();
+        let mut g = Gfx::new();
+        g.project_dir = dir.clone();
+        g.spaces.insert(1, Space::new(1, "w"));
+        assert_eq!(open(&mut g, "missing.avi"), 0.0);
+        assert_eq!(open(&mut g, "bad.avi"), 0.0);
+        let v = open(&mut g, "t.avi");
+        assert!(v > 0.0);
+        let fr = call(&mut g, "CreateVideoFrame2d", &[1.0, v, 5.0, 6.0, -1.0, -1.0, 0.0]);
+        assert!(fr > 0.0);
+        let o = &g.space(1).unwrap().objects[&(fr as u32)];
+        assert!(matches!(o.shape, Shape::Bitmap { .. }) && o.w == 4.0 && o.h == 2.0);
+        assert_eq!(call(&mut g, "FrameGetVideo2d", &[1.0, fr]), v);
+        assert_eq!(call(&mut g, "VideoSetPos2d", &[v, 2.0]), 2.0);
+        assert_eq!(call(&mut g, "VideoSetPos2d", &[v, 99.0]), 2.0);
+        let dib = g.space(1).unwrap().dibs.values().next().unwrap().clone();
+        let (_, _, rgb) = stratum_core::gfx::decode_bmp(&dib.bmp).unwrap();
+        assert_eq!(rgb[2], 100);
+        assert_eq!(call(&mut g, "CloseVideo", &[v]), 0.0);
+        assert_eq!(call(&mut g, "VideoPlay2d", &[1.0, fr, 0.0, -1.0, 0.0, 0.0]), 1.0);
+        g.advance_videos();
+        assert_eq!(call(&mut g, "VideoGetPos2d", &[v]), 1.0);
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn sample_video2_opens() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../fixtures/PROJECTS/samples/VIDEO2");
+        if !root.is_dir() {
+            return;
+        }
+        let mut g = Gfx::new();
+        g.project_dir = root;
+        g.spaces.insert(1, Space::new(1, "w"));
+        let v = open(&mut g, "..\\_SCENE.AVI");
+        assert!(v > 0.0, "{}", g.video_error);
+        let fr = call(&mut g, "CreateVideoFrame2d", &[1.0, v, 0.0, 0.0, -1.0, -1.0, 0.0]);
+        assert!(fr > 0.0);
+        assert!(call(&mut g, "VideoSetPos2d", &[v, 50.0]) == 50.0);
+    }
+}
