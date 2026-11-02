@@ -2,6 +2,7 @@
 // см. docs/original/menus.md). Каждый пункт оригинала либо действует, либо
 // помечен причиной, почему в новой среде он не нужен. Из тех же пунктов
 // собирается палитра команд.
+import { unlockAudio } from './audio';
 import { api } from './api';
 import type { Menu, MenuItem } from './components/MenuBar';
 import type { Command } from './components/Palette';
