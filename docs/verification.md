@@ -262,3 +262,5 @@ python3 tools/verify_trajectory.py fixtures/PROJECTS/samples/GIST --ticks 50
   другом экране оригинал даст другие числа.
 - Сверки графики (снимки окон оригинала против нашего SVG).
 - Эталона для `arcsin(2)` и других ошибок, на которых оригинал зависает.
+
+| Enter-ответчик закрывал и окна модели оригинала | отвечает только окнам с рамкой менеджера (не override_redirect) типа DIALOG или с владельцем; окно модели WindowRegion (300x299, override_redirect) больше не закрывается | Wine, tools/wine_dialogs.py; WindowRegion и AudioPlayer прогнаны заново - расхождения те же, значит x0/y0/msg не артефакт |

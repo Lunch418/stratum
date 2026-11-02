@@ -59,6 +59,17 @@ class Answerer:
             self.stop.wait(0.5)
 
     @staticmethod
+    def is_dialog(d, w):
+        try:
+            from Xlib import Xatom
+            ty = w.get_full_property(d.intern_atom('_NET_WM_WINDOW_TYPE'), Xatom.ATOM)
+            if ty and d.intern_atom('_NET_WM_WINDOW_TYPE_DIALOG') in ty.value:
+                return True
+            return w.get_wm_transient_for() is not None
+        except Exception:
+            return False
+
+    @staticmethod
     def dialogs(d):
         out = []
 
@@ -76,7 +87,11 @@ class Answerer:
                     continue
                 # заголовок с кириллицей приходит пустыми байтами (он в
                 # _NET_WM_NAME), поэтому годится любое видимое окно, кроме главного
-                if 'sc200032.exe' in cls and attrs.map_state == 2:
+                # окна модели оригинала (сам рабочий лист) идут без рамки
+                # менеджера окон (override_redirect) - их трогать нельзя;
+                # диалоги - окна типа DIALOG или с владельцем
+                if ('sc200032.exe' in cls and attrs.map_state == 2
+                        and not attrs.override_redirect and Answerer.is_dialog(d, c)):
                     text = name if isinstance(name, str) else (name or b'').decode('latin-1')
                     if not any(m in text for m in MAIN_MARKS):
                         out.append(c)
