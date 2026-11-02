@@ -519,8 +519,28 @@ fn read_object_data_v2(tail: &[u8], pic: &mut Picture) {
             }
             pic.object_data.push((handle, tail[i..i + n].to_vec()));
         }
+        if kind == 2 && pic.page.is_none() {
+            pic.page = sheet_page(&tail[i..i + n]);
+        }
         i += n;
     }
+}
+
+/// Элемент 1 (34 байта) данных листа 2.x - то же, что запись типа 34 чанка
+/// 1022 в 3.x (id чанка 1022 = 0x03FE: в 3.x данные листа и есть этот чанк).
+fn sheet_page(data: &[u8]) -> Option<Vec<u8>> {
+    let count = *data.get(6)? as usize;
+    let mut i = 7;
+    for _ in 0..count.min(32) {
+        let k = u16::from_le_bytes([*data.get(i)?, *data.get(i + 1)?]);
+        let n = u16::from_le_bytes([*data.get(i + 2)?, *data.get(i + 3)?]) as usize;
+        let body = data.get(i + 4..i + 4 + n)?;
+        if k == 1 && n == 34 {
+            return Some(body.to_vec());
+        }
+        i += 4 + n;
+    }
+    None
 }
 
 fn read_chunk(r: &mut Reader, ctx: &Ctx, id: u16, pic: &mut Picture) -> Result<()> {
@@ -1427,6 +1447,24 @@ mod tests {
         let back = parse(&write(&pic), "copy").unwrap();
         assert_eq!(back.extra, pic.extra);
         assert_eq!(back.objects.len(), pic.objects.len());
+    }
+
+    #[test]
+    fn keeps_sheet_data_of_an_old_picture() {
+        // данные листа 2.x (запись типа 2 блока 0x03FE) = запись 34 чанка 1022 в 3.x
+        let Some(data) = fixture("PROJECTS/samples/api/saverect/BAR.VDR") else { return };
+        let pic = parse(&data, "BAR.VDR").unwrap();
+        let page = pic.page.clone().expect("данные листа 2.x");
+        assert_eq!(page.len(), 34);
+        let back = parse(&write(&pic), "copy").unwrap();
+        assert_eq!(back.page, Some(page));
+    }
+
+    #[test]
+    fn sheet_page_is_bounds_checked() {
+        assert_eq!(sheet_page(&[1, 0, 5, 0, 2, 0, 255, 1, 0, 255, 255]), None);
+        assert_eq!(sheet_page(&[1, 0, 5, 0, 2, 0, 1, 1, 0, 2, 0, 9, 9]), None);
+        assert_eq!(sheet_page(&[]), None);
     }
 
     #[test]
