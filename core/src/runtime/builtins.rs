@@ -79,6 +79,8 @@ pub struct Effects {
     pub streams: super::extra::Streams,
     /// Открытые таблицы dBASE (`Db*`).
     pub dbs: super::db::Dbs,
+    /// Аудио-файлы модели (`Audio*`).
+    pub audio: super::audio::Audios,
 }
 
 impl Effects {

@@ -526,27 +526,56 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
         // ── аудио: через очередь звука плеера ─────────────────────────────
         "audioopensound" => {
             let file = s(args, 0);
-            let n = fx.mci.len() + 1;
-            fx.mci.insert(format!("audio{n}"), file);
-            Value::Handle(n as f64)
+            // файл ищется как ресурсы модели; нет файла - дескриптор 0
+            let Some(path) = fx.gfx.find_file(&file) else { return Some(Value::Handle(0.0)) };
+            let mut head = Vec::new();
+            if let Ok(f) = std::fs::File::open(&path) {
+                use std::io::Read;
+                let _ = f.take(4096).read_to_end(&mut head);
+            }
+            let (rate, length) = super::audio::wav_info(&head).unwrap_or((44100.0, 0.0));
+            match fx.audio.open(file, rate, length) {
+                Some(id) => Value::Handle(id as f64),
+                None => Value::Handle(0.0),
+            }
         }
         "audioplay" => {
-            let key = format!("audio{}", f(args, 0) as u32);
-            if let Some(file) = fx.mci.get(&key).cloned() {
-                fx.sounds.push(("play".into(), file, false));
-            }
+            fx.audio.play(f(args, 0) as u32);
             num(1.0)
         }
-        "audiostop" | "audioreset" => {
-            let key = format!("audio{}", f(args, 0) as u32);
-            if let Some(file) = fx.mci.get(&key).cloned() {
-                fx.sounds.push(("stop".into(), file, false));
-            }
+        "audiostop" => {
+            fx.audio.stop(f(args, 0) as u32);
             num(1.0)
         }
-        "audioisplaying" | "audiogetrepeat" | "audiogetbalance" | "audiogettone" | "audiogetposition" | "audiogetlength" | "audioisseekable" => num(0.0),
-        "audiogetvolume" => num(1.0),
-        "audiosetrepeat" | "audiosetbalance" | "audiosetposition" => num(1.0),
+        "audioreset" => {
+            fx.audio.reset(f(args, 0) as u32);
+            num(1.0)
+        }
+        "audiosetvolume" | "audiosetbalance" | "audiosettone" | "audiosetrepeat" => {
+            let what = &lower[8..];
+            fx.audio.set(f(args, 0) as u32, what, f(args, 1));
+            num(1.0)
+        }
+        "audiosetposition" => {
+            let id = f(args, 0) as u32;
+            let rate = fx.audio.items.get(&id).map_or(44100.0, |x| x.rate);
+            fx.audio.seek_sec(id, f(args, 1) / rate);
+            num(1.0)
+        }
+        "audioisplaying" | "audiogetrepeat" | "audiogetbalance" | "audiogettone" | "audiogetposition" | "audiogetlength" | "audioisseekable" | "audiogetvolume" => {
+            let id = f(args, 0) as u32;
+            let Some(snd) = fx.audio.items.get_mut(&id) else { return Some(num(0.0)) };
+            num(match lower.as_str() {
+                "audioisplaying" => snd.is_playing() as u8 as f64,
+                "audiogetrepeat" => snd.repeat as u8 as f64,
+                "audiogetbalance" => snd.balance,
+                "audiogettone" => snd.tone,
+                "audiogetvolume" => snd.volume,
+                "audiogetposition" => snd.position(),
+                "audiogetlength" => (snd.length * snd.rate).floor(),
+                _ => 1.0,
+            })
+        }
         "mcisendstringstr" | "mcisendstringex" | "getmcierrorstr" => text(""),
         "getlastmcierror" | "getlastmcieerror" => num(0.0),
         // видео: кадры не показываем

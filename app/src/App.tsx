@@ -16,6 +16,7 @@ import { PictureEditor } from './components/PictureEditor';
 import { Debug } from './components/Debug';
 import { Help } from './components/Help';
 import { Search } from './components/Search';
+import { handleAudio, unlockAudio } from './audio';
 import { DbfViewer } from './components/DbfViewer';
 import { NewProjectDialog, InfoDialog } from './components/ProjectDialogs';
 import { OpenDialog } from './components/OpenDialog';
@@ -97,7 +98,7 @@ export default function App() {
   useEffect(() => {
     let alive = true;
     const poll = async () => {
-      try { const f = await api.frame(); if (alive) { s.setFrame(f); handleSounds(f.sounds); handleHyper(f.hyper); } } catch { /* ядро недоступно */ }
+      try { const f = await api.frame(); if (alive) { s.setFrame(f); handleSounds(f.sounds); handleAudio(f.audio); handleHyper(f.hyper); } } catch { /* ядро недоступно */ }
       if (alive) setTimeout(poll, s.tab === 'model' ? env.pollMs : 250);
     };
     poll();
@@ -109,7 +110,7 @@ export default function App() {
   useWindowEvent('keydown', (e: KeyboardEvent) => {
       if ((e.target as HTMLElement).closest('.monaco-editor, input, textarea')) return;
       if ((e.code === 'F5' && e.shiftKey) || (e.code === 'F2' && e.ctrlKey)) { e.preventDefault(); api.event('type=reset').then(() => s.refreshInstances()); }
-      else if (e.code === 'F5' || (e.code === 'F9' && e.ctrlKey)) { e.preventDefault(); api.event(frame?.running ? 'type=pause' : 'type=run'); }
+      else if (e.code === 'F5' || (e.code === 'F9' && e.ctrlKey)) { e.preventDefault(); unlockAudio(); api.event(frame?.running ? 'type=pause' : 'type=run'); }
       else if (e.code === 'F10' && e.shiftKey) { e.preventDefault(); api.event('type=back'); }
       else if (e.code === 'F10' || e.code === 'F7') { e.preventDefault(); api.event('type=step'); }
       else if (e.code === 'F2' && e.altKey) { e.preventDefault(); api.stateAction('keep').then(() => s.markUnsaved()); }
@@ -181,7 +182,7 @@ export default function App() {
         <MenuBar menus={menus} />
         <span className="sep" />
         <div className="transport">
-        <button className={`primary icon-text${running ? ' paused' : ''}`} onClick={() => api.event(running ? 'type=pause' : 'type=run')} title="Запуск / пауза (F5)"><Icon name={running ? 'pause' : 'play'} />{running ? 'Пауза' : 'Пуск'}</button>
+        <button className={`primary icon-text${running ? ' paused' : ''}`} onClick={() => { unlockAudio(); void api.event(running ? 'type=pause' : 'type=run'); }} title="Запуск / пауза (F5)"><Icon name={running ? 'pause' : 'play'} />{running ? 'Пауза' : 'Пуск'}</button>
         <button aria-label="Один шаг" className="icon-only" onClick={() => api.event('type=step')} title="Один шаг (F10)"><Icon name="step" /></button>
         <button aria-label="Такт назад" className="icon-only" onClick={() => api.event('type=back')} title="Такт назад (Shift+F10)" disabled={!frame?.canBack || running}><Icon name="back" /></button>
         <button aria-label="Стоп и сброс" className="icon-only" onClick={() => api.event('type=reset').then(() => s.refreshInstances())} title="Стоп и сброс (Ctrl+F2)"><Icon name="stop" /></button>

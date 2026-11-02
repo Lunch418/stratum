@@ -1,3 +1,4 @@
+import type { AudioCmd } from './audio';
 // Обёртка над JSON-API ядра (core/src/player/api.rs).
 
 export interface Variable {
@@ -32,6 +33,7 @@ export interface Frame {
   unsupported?: { name: string; count: number }[];
   windows: { id: number; name: string; w: number; h: number; size?: string; style?: string; svg: string; controls: Control[] }[];
   sounds: { cmd: 'play' | 'stop'; file: string; loop: boolean }[];
+  audio?: AudioCmd[];
   /// гиперпереходы кадра: смена страницы с эффектом (0), запуск приложения (1), загрузка проекта (2)
   hyper?: { mode: number; target: string; window: string; effect: string }[];
   log: string[];

@@ -769,6 +769,17 @@ fn handle(mut stream: TcpStream, shared: &Arc<Mutex<Shared>>, server: &Server) -
             } else {
                 shared.lock().unwrap().sim.effects.gfx.find_file(&name)
             };
+            // звук отдаётся только из папки проекта, не из библиотек и не снаружи
+            let found = found.filter(|p| {
+                let audio = p.extension().and_then(|e| e.to_str()).is_some_and(|e| matches!(e.to_ascii_lowercase().as_str(), "wav" | "mp3" | "ogg" | "mid" | "midi" | "flac" | "aif" | "aiff"));
+                !audio || {
+                    let root = shared.lock().unwrap().sim.effects.gfx.project_dir.clone();
+                    match (std::fs::canonicalize(p), std::fs::canonicalize(root)) {
+                        (Ok(p), Ok(r)) => p.starts_with(r),
+                        _ => false,
+                    }
+                }
+            });
             match found.and_then(|p| std::fs::read(&p).ok().map(|d| (p, d))) {
                 Some((p, data)) => {
                     let mime = match p.extension().and_then(|e| e.to_str()).map(|e| e.to_ascii_lowercase()).as_deref() {
@@ -997,6 +1008,15 @@ fn frame_json(shared: &Arc<Mutex<Shared>>) -> String {
         .iter()
         .map(|(cmd, file, looped)| format!("{{\"cmd\":{},\"file\":{},\"loop\":{looped}}}", json_string(cmd), json_string(file)))
         .collect();
+    let audio: Vec<String> = std::mem::take(&mut s.sim.effects.audio.cmds)
+        .iter()
+        .map(|c| {
+            format!(
+                "{{\"cmd\":{},\"id\":{},\"file\":{},\"volume\":{},\"balance\":{},\"tone\":{},\"repeat\":{},\"pos\":{}}}",
+                json_string(c.cmd), c.id, json_string(&c.file), c.volume, c.balance, c.tone, c.repeat, c.pos
+            )
+        })
+        .collect();
     let halt = match &s.halt {
         Some(h) => {
             let inst = h.instance.and_then(|i| s.sim.instances().get(i));
@@ -1029,7 +1049,7 @@ fn frame_json(shared: &Arc<Mutex<Shared>>) -> String {
     unsupported.sort();
     let unsupported: Vec<String> = unsupported.iter().map(|(n, c)| format!("{{\"name\":{},\"count\":{c}}}", json_string(n))).collect();
     format!(
-        "{{\"tick\":{},\"running\":{},\"stopped\":{},\"canBack\":{},\"canHyperBack\":{},\"halt\":{},\"dialog\":{},\"unsupported\":[{}],\"windows\":[{}],\"sounds\":[{}],\"hyper\":[{}],\"log\":[{}]}}",
+        "{{\"tick\":{},\"running\":{},\"stopped\":{},\"canBack\":{},\"canHyperBack\":{},\"halt\":{},\"dialog\":{},\"unsupported\":[{}],\"windows\":[{}],\"sounds\":[{}],\"audio\":[{}],\"hyper\":[{}],\"log\":[{}]}}",
         s.sim.tick_number(),
         s.running,
         s.sim.stopped,
@@ -1040,6 +1060,7 @@ fn frame_json(shared: &Arc<Mutex<Shared>>) -> String {
         unsupported.join(","),
         windows.join(","),
         sounds.join(","),
+        audio.join(","),
         hyper.join(","),
         log.join(",")
     )

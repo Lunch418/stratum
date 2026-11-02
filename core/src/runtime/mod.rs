@@ -1,5 +1,6 @@
 //! Среда исполнения: значения, константы и встроенные функции.
 
+pub mod audio;
 pub mod builtins;
 pub mod clock;
 pub mod constants;

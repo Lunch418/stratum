@@ -18,6 +18,7 @@
 | Интерфейсные элементы (контролы, LB*) | 21 | есть |
 | Имиджи и схема (`GetObjectCount`, `GetVarInfo`, `SetModelText`…) | 25 | есть, кроме перестройки схемы на ходу: `CreateObject`, `DeleteObject`, `CreateLink`, `RemoveLink`, `SetLinkVars`, `CreateClass`, `DeleteClass`, `SetCalcOrder`, `Load/SaveObjectState`, `LoadProject` — принимаются без действия и попадают в список «не реализовано» |
 | 3D (`*3d`, `3DTOOLS.TDL`) | ~50 | есть, кроме текстур и `CreateObjectFromFile3d` (v3d), `SweepAndExtrude3d` |
+| Звук (`Audio*`, `SndPlaySound`, MCI) | 20 | есть: состояние по дескрипторам в ядре (громкость, баланс, тональность, повтор, позиция и длина в отсчётах, длина WAV из заголовка), воспроизведение через Web Audio после первого щелчка по «Пуск»; файл отдаётся только из папки проекта; MIDI, MOD и форматы, которые не декодирует WebView, молчат |
 | Базы данных DBF (`Db*`) | 49 | есть для dBASE: открытие, навигация, поля, запись, удаление, `DbZap`, `DbPackFile`, режим удаления, кодовая страница (`formats/dbf.rs`, `runtime/db.rs`), просмотр в IDE («Таблицы DBF…»); SQL, индексы, MEMO, `DbCreateTable`, `DbCopyTo`, сортировка и `DbBrowse` - заглушки |
 | Анализатор текста | 10 | заглушки |
 | Ogre3D (`Root_*`, `Entity_*`, `SceneNode_*`…) | 315 | нет — отдельный движок-плагин; вызовы возвращают 0 и считаются |

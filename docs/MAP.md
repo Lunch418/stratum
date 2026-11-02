@@ -31,6 +31,7 @@
 - value.rs - Value, ValueType, format_g, format_number
 - builtins.rs - встроенные функции: call, call_stub, Effects, DialogRequest
 - extra.rs - строки, файлы, папки, потоки: call, Stream, Streams
+- audio.rs - состояние Audio* по дескрипторам: Audios, Sound, AudioCmd, wav_info
 - db.rs - функции Db* языка поверх dbf.rs: Dbs, call
 - data.rs - матрицы и динамические массивы: Matrix, Matrices, multiply, transpose, determinant
 - constants.rs - константы (PI, WM_*, стили окон): lookup (генерируется tools/gen_constants.py)
@@ -60,6 +61,7 @@
 - player_guard.rs - защита сервера на живом сервере | semantics.rs - семантика языка (регистр, фазы)
 
 ## app/src (React/TS IDE)
+- audio.ts - Web Audio: handleAudio, unlockAudio
 - main.tsx, App.tsx - вход и корневой макет | store.ts - состояние (useStore, classByName)
 - api.ts - клиент JSON-API ядра (api) | hyper.ts - обработка гиперсобытий (handleHyper)
 - menus.tsx - меню и команды | print.ts - печать | a11y.ts - доступность | autolink.ts - автоссылки | hooks.ts

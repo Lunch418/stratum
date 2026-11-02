@@ -170,7 +170,7 @@ export function buildMenus(ctx: MenuContext): Menu[] {
       { label: 'Редактировать порядок вычислений…', run: () => ctx.open('calcOrder'), disabled: !cls || lib },
     ] },
     { title: 'Моделирование', items: [
-      { label: ctx.running ? 'Пауза' : 'Запуск', hint: 'F5 · Ctrl+F9', run: () => api.event(ctx.running ? 'type=pause' : 'type=run') },
+      { label: ctx.running ? 'Пауза' : 'Запуск', hint: 'F5 · Ctrl+F9', run: () => { unlockAudio(); void api.event(ctx.running ? 'type=pause' : 'type=run'); } },
       { label: 'Один шаг', hint: 'F10 · F7', run: () => api.event('type=step') },
       { label: 'Такт назад', hint: 'Shift+F10', run: () => api.event('type=back'), disabled: !ctx.canBack || ctx.running },
       { label: 'Стоп (сброс)', hint: 'Ctrl+F2 · Shift+F5', run: () => api.event('type=reset').then(() => s.refreshInstances()) },
