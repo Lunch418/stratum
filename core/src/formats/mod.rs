@@ -4,6 +4,7 @@
 
 pub mod cls;
 pub mod cp1251;
+pub mod dbf;
 pub mod json;
 pub mod native;
 pub mod project;

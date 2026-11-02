@@ -11,6 +11,7 @@
 - mod.rs - реэкспорт подмодулей
 - reader.rs / writer.rs - little-endian поля и строки с префиксом длины: Reader, Writer, FormatError
 - cp1251.rs - перекодировка CP1251: decode, encode
+- dbf.rs - таблицы dBASE: Table, Field, Row, Codepage (cp866/cp1251), parse, to_bytes
 - json.rs - свой JSON без крейтов: Json, parse, write_string, object
 - cls.rs - имидж .cls (секции, переменные, связи): Variable, Child, Link, section
 - project.rs - project.spj и _preload.stt: Project, parse_project, write_project, write_state
@@ -30,6 +31,7 @@
 - value.rs - Value, ValueType, format_g, format_number
 - builtins.rs - встроенные функции: call, call_stub, Effects, DialogRequest
 - extra.rs - строки, файлы, папки, потоки: call, Stream, Streams
+- db.rs - функции Db* языка поверх dbf.rs: Dbs, call
 - data.rs - матрицы и динамические массивы: Matrix, Matrices, multiply, transpose, determinant
 - constants.rs - константы (PI, WM_*, стили окон): lookup (генерируется tools/gen_constants.py)
 - clock.rs - часы: local_now, tick_count, hundredths
@@ -62,7 +64,7 @@
 - api.ts - клиент JSON-API ядра (api) | hyper.ts - обработка гиперсобытий (handleHyper)
 - menus.tsx - меню и команды | print.ts - печать | a11y.ts - доступность | autolink.ts - автоссылки | hooks.ts
 - lang-data.json - данные языка для редактора
-- components/: ModelView, SchemeCanvas (схема), Hierarchy, Inspector, ObjectProps/ObjectDialog, CodeEditor (Monaco), Debug, Messages, Graph/Graphs, PictureEditor, BitmapEditor, Palette, Help, Search, Options, MenuBar, Open/Link/Path/Print/ChooseClass/ProjectDialogs, Icon, ZoomSelect
+- components/: ModelView, SchemeCanvas (схема), Hierarchy, DbfViewer (таблицы DBF), Inspector, ObjectProps/ObjectDialog, CodeEditor (Monaco), Debug, Messages, Graph/Graphs, PictureEditor, BitmapEditor, Palette, Help, Search, Options, MenuBar, Open/Link/Path/Print/ChooseClass/ProjectDialogs, Icon, ZoomSelect
 ## app/src-tauri/src
 - main.rs - оболочка Tauri: поднимает ядро и WebView (WebviewWindowBuilder)
 

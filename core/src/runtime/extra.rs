@@ -557,6 +557,9 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
         // Отвечаем неудачей и считаем вызовы — плеер покажет их списком
         // неподдерживаемых, а не будет молча делать вид, что всё работает.
         n if n.starts_with("db") => {
+            if let Some(v) = super::db::call(n, args, fx) {
+                return Some(v);
+            }
             *fx.missing.entry(name.to_string()).or_insert(0) += 1;
             if n.ends_with("str") || n.contains("name") || n == "dbgetfield" { text("") } else { num(0.0) }
         }

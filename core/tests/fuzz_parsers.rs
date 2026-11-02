@@ -354,3 +354,19 @@ fn messages_to_parent_do_not_explode_exponentially() {
         .unwrap();
     assert!(rx.recv_timeout(std::time::Duration::from_secs(10)).is_ok(), "такт не кончился");
 }
+
+#[test]
+fn damaged_dbf_does_not_panic() {
+    use stratum_core::formats::dbf::{Codepage, Field, Row, Table};
+    let mut t = Table::new(vec![Field { name: "A".into(), kind: b'C', len: 8, dec: 0 }, Field { name: "N".into(), kind: b'N', len: 6, dec: 2 }], Codepage::Cp866);
+    for i in 0..20 {
+        t.rows.push(Row { deleted: i % 5 == 0, cells: vec![format!("row{i}"), format!("{i}.5")] });
+    }
+    let data = t.to_bytes();
+    for m in mutants(&data, 7, 2000) {
+        let _ = catch_unwind(AssertUnwindSafe(|| Table::parse(&m))).expect("dbf parser panicked");
+    }
+    for n in 0..data.len() {
+        let _ = Table::parse(&data[..n]);
+    }
+}

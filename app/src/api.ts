@@ -63,7 +63,16 @@ async function get<T>(url: string): Promise<T> {
 // версия иконок: меняется после выбора иконки, чтобы сбросить кэш браузера
 let iconVersion = 0;
 
+export interface DbfPage {
+  codepage: number; total: number; matched: number;
+  fields: { name: string; kind: string; len: number }[];
+  rows: { n: number; deleted: boolean; cells: string[] }[];
+}
+
 export const api = {
+  dbfFiles: () => get<string[]>('/api/dbf/files'),
+  dbf: (file: string, offset: number, limit: number, q: string) =>
+    get<DbfPage>(`/api/dbf?file=${encodeURIComponent(file)}&offset=${offset}&limit=${limit}&q=${encodeURIComponent(q)}`),
   project: () => get<Project>('/api/project'),
   klass: (name: string) => get<ClassInfo>(`/api/class/${encodeURIComponent(name)}`),
   scheme: (name: string) => get<{ bounds: { x: number; y: number; w: number; h: number } | null; svg: string }>(`/api/scheme/${encodeURIComponent(name)}`),

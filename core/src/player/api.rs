@@ -175,10 +175,81 @@ fn fit(sp: &mut Space) {
     }
 }
 
+/// Файлы `.dbf` в папке проекта (до трёх уровней вглубь).
+fn dbf_files(root: &std::path::Path, dir: &std::path::Path, depth: usize, out: &mut Vec<String>) {
+    let Ok(rd) = std::fs::read_dir(dir) else { return };
+    for e in rd.flatten() {
+        let p = e.path();
+        let Ok(ft) = e.file_type() else { continue };
+        if ft.is_dir() && depth < 3 {
+            dbf_files(root, &p, depth + 1, out);
+        } else if ft.is_file() && p.extension().is_some_and(|x| x.eq_ignore_ascii_case("dbf")) {
+            if let Ok(rel) = p.strip_prefix(root) {
+                out.push(rel.to_string_lossy().replace('\\', "/"));
+            }
+        }
+    }
+}
+
 pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mutex<Shared>>) -> Response {
     let rest = path.strip_prefix("/api/").unwrap_or("");
     let parts: Vec<&str> = rest.split('/').collect();
     match (method, parts.as_slice()) {
+        ("GET", ["dbf", "files"]) => {
+            let s = shared.lock().unwrap();
+            let mut found = Vec::new();
+            dbf_files(&s.project.dir, &s.project.dir, 0, &mut found);
+            found.sort();
+            json(format!("[{}]", found.iter().map(|f| json_string(f)).collect::<Vec<_>>().join(",")))
+        }
+        ("GET", ["dbf"]) => {
+            let file = super::param(query, "file").map(super::url_decode).unwrap_or_default();
+            let offset: usize = super::param(query, "offset").and_then(|v| v.parse().ok()).unwrap_or(0);
+            let limit: usize = super::param(query, "limit").and_then(|v| v.parse().ok()).unwrap_or(100).clamp(1, 500);
+            let q = super::param(query, "q").map(super::url_decode).unwrap_or_default().to_lowercase();
+            if !file.to_ascii_lowercase().ends_with(".dbf") {
+                return error("400 Bad Request", "нужен файл .dbf");
+            }
+            let path = {
+                let mut s = shared.lock().unwrap();
+                crate::runtime::extra::sandboxed(&mut s.sim.effects, &file, false)
+            };
+            let Some(path) = path else { return error("403 Forbidden", "файл вне папки проекта") };
+            if std::fs::metadata(&path).map_or(true, |m| m.len() > 256 << 20) {
+                return error("404 Not Found", "нет такого файла или он слишком велик");
+            }
+            let table = match std::fs::read(&path).map_err(|e| e.to_string()).and_then(|d| crate::formats::dbf::Table::parse(&d).map_err(|e| e.0)) {
+                Ok(t) => t,
+                Err(e) => return error("422 Unprocessable Entity", &e),
+            };
+            let hit = |r: &crate::formats::dbf::Row| q.is_empty() || r.cells.iter().any(|c| c.to_lowercase().contains(&q));
+            let matched = table.rows.iter().filter(|r| hit(r)).count();
+            let rows: Vec<String> = table
+                .rows
+                .iter()
+                .enumerate()
+                .filter(|(_, r)| hit(r))
+                .skip(offset)
+                .take(limit)
+                .map(|(i, r)| {
+                    let cells: Vec<String> = r.cells.iter().map(|c| json_string(c)).collect();
+                    format!("{{\"n\":{},\"deleted\":{},\"cells\":[{}]}}", i + 1, r.deleted, cells.join(","))
+                })
+                .collect();
+            let fields: Vec<String> = table
+                .fields
+                .iter()
+                .map(|f| format!("{{\"name\":{},\"kind\":{},\"len\":{}}}", json_string(&f.name), json_string(&(f.kind as char).to_string()), f.len))
+                .collect();
+            json(format!(
+                "{{\"codepage\":{},\"total\":{},\"matched\":{},\"fields\":[{}],\"rows\":[{}]}}",
+                table.codepage.number(),
+                table.rows.len(),
+                matched,
+                fields.join(","),
+                rows.join(",")
+            ))
+        }
         ("GET", ["project"]) => {
             let s = shared.lock().unwrap();
             let p = &s.project;

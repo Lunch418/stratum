@@ -202,7 +202,7 @@ export function buildMenus(ctx: MenuContext): Menu[] {
       { label: 'Параметры проекта…', run: () => ctx.open('projectOptions'), disabled: noProject },
       { sep: true },
       { label: 'Дополнительные модули…', disabled: true, why: 'Плагины Ogre3D, видео и БД не переносятся' },
-      { label: 'Database Explorer…', disabled: true, why: 'Базы данных DBF не поддерживаются' },
+      { label: 'Database Explorer…', run: () => ctx.open('dbf') },
     ] },
     { title: 'Окна', items: [
       { label: 'Каскадом', disabled: true, why: MDI },
@@ -211,6 +211,7 @@ export function buildMenus(ctx: MenuContext): Menu[] {
       { label: 'Упорядочить иконки', disabled: true, why: MDI },
       { sep: true },
       { label: 'Раскладка панелей по умолчанию', run: () => { try { localStorage.removeItem('layout'); } catch { /* */ } location.reload(); } },
+      { label: 'Таблицы DBF…', run: () => ctx.open('dbf') },
       { label: 'Палитра команд…', hint: 'Ctrl+Shift+P', run: () => s.setPaletteOpen(true) },
     ] },
     { title: 'Помощь', items: [

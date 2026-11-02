@@ -16,6 +16,7 @@ import { PictureEditor } from './components/PictureEditor';
 import { Debug } from './components/Debug';
 import { Help } from './components/Help';
 import { Search } from './components/Search';
+import { DbfViewer } from './components/DbfViewer';
 import { NewProjectDialog, InfoDialog } from './components/ProjectDialogs';
 import { OpenDialog } from './components/OpenDialog';
 import { Palette, type Command } from './components/Palette';
@@ -216,6 +217,7 @@ export default function App() {
       {dialog === 'envOptions' && <EnvOptionsDialog onClose={() => setDialog(null)} />}
       {dialog === 'classProps' && <ClassPropsDialog onClose={() => setDialog(null)} />}
       {dialog === 'calcOrder' && <CalcOrderDialog onClose={() => setDialog(null)} />}
+      {dialog === 'dbf' && <DbfViewer onClose={() => setDialog(null)} />}
       {dialog === 'about' && <AboutDialog onClose={() => setDialog(null)} />}
       {dialog === 'print' && <PrintDialog onClose={() => setDialog(null)} />}
       {dialog === 'chooseClass' && <ChooseClassDialog onClose={() => setDialog(null)} />}
