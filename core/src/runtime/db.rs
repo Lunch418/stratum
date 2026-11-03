@@ -625,6 +625,20 @@ fn index_file_ok(p: &std::path::Path) -> bool {
     !p.extension().and_then(|e| e.to_str()).is_some_and(|e| matches!(e.to_ascii_lowercase().as_str(), "dbf" | "dbt" | "fpt"))
 }
 
+/// Файл с таким именем нашего индекса или ещё не существует: чужой файл
+/// проекта (модель, ресурс) индексом не перезаписывается и не удаляется.
+fn index_file_replaceable(p: &std::path::Path) -> bool {
+    use std::io::Read;
+    match std::fs::symlink_metadata(p) {
+        Err(_) => true,
+        Ok(m) if m.is_file() => {
+            let mut head = [0u8; 13];
+            std::fs::File::open(p).and_then(|mut f| f.read_exact(&mut head)).is_ok() && &head == b"STRATUM-IDX 1"
+        }
+        Ok(_) => false,
+    }
+}
+
 /// Собственный текстовый формат индекса: заголовок, флаги, выражение ключа.
 /// Порядок записей при открытии строится заново по таблице.
 fn encode_index(spec: &str, flags: i64) -> String {
@@ -738,7 +752,7 @@ fn extended(name: &str, args: &[Value], fx: &mut Effects, h: u32) -> Option<Valu
                     let def = IndexDef { spec, keys, unique: flags & 2 != 0 };
                     // с именем файла индекс сохраняется на диск, чтобы DbOpenIndex открыл его снова
                     let saved = match &ipath {
-                        Some(p) => write_atomic(p, encode_index(&def.spec, flags).as_bytes()),
+                        Some(p) => index_file_replaceable(p) && write_atomic(p, encode_index(&def.spec, flags).as_bytes()),
                         None => arg_s(args, 1).trim().is_empty(),
                     };
                     if saved {
@@ -783,7 +797,7 @@ fn extended(name: &str, args: &[Value], fx: &mut Effects, h: u32) -> Option<Valu
             }
             let had = o.defs.remove(&n).is_some();
             // удаление убирает и файл индекса; закрытие оставляет его
-            let gone = name == "dbdeleteindex" && ipath.as_ref().is_some_and(|p| std::fs::remove_file(p).is_ok());
+            let gone = name == "dbdeleteindex" && ipath.as_ref().is_some_and(|p| index_file_replaceable(p) && std::fs::remove_file(p).is_ok());
             ok(had || gone)
         }
         "dbswitchtoindex" => {
@@ -987,6 +1001,11 @@ mod tests {
         assert!(dir.join("ages.idx").is_file());
         // индекс не может затереть таблицу
         assert_eq!(add(&mut fx, &h, "t.dbf"), 0.0);
+        // чужой файл проекта индексом не затирается и не удаляется
+        std::fs::write(dir.join("model.spj"), "precious").unwrap();
+        assert_eq!(add(&mut fx, &h, "model.spj"), 0.0);
+        assert_eq!(call("dbdeleteindex", &[h.clone(), s("model.spj")], &mut fx).unwrap().as_float(), 0.0);
+        assert_eq!(std::fs::read_to_string(dir.join("model.spj")).unwrap(), "precious");
         // выход из песочницы отвергается
         assert_eq!(add(&mut fx, &h, "/etc/evil.idx"), 0.0);
         call("dbclosetable", &[h.clone()], &mut fx).unwrap();

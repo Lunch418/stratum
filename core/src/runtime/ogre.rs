@@ -650,8 +650,31 @@ impl Ogre {
     }
 
     fn remove_obj(&mut self, id: u32) {
+        if let Some(kind) = self.remove_obj_core(id) {
+            // ссылки на камеру и цель слежения есть только у камер и узлов
+            if matches!(kind, Kind::Camera | Kind::Node | Kind::Bone) {
+                self.drop_refs(&[id]);
+            }
+        }
+    }
+
+    /// Убирает ссылки видовых экранов на камеру и цели слежения за удалёнными объектами.
+    fn drop_refs(&mut self, ids: &[u32]) {
+        let set: BTreeSet<u32> = ids.iter().copied().collect();
+        for v in self.objs.values_mut() {
+            if v.kind == Kind::Viewport && v.f.get("camera").is_some_and(|c| set.contains(&(c[0] as u32)) && c[0] >= 0.0) {
+                v.f.remove("camera");
+            }
+            if v.track != 0 && set.contains(&v.track) {
+                v.track = 0;
+            }
+        }
+    }
+
+    /// Удаление одного объекта без обхода всей таблицы; вид удалённого.
+    fn remove_obj_core(&mut self, id: u32) -> Option<Kind> {
         self.detach(id);
-        let Some(o) = self.objs.remove(&id) else { return };
+        let o = self.objs.remove(&id)?;
         if o.kind == Kind::BillboardSet {
             for c in &o.children {
                 self.objs.remove(c);
@@ -669,18 +692,11 @@ impl Ogre {
                 mo.parent = 0;
             }
         }
-        for v in self.objs.values_mut() {
-            if v.kind == Kind::Viewport && v.f.get("camera").is_some_and(|c| c[0] == id as f64) {
-                v.f.remove("camera");
-            }
-            if v.track == id {
-                v.track = 0;
-            }
-        }
         self.hits.retain(|h| h.1 != id);
         if o.kind == Kind::Material {
             self.materials.retain(|_, v| *v != id);
         }
+        Some(o.kind)
     }
 
     fn remove_tree(&mut self, id: u32) {
@@ -694,12 +710,15 @@ impl Ogre {
     fn remove_scene(&mut self, scene: u32, keep_scene: bool) {
         let ids: Vec<u32> = self.objs.iter().filter(|(_, o)| o.scene == scene).map(|(i, _)| *i).collect();
         let root = self.root_node(scene);
+        let mut gone = Vec::with_capacity(ids.len());
         for id in ids {
             if keep_scene && id == root {
                 continue;
             }
-            self.remove_obj(id);
+            self.remove_obj_core(id);
+            gone.push(id);
         }
+        self.drop_refs(&gone);
         if keep_scene {
             if let Some(r) = self.objs.get_mut(&root) {
                 r.children.clear();
@@ -856,11 +875,19 @@ impl Ogre {
     }
 
     fn scan_resources(&mut self, fx: &mut Effects) {
+        let mut script_budget = 32usize << 20;
         for l in self.zip_locations() {
             let Some(z) = self.get_zip(fx, &l) else { continue };
             for n in z.names() {
                 let ext = n.rsplit('.').next().unwrap_or("");
                 if matches!(ext, "material" | "compositor" | "particle" | "overlay") {
+                    // как и для файлов на диске: скрипт до 4 МБ, всего из архивов до 32 МБ
+                    // (записи каталога могут указывать на один и тот же сжатый поток)
+                    let sz = z.size(&n).unwrap_or(usize::MAX);
+                    if sz > 4 << 20 || sz > script_budget {
+                        continue;
+                    }
+                    script_budget -= sz;
                     if let Some(d) = z.read(&n) {
                         self.ingest_script(ext, &String::from_utf8_lossy(&d));
                     }
@@ -2854,5 +2881,7 @@ mod scene;
 mod zip;
 pub use render::WINDOW_NAME;
 
+#[cfg(test)]
+mod guard;
 #[cfg(test)]
 mod tests;

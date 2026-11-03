@@ -345,12 +345,14 @@ fn png(d: &[u8]) -> Option<Tex> {
     let bits = chans * depth as usize;
     let stride = (w * bits).div_ceil(8);
     let bpp = bits.div_ceil(8).max(1);
-    let mut img = vec![0u8; stride * h];
+    // буфер строк выделяется после распаковки: заявленный размер без данных ничего не стоит
+    let mut img: Vec<u8>;
     if interlace == 0 {
         let raw = inflate(&idat, (stride + 1) * h)?;
         if raw.len() < (stride + 1) * h {
             return None;
         }
+        img = vec![0u8; stride * h];
         png_unfilter(&raw, stride, h, bpp, &mut img)?;
     } else {
         // Adam7: (x0, y0, шаг x, шаг y) семи проходов
@@ -367,6 +369,7 @@ fn png(d: &[u8]) -> Option<Tex> {
         if raw.len() < total {
             return None;
         }
+        img = vec![0u8; stride * h];
         let mut off = 0;
         for pass in PASSES.iter() {
             let Some((pw, ph, ps)) = dims(pass) else { continue };
@@ -624,7 +627,7 @@ fn jpeg(d: &[u8]) -> Option<Tex> {
                 }
             }
             0xC0 | 0xC1 => {
-                if *seg.first()? != 8 {
+                if seg.len() < 6 || seg[0] != 8 {
                     return None;
                 }
                 h = u16::from_be_bytes([seg[1], seg[2]]) as usize;
@@ -716,8 +719,8 @@ fn jpeg_scan(d: &[u8], p: usize, w: usize, h: usize, hmax: usize, vmax: usize, r
                             return None;
                         }
                         let diff = extend(b.bits(t)?, t);
-                        pred[ci] += diff;
-                        blk[0] = pred[ci] * qt[c.tq][0] as i32;
+                        pred[ci] = pred[ci].wrapping_add(diff);
+                        blk[0] = pred[ci].wrapping_mul(qt[c.tq][0] as i32);
                         let mut k = 1;
                         while k < 64 {
                             let rs = b.huff(act)?;
@@ -734,7 +737,7 @@ fn jpeg_scan(d: &[u8], p: usize, w: usize, h: usize, hmax: usize, vmax: usize, r
                                 return None;
                             }
                             let v = extend(b.bits(s)?, s);
-                            blk[ZIGZAG[k]] = v * qt[c.tq][ZIGZAG[k]] as i32;
+                            blk[ZIGZAG[k]] = v.wrapping_mul(qt[c.tq][ZIGZAG[k]] as i32);
                             k += 1;
                         }
                         let mut out = [0u8; 64];
@@ -916,7 +919,7 @@ fn jpeg_prog(d: &[u8]) -> Option<Tex> {
                 let off = (by * c.bw + bx) * 64;
                 let mut blk = [0i32; 64];
                 for i in 0..64 {
-                    blk[i] = c.coef[off + i] as i32 * qt[c.tq][i] as i32;
+                    blk[i] = (c.coef[off + i] as i32).wrapping_mul(qt[c.tq][i] as i32);
                 }
                 let mut out = [0u8; 64];
                 idct(&blk, &mut out);
@@ -977,7 +980,7 @@ fn prog_scan(d: &[u8], p: usize, comps: &mut [PComp], dims: (usize, usize, usize
                                 if t > 15 {
                                     return None;
                                 }
-                                pred[si] += extend(b.bits(t)?, t);
+                                pred[si] = pred[si].wrapping_add(extend(b.bits(t)?, t));
                                 blk[0] = (pred[si] << al) as i16;
                             } else if b.bit()? == 1 {
                                 blk[0] |= p1 as i16;

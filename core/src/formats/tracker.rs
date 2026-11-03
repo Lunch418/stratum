@@ -165,7 +165,9 @@ pub fn render(m: &Module) -> Pcm {
                         if porta {
                             c.target = tune(cell.period as f64, if c.sample > 0 { m.samples[c.sample - 1].finetune } else { 0 });
                         } else if cell.cmd == 0xe && x == 0xd && y > 0 {
-                            c.delay = Some((y as u32, cell.sample as usize, cell.period));
+                            // номер образца бывает до 255: за пределами 1..=31 берётся прежний
+                            let smp = if (1..=31).contains(&cell.sample) { cell.sample as usize } else { 0 };
+                            c.delay = Some((y as u32, smp, cell.period));
                         } else {
                             trigger(c, m, 0, cell.period);
                         }
@@ -255,7 +257,9 @@ pub fn render(m: &Module) -> Pcm {
                         let v = SINE[idx] * c.vib_depth as i32 / 128;
                         per += if c.vib_pos & 32 != 0 { -v } else { v } as f64;
                     }
-                    per *= 2f64.powf(-(c.arp as f64) / 12.0);
+                    if c.arp != 0 {
+                        per *= 2f64.powf(-(c.arp as f64) / 12.0);
+                    }
                     let per = per.clamp(50.0, 2000.0);
                     let step = PAULA / (per * 2.0) / rate;
                     let ip = c.pos as usize;
@@ -270,7 +274,7 @@ pub fn render(m: &Module) -> Pcm {
                     // каналы Amiga: L R R L
                     if matches!(i & 3, 0 | 3) { l += v; } else { r += v; }
                     c.pos += step;
-                    if s.loop_len > 2 {
+                    if s.loop_len > 2 && s.loop_start < len {
                         let end = (s.loop_start + s.loop_len).min(len);
                         if c.pos >= end as f64 {
                             c.pos = s.loop_start as f64 + (c.pos - end as f64) % (end - s.loop_start).max(1) as f64;

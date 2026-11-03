@@ -6,6 +6,9 @@ use super::sequencer::{Pcm, MAX_SECONDS, RATE};
 
 const MAX_EVENTS: usize = 400_000;
 const MAX_NOTES: usize = 100_000;
+const MAX_OPEN: usize = 128;
+/// Предел работы синтезатора: отсчётов, суммарно по всем нотам.
+const MAX_VOICE_SAMPLES: usize = 120_000_000;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Note {
@@ -188,7 +191,13 @@ pub fn parse(d: &[u8]) -> Option<Song> {
                 if song.notes.len() < MAX_NOTES {
                     let level = vol[c as usize] as f32 / 127.0 * expr[c as usize] as f32 / 127.0;
                     song.notes.push(Note { start: sec, end: -1.0, ch: c, key: k, vel: v, program: prog[c as usize], level });
-                    open[c as usize].push((k, song.notes.len() - 1));
+                    let o = &mut open[c as usize];
+                    // незакрытых нот на канал не больше MAX_OPEN: поиск конца остаётся быстрым
+                    if o.len() >= MAX_OPEN {
+                        let (_, old) = o.remove(0);
+                        song.notes[old].end = sec;
+                    }
+                    o.push((k, song.notes.len() - 1));
                 }
             }
             Kind::Off(c, k) => {
@@ -260,7 +269,11 @@ pub fn render(song: &Song) -> Pcm {
     let n = (total * rate) as usize;
     let mut buf = vec![0f32; n];
     let mut rng = Rng(0x1234_5678);
+    let mut budget = MAX_VOICE_SAMPLES;
     for note in &song.notes {
+        if budget == 0 {
+            break;
+        }
         if note.start >= total {
             continue;
         }
@@ -268,7 +281,7 @@ pub fn render(song: &Song) -> Pcm {
         let dur = (note.end - note.start).max(0.02);
         let amp = note.vel as f32 / 127.0 * note.level * 0.18;
         if note.ch == 9 {
-            drum(&mut buf, first, note.key, amp * 1.6, &mut rng);
+            budget = budget.saturating_sub(drum(&mut buf, first, note.key, amp * 1.6, &mut rng));
             continue;
         }
         let (w, atk, dec) = GROUPS[(note.program >> 3) as usize & 15];
@@ -278,7 +291,8 @@ pub fn render(song: &Song) -> Pcm {
         if dec > 0.0 {
             tail = tail.min(8.0 / dec);
         }
-        let cnt = ((tail * RATE as f32) as usize).min(n.saturating_sub(first));
+        let cnt = ((tail * RATE as f32) as usize).min(n.saturating_sub(first)).min(budget);
+        budget -= cnt;
         let mut ph = 0f32;
         for i in 0..cnt {
             let t = i as f32 / RATE as f32;
@@ -304,7 +318,7 @@ pub fn render(song: &Song) -> Pcm {
     Pcm { channels: 2, samples: out }
 }
 
-fn drum(buf: &mut [f32], first: usize, key: u8, amp: f32, rng: &mut Rng) {
+fn drum(buf: &mut [f32], first: usize, key: u8, amp: f32, rng: &mut Rng) -> usize {
     // (тон Гц начало, Гц конец, доля шума, спад 1/с)
     let (f0, f1, noise, dec) = match key {
         35 | 36 => (150.0, 45.0, 0.0, 14.0),
@@ -319,7 +333,8 @@ fn drum(buf: &mut [f32], first: usize, key: u8, amp: f32, rng: &mut Rng) {
     let len = ((7.0 / dec) * RATE as f32) as usize;
     let mut ph = 0f32;
     let mut prev = 0f32;
-    for i in 0..len.min(buf.len().saturating_sub(first)) {
+    let cnt = len.min(buf.len().saturating_sub(first));
+    for i in 0..cnt {
         let t = i as f32 / RATE as f32;
         let env = (-dec * t).exp();
         let f = f1 + (f0 - f1) * (-30.0 * t).exp();
@@ -331,6 +346,7 @@ fn drum(buf: &mut [f32], first: usize, key: u8, amp: f32, rng: &mut Rng) {
         let tone = if f0 > 0.0 { (ph * std::f32::consts::TAU).sin() } else { 0.0 };
         buf[first + i] += (tone * (1.0 - noise) + hp * 0.5 * noise) * env * amp;
     }
+    cnt
 }
 
 #[cfg(test)]

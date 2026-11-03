@@ -75,6 +75,11 @@ impl Zip {
         v
     }
 
+    /// Заявленный размер распакованной записи (по каталогу).
+    pub fn size(&self, name: &str) -> Option<usize> {
+        self.entries.get(name).map(|e| e.usize_)
+    }
+
     /// Файл по пути внутри архива либо по одному имени.
     pub fn read(&self, name: &str) -> Option<Vec<u8>> {
         let key = name.replace('\\', "/").to_ascii_lowercase();
