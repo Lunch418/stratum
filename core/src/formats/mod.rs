@@ -7,9 +7,12 @@ pub mod cls;
 pub mod cp1251;
 pub mod dbf;
 pub mod json;
+pub mod midi;
 pub mod native;
 pub mod project;
 pub mod reader;
+pub mod sequencer;
+pub mod tracker;
 pub mod vdr;
 pub mod writer;
 

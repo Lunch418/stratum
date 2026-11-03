@@ -529,7 +529,11 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
             // файл ищется как ресурсы модели; нет файла - дескриптор 0
             let Some(path) = fx.gfx.find_file(&file) else { return Some(Value::Handle(0.0)) };
             let mut head = Vec::new();
-            if let Ok(f) = std::fs::File::open(&path) {
+            if crate::formats::sequencer::is_sequence(&path) {
+                // MIDI/MOD отрисовываются в WAV; длина и частота - из его заголовка
+                let Some(wav) = crate::formats::sequencer::render_cached(&path) else { return Some(Value::Handle(0.0)) };
+                head.extend_from_slice(&wav[..wav.len().min(4096)]);
+            } else if let Ok(f) = std::fs::File::open(&path) {
                 use std::io::Read;
                 let _ = f.take(4096).read_to_end(&mut head);
             }

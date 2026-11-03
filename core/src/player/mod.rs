@@ -771,7 +771,7 @@ fn handle(mut stream: TcpStream, shared: &Arc<Mutex<Shared>>, server: &Server) -
             };
             // звук отдаётся только из папки проекта, не из библиотек и не снаружи
             let found = found.filter(|p| {
-                let audio = p.extension().and_then(|e| e.to_str()).is_some_and(|e| matches!(e.to_ascii_lowercase().as_str(), "wav" | "mp3" | "ogg" | "mid" | "midi" | "flac" | "aif" | "aiff"));
+                let audio = p.extension().and_then(|e| e.to_str()).is_some_and(|e| matches!(e.to_ascii_lowercase().as_str(), "wav" | "mp3" | "ogg" | "mid" | "midi" | "mod" | "flac" | "aif" | "aiff"));
                 !audio || {
                     let root = shared.lock().unwrap().sim.effects.gfx.project_dir.clone();
                     match (std::fs::canonicalize(p), std::fs::canonicalize(root)) {
@@ -780,7 +780,13 @@ fn handle(mut stream: TcpStream, shared: &Arc<Mutex<Shared>>, server: &Server) -
                     }
                 }
             });
-            match found.and_then(|p| std::fs::read(&p).ok().map(|d| (p, d))) {
+            // MIDI и MOD отдаются отрисованными в WAV
+            let seq = found.as_ref().filter(|p| crate::formats::sequencer::is_sequence(p)).and_then(|p| crate::formats::sequencer::render_cached(p));
+            let found = if found.as_ref().is_some_and(|p| crate::formats::sequencer::is_sequence(p)) && seq.is_none() { None } else { found };
+            match found.and_then(|p| match &seq {
+                Some(w) => Some((p.with_extension("wav"), w.to_vec())),
+                None => std::fs::read(&p).ok().map(|d| (p, d)),
+            }) {
                 Some((p, data)) => {
                     let mime = match p.extension().and_then(|e| e.to_str()).map(|e| e.to_ascii_lowercase()).as_deref() {
                         Some("wav") => "audio/wav",

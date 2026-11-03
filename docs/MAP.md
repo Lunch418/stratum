@@ -15,6 +15,7 @@
 - json.rs - свой JSON без крейтов: Json, parse, write_string, object
 - avi.rs - чтение AVI (RIFF): BI_RGB, RLE8, MSVC1, Cinepak: Avi, AviError
 - cls.rs - имидж .cls (секции, переменные, связи): Variable, Child, Link, section
+- midi.rs / tracker.rs / sequencer.rs - MIDI и MOD: разбор, синтез в PCM, WAV и кэш; /api/file отдаёт их как WAV
 - project.rs - project.spj и _preload.stt: Project, parse_project, write_project, write_state
 - vdr.rs - векторная графика .vdr и секции иконки/рисунка/схемы, 3D-данные: Picture, Space3dData, Object3dData, Hyper, parse_hyper
 - native.rs - родной текстовый формат проекта: load, save, export_stratum2000, check_text, image_functions
