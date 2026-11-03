@@ -51,7 +51,7 @@ fn fail(fx: &mut Effects, code: u32) -> Option<()> {
 }
 
 fn flush(o: &Open) -> bool {
-    !o.readonly && std::fs::write(&o.path, o.table.to_bytes()).is_ok()
+    !o.readonly && write_atomic(&o.path, &o.table.to_bytes())
 }
 
 /// Поле по номеру (с 1, число) или по имени (строка).
@@ -333,4 +333,20 @@ mod tests {
         assert_eq!(call("dbopentable", &bad, &mut fx).unwrap().as_float(), 0.0);
         let _ = std::fs::remove_dir_all(&dir);
     }
+}
+
+/// Запись через временный файл и rename: сбой не обрезает исходную таблицу.
+fn write_atomic(path: &std::path::Path, data: &[u8]) -> bool {
+    let mut tmp = path.as_os_str().to_owned();
+    tmp.push(".tmp~");
+    let tmp = std::path::PathBuf::from(tmp);
+    if std::fs::write(&tmp, data).is_err() {
+        let _ = std::fs::remove_file(&tmp);
+        return false;
+    }
+    if std::fs::rename(&tmp, path).is_err() {
+        let _ = std::fs::remove_file(&tmp);
+        return false;
+    }
+    true
 }

@@ -133,7 +133,10 @@ impl LightParams {
         if b.len() < 88 {
             return None;
         }
-        let f = |o: usize| f64::from_le_bytes(b[o..o + 8].try_into().unwrap());
+        let f = |o: usize| {
+            let v = f64::from_le_bytes(b[o..o + 8].try_into().unwrap());
+            if v.is_finite() { v } else { 0.0 }
+        };
         let kind = u16::from_le_bytes([b[2], b[3]]);
         let color = u32::from_le_bytes(b[4..8].try_into().unwrap());
         Some(LightParams { kind, color, pos: [f(8), f(16), f(24)], dir: [f(32), f(40), f(48)], params: [f(56), f(64), f(72)] })
@@ -943,6 +946,17 @@ mod tests {
         b[56..64].copy_from_slice(&825.0f64.to_le_bytes());
         let l = LightParams::parse(&b).unwrap();
         assert_eq!((l.kind, l.color, l.pos[0], l.params[0]), (1, 0xB4B4B4, -460.0, 825.0));
+    }
+
+    #[test]
+    fn light_params_nan_and_inf_become_zero() {
+        let mut b = vec![0u8; 88];
+        for (i, v) in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY].iter().enumerate() {
+            b[8 + i * 8..16 + i * 8].copy_from_slice(&v.to_le_bytes());
+        }
+        b[56..64].copy_from_slice(&f64::NAN.to_le_bytes());
+        let l = LightParams::parse(&b).unwrap();
+        assert!(l.pos.iter().chain(&l.dir).chain(&l.params).all(|v| v.is_finite()));
     }
 
     #[test]
