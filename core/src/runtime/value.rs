@@ -124,7 +124,7 @@ impl Value {
                     }
                 }
                 if let Some(inner) = lower.strip_prefix("rgb(").and_then(|x| x.strip_suffix(')').map(str::to_string)) {
-                    let c: Vec<f64> = inner.split(',').map(|x| x.trim().parse::<f64>().unwrap_or(0.0).clamp(0.0, 255.0)).collect();
+                    let c: Vec<f64> = inner.split(',').map(|x| x.trim().parse::<f64>().unwrap_or(0.0)) .map(|x| (x as i64 & 0xFF) as f64).collect();
                     let v = c.first().copied().unwrap_or(0.0) + c.get(1).copied().unwrap_or(0.0) * 256.0 + c.get(2).copied().unwrap_or(0.0) * 65536.0;
                     return match ty {
                         ValueType::Color => Value::Color(v),

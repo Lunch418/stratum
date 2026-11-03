@@ -1,0 +1,4 @@
+a | Float(rgb(256,0,128))
+b | Float(rgb(-1,300,0))
+c | Float(rgb(511,512,1000))
+d | Float(rgb(255.7,0.4,128.5))

@@ -234,9 +234,7 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
         "ascii" => num(s(args, 0).chars().next().map(|c| c as u32 as f64).unwrap_or(0.0)),
         "rgbf" => Value::Color(f(args, 0)),
         "rgb" => Value::Color(
-            ((f(args, 0) as u32 & 0xFF)
-                | ((f(args, 1) as u32 & 0xFF) << 8)
-                | ((f(args, 2) as u32 & 0xFF) << 16)) as f64,
+            ((f(args, 0) as i64 & 0xFF) | ((f(args, 1) as i64 & 0xFF) << 8) | ((f(args, 2) as i64 & 0xFF) << 16)) as f64,
         ),
         // RGBEx(r, g, b, flags): старший байт — прозрачность и прочие флаги
         // RgbEx(r, g, b, тип) у оригинала раскладывает байты не по справке:
