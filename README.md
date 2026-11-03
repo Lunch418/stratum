@@ -18,7 +18,7 @@
 | Спецификация `project.spj` и `_preload.stt` | [`docs/formats/spj.md`](docs/formats/spj.md) |
 | Спецификация векторной графики `.vdr` | [`docs/formats/vdr.md`](docs/formats/vdr.md) |
 | Родной текстовый формат проекта (`project.json`, `*.strat`) и обмен со Stratum 2000 | [`docs/formats/native.md`](docs/formats/native.md) |
-| Справочник встроенных функций (960 имён: типы аргументов, опкоды, описания) | `docs/lang/functions.md`, `functions.json` |
+| Справочник встроенных функций (960 имён: типы аргументов, опкоды, описания) | `docs/lang/functions.md`, `functions.json` (собираются локально, `make help`) |
 | Таблицы компилятора: функции, операторы с приоритетами, 414 констант, описатели DLL | `docs/lang/{builtins,operators,constants,tdl}.json` |
 | Справка `SC3.HLP` целиком в markdown — 1329 тем с оглавлением и рисунками | `docs/help/` (собирается локально) |
 | Тексты моделей всех 656 имиджей корпуса + индекс переменных | `docs/corpus/` |

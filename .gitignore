@@ -12,3 +12,9 @@ __pycache__/
 /app/dist/
 /app/src-tauri/target/
 /app/src-tauri/gen/
+
+# Dumps of original help text and UI resources: rebuilt locally
+# (`make help`, tools/dump_resources.py), not redistributed.
+/docs/lang/functions.json
+/docs/lang/functions.md
+/docs/original/
