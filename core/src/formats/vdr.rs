@@ -22,6 +22,11 @@ pub struct Picture {
     pub dibs: Vec<Dib>,
     /// Параметры листа (запись типа 34 чанка 1022) как есть — пишутся обратно.
     pub page: Option<Vec<u8>>,
+    /// «Параметры листа -> Окно»: элемент 0x0b данных листа (8 байт). Нет
+    /// элемента - окно по умолчанию (MDI). Биты 4-5 - стиль окна (0 и 1 -
+    /// MDI/по умолчанию, иначе окно верхнего уровня), сверено на WindowRegion
+    /// и VIDEO2; остальные биты не разобраны.
+    pub window_opts: Option<u64>,
     /// Гиперссылки объектов (закладка «Гипербаза»): handle объекта → ссылка.
     pub hypers: Vec<(u16, Hyper)>,
     /// Данные объектов (блок `0x03FE`) как есть: кроме гиперссылки там
@@ -558,6 +563,28 @@ fn read_chunk(r: &mut Reader, ctx: &Ctx, id: u16, pic: &mut Picture) -> Result<(
     let at = r.pos;
     r.u16()?;
     let size = if ctx.sized { Some(r.u32()? as usize) } else { None };
+    // 3.x: данные листа (чанк 1022 = 0x03FE) - список элементов, как блок 0x03FE
+    // объекта: [2, 5, 2, счёт, элементы]; элемент 1 - 34 байта (сетка),
+    // 0x0b - параметры окна
+    if let (1022, Some(n)) = (id, size) {
+        if let Some(data) = r.data.get(at + 6..(at + n).min(r.data.len())) {
+            if data.starts_with(&[2, 0, 5, 0, 2, 0]) {
+                let mut i = 7;
+                while let (Some(k), Some(l)) = (data.get(i..i + 2), data.get(i + 2..i + 4)) {
+                    let (k, l) = (u16::from_le_bytes([k[0], k[1]]), u16::from_le_bytes([l[0], l[1]]) as usize);
+                    let Some(body) = data.get(i + 4..i + 4 + l) else { break };
+                    match (k, l) {
+                        (1, 34) => pic.page = Some(body.to_vec()),
+                        (0x0b, 8) => pic.window_opts = body.try_into().ok().map(u64::from_le_bytes),
+                        _ => {}
+                    }
+                    i += 4 + l;
+                }
+                r.pos = at + n;
+                return Ok(());
+            }
+        }
+    }
     // размер меньше заголовка чанка вернул бы чтение на тот же чанк: разбор
     // зацикливался и копил объекты, пока не кончалась память
     if size.is_some_and(|s| s < 12) {
@@ -1361,14 +1388,21 @@ pub fn write(pic: &Picture) -> Vec<u8> {
         }
     });
     if let Some(page) = &pic.page {
-        chunk(&mut w, 1022, 1, |w| {
-            record(w, 34, false, |w| {
-                w.u16(0);
-                w.u16(1);
-                w.u16(1);
-                w.bytes(page);
-            });
-        });
+        // как в файлах оригинала: [2, 5, 2, счёт, элемент 1, элемент 0x0b]
+        let at = w.pos();
+        w.u16(1022);
+        w.u32(0);
+        w.bytes(&[2, 0, 5, 0, 2, 0, 1]);
+        w.u16(1);
+        w.u16(34);
+        w.bytes(page);
+        if let Some(opts) = pic.window_opts {
+            w.u16(0x0b);
+            w.u16(8);
+            w.bytes(&opts.to_le_bytes());
+        }
+        let size = (w.pos() - at) as u32;
+        w.patch_u32(at + 2, size);
     }
     w.bytes(&pic.extra);
     let total = w.pos() as u32;

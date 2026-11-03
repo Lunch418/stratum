@@ -44,9 +44,14 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
             // после открытия: WM_SIZE придёт и после SetClientSize (SMO2);
             // без полос сообщение уходит в момент вызова, до подписки (L1)
             let flags = s(args, 2).to_uppercase();
+            // WS_BYSPACE берёт стиль окна из «Параметров листа»: без заданного
+            // стиля окно остаётся MDI (625x611 каскадом, сверено в Wine на
+            // VIDEO2 и BALLS); окно верхнего уровня - при стиле не MDI
+            let top_level = gfx.pictures.get(&s(args, 1).to_lowercase()).and_then(|p| p.window_opts).is_some_and(|o| (o >> 4) & 3 > 1)
+                || gfx.sheets.get(&s(args, 1).to_lowercase()).is_some_and(|sh| matches!(sh.window_style.as_str(), "dialog" | "popup"));
             if let Some(space) = gfx.space_mut(sp) {
                 space.scroll_size_msg = flags.contains("SCROLL");
-                if flags.contains("WS_BYSPACE") {
+                if flags.contains("WS_BYSPACE") && top_level {
                     space.by_space = true;
                     space.org = (0.0, 0.0);
                     space.client = super::BYSPACE_CLIENT;
