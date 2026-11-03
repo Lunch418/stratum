@@ -1122,6 +1122,16 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
             names.truncate(50);
             json(format!("[{}]", names.iter().map(|n| json_string(n)).collect::<Vec<_>>().join(",")))
         }
+        // картинка темы справки (docs/help/images/NAME.png) в base64
+        ("GET", ["help-image", name]) => {
+            let name = super::url_decode(name);
+            let ok = !name.is_empty() && name.len() < 64 && name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-');
+            let file = help_dir().and_then(|d| d.parent().map(|p| p.join("images").join(format!("{name}.png"))));
+            match file.filter(|_| ok).and_then(|f| std::fs::read(f).ok()) {
+                Some(bytes) => json(format!("{{\"data\":\"data:image/png;base64,{}\"}}", crate::gfx::svg::base64(&bytes))),
+                None => error("404 Not Found", "нет такой картинки"),
+            }
+        }
         ("GET", ["help", topic]) => {
             let topic = super::url_decode(topic);
             let Some(dir) = help_dir() else { return error("404 Not Found", "справка не собрана: make help") };

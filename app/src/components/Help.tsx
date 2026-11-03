@@ -16,6 +16,7 @@ function render(md: string): string {
   let para: string[] = [];
   let list = false;
   const inline = (t: string) => escapeHtml(t)
+    .replace(/!\[[^\]]*\]\((?:\.\.\/images\/)?([A-Za-z0-9_-]+)\.png\)/g, (_m, n) => `<img class="help-img" data-img="${n}" alt="">`)
     .replace(/\[([^\]]+)\]\(([^)]+)\.md\)/g, (_m, text, topic) => `<a href="#help/${encodeURIComponent(topic)}" data-topic="${topic}">${text}</a>`)
     .replace(/`([^`]+)`/g, '<code>$1</code>')
     .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
@@ -56,6 +57,16 @@ export function Help() {
     }).catch(e => alive && setPage({ error: String(e) }));
     return () => { alive = false; };
   }, [topic]);
+
+  // картинки темы (формулы, схемы) подгружаются по именам после показа текста
+  useEffect(() => {
+    if (!page || !('html' in page)) return;
+    let alive = true;
+    document.querySelectorAll<HTMLImageElement>('.help-body img[data-img]').forEach(img => {
+      fetch(`/api/help-image/${encodeURIComponent(img.dataset.img!)}`).then(r => r.ok ? r.json() : null).then(j => { if (alive && j?.data) img.src = j.data; }).catch(() => {});
+    });
+    return () => { alive = false; };
+  }, [page]);
 
   useEffect(() => {
     if (query.trim().length < 2) return;
