@@ -28,6 +28,13 @@ CASES = [
     ('h_hash', 'HANDLE', '#5'),
     ('f_list', 'FLOAT', '1, 2'),
     ('f_exp', 'FLOAT', '1e3'),
+    ('f_comma', 'FLOAT', '0,78539816'),
+    ('f_dot', 'FLOAT', '0.5'),
+    ('f_const', 'FLOAT', 'PM_SOLID'),
+    ('f_const_l', 'FLOAT', 'pm_solid'),
+    ('f_pi', 'FLOAT', 'pi'),
+    ('f_neg', 'FLOAT', '-2,5'),
+    ('h_const', 'HANDLE', 'PM_SOLID'),
 ]
 
 

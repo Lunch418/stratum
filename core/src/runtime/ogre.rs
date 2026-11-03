@@ -32,7 +32,7 @@ const MAX_DEPTH: usize = 1000;
 const MAX_TRIS_TESTED: usize = 5_000_000;
 const MAX_SURFACE: usize = 16384;
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Hash, PartialOrd, Ord)]
 pub enum Kind {
     Scene,
     Camera,
@@ -200,6 +200,8 @@ pub struct Frame {
 pub struct Ogre {
     objs: BTreeMap<u32, Obj>,
     next: u32,
+    /// Счётчики автоматических имён по видам: `__Camera_0`, `__SceneNode_1`.
+    auto_names: BTreeMap<Kind, u32>,
     root_created: bool,
     initialised: bool,
     config: String,
@@ -577,7 +579,14 @@ impl Ogre {
     fn create_in_scene(&mut self, scene: u32, kind: Kind, name: &str) -> u32 {
         let mut name = clean_name(name);
         if name.is_empty() {
-            name = format!("Unnamed_{}", self.next + 1);
+            // пустое имя: оригинал даёт `__Вид_N`, N с нуля по каждому виду (Wine, BillboardDemo)
+            let label = match kind {
+                Kind::Node => "SceneNode".to_string(),
+                other => format!("{other:?}"),
+            };
+            let n = self.auto_names.entry(kind).or_insert(0);
+            name = format!("__{label}_{n}");
+            *n += 1;
         } else if self.name_taken(scene, kind, &name) {
             self.fail(format!("имя '{name}' уже занято"));
             return 0;

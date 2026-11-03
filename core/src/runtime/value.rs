@@ -132,10 +132,15 @@ impl Value {
                         _ => Value::Float(v),
                     };
                 }
-                let n = t
-                    .strip_prefix('#')
-                    .unwrap_or(t)
+                // FLOAT: десятичная запятая ("0,78539816") и имена констант
+                // ("PM_SOLID", "pi") читаются, как в оригинале (Wine,
+                // tools/verify_defaults.py); у HANDLE и COLORREF имён нет
+                let body = t.strip_prefix('#').unwrap_or(t);
+                let n = body
                     .parse::<f64>()
+                    .ok()
+                    .or_else(|| (ty == ValueType::Float).then(|| body.replace(',', ".").parse::<f64>().ok()).flatten())
+                    .or_else(|| (ty == ValueType::Float).then(|| super::constants::lookup(body)).flatten())
                     .unwrap_or(0.0);
                 match ty {
                     ValueType::Handle => Value::Handle(n),
