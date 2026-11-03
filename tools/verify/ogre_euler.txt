@@ -1,0 +1,31 @@
+# Ogre: порядок поворотов Node_SetRotationEuler* (кватернион W X Y Z после поворота).
++ fixtures/PROJECTS/samples/Ogre_3D/BillboardDemo/Ogre.cfg
+# Аргументы всегда (Yaw, Pitch, Roll) = (вокруг Y, вокруг X, вокруг Z).
+% Wait = 3
+$ HANDLE sc, nn, rw
+$ FLOAT w, x, y, z, ok
+! Root_Create("Plugins.cfg", "Ogre.cfg", "Ogre.log")
+! ok := Root_ShowConfigDialog()
+! Root_Initialise()
+! rw := RenderWindow_Create2(#0, "t", 320, 240, 0, 0, 0, 0)
+> sc := Scene_Create("OctreeSceneManager")
+> nn := SceneNode_Create(~sc, "n")
+> Node_SetRotationEulerXYZ(~nn, 0.3, 0.5, 0.7)
+> Node_GetRotationQuaternion(~nn, w, x, y, z)
+xyz | s:String(~w) + " " + String(~x) + " " + String(~y) + " " + String(~z)
+> Node_SetRotationEulerZYX(~nn, 0.3, 0.5, 0.7)
+> Node_GetRotationQuaternion(~nn, w, x, y, z)
+zyx | s:String(~w) + " " + String(~x) + " " + String(~y) + " " + String(~z)
+> Node_SetRotationEulerYXZ(~nn, 0.3, 0.5, 0.7)
+> Node_GetRotationQuaternion(~nn, w, x, y, z)
+yxz | s:String(~w) + " " + String(~x) + " " + String(~y) + " " + String(~z)
+> Node_SetRotationEulerXZY(~nn, 0.3, 0.5, 0.7)
+> Node_GetRotationQuaternion(~nn, w, x, y, z)
+xzy | s:String(~w) + " " + String(~x) + " " + String(~y) + " " + String(~z)
+> Node_SetRotationEulerYZX(~nn, 0.3, 0.5, 0.7)
+> Node_GetRotationQuaternion(~nn, w, x, y, z)
+yzx | s:String(~w) + " " + String(~x) + " " + String(~y) + " " + String(~z)
+> Node_SetRotationEulerZXY(~nn, 0.3, 0.5, 0.7)
+> Node_GetRotationQuaternion(~nn, w, x, y, z)
+zxy | s:String(~w) + " " + String(~x) + " " + String(~y) + " " + String(~z)
+okk | s:String(~ok)

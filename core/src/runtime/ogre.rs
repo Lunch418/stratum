@@ -7,8 +7,7 @@
 //! берутся из таблицы `ogre_sigs.txt` (из docs/lang/functions.md).
 //!
 //! Допущения, которых нет в справке: углы в радианах; кватернион (w, x, y, z);
-//! Node_SetRotationEuler*: аргументы (рыскание Y, тангаж X, крен Z), буквы в
-//! имени задают порядок перемножения поворотов; объект Billboard адресуется
+//! Node_SetRotationEuler*: аргументы в порядке букв имени, q = q1*q2*q3 (Wine); объект Billboard адресуется
 //! дескриптором своего BillboardSet (первая плоскость); SceneNode_Create не
 //! подключает узел к корню (как createSceneNode в Ogre).
 
@@ -439,16 +438,19 @@ fn look_rotation(dir: V3) -> Q {
     q_from_basis(x, y, z)
 }
 
-fn euler(order: &str, yaw: f64, pitch: f64, roll: f64) -> Q {
+/// Node_SetRotationEuler<порядок>: аргументы идут в порядке букв имени
+/// (ZYX: первый - угол вокруг Z, второй - вокруг Y, третий - вокруг X),
+/// кватернион q = q(первая буква) * q(вторая) * q(третья). Сверено в Wine:
+/// tools/verify/ogre_euler.txt (все шесть порядков).
+fn euler(order: &str, angles: [f64; 3]) -> Q {
     let mut q = [1.0, 0.0, 0.0, 0.0];
-    for c in order.chars() {
-        let r = match c {
-            'x' => qaxis(pitch, [1.0, 0.0, 0.0]),
-            'y' => qaxis(yaw, [0.0, 1.0, 0.0]),
-            _ => qaxis(roll, [0.0, 0.0, 1.0]),
+    for (c, angle) in order.chars().zip(angles) {
+        let axis = match c {
+            'x' => [1.0, 0.0, 0.0],
+            'y' => [0.0, 1.0, 0.0],
+            _ => [0.0, 0.0, 1.0],
         };
-        // справка: "поворот вокруг осей в порядке Z, Y, X" - последовательно, вокруг неподвижных осей
-        q = qmul(r, q);
+        q = qmul(q, qaxis(angle, axis));
     }
     qnorm(q)
 }
@@ -1452,7 +1454,7 @@ impl Ogre {
             "node_setrotationeulerxyz" | "node_setrotationeulerxzy" | "node_setrotationeuleryxz" | "node_setrotationeuleryzx"
             | "node_setrotationeulerzxy" | "node_setrotationeulerzyx" => {
                 let order = &name[name.len() - 3..];
-                self.set_rot(id, euler(order, n(1), n(2), n(3)));
+                self.set_rot(id, euler(order, [n(1), n(2), n(3)]));
                 fl(0.0)
             }
             "scenenode_attachobject" => {

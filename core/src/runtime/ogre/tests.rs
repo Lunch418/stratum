@@ -697,3 +697,23 @@ fn cyrillic_glyphs_are_drawn() {
     assert_eq!(set("а"), set("A"));
     assert_ne!(set("Привет"), set("??????"));
 }
+
+/// Порядок углов и перемножения Node_SetRotationEuler* - числа оригинала (Wine,
+/// tools/verify/ogre_euler.txt), углы 0.3, 0.5, 0.7.
+#[test]
+fn euler_order_matches_original() {
+    let want = [
+        ("xyz", [0.887272, 0.219896, 0.180146, 0.363237]),
+        ("zyx", [0.912627, 0.293777, 0.279444, 0.0521324]),
+        ("yxz", [0.912627, 0.279444, 0.0521324, 0.293777]),
+        ("xzy", [0.912627, 0.0521324, 0.293777, 0.279444]),
+        ("yzx", [0.887272, 0.363237, 0.219896, 0.180146]),
+        ("zxy", [0.887272, 0.180146, 0.363237, 0.219896]),
+    ];
+    for (order, q) in want {
+        let got = super::euler(order, [0.3, 0.5, 0.7]);
+        for i in 0..4 {
+            assert!((got[i] - q[i]).abs() < 2e-6, "{order}: {got:?} vs {q:?}");
+        }
+    }
+}
