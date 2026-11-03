@@ -53,3 +53,5 @@ docs/verification.md (сверка с оригиналом в Wine), docs/review
 - Ревью (docs/review.md): 32 находки, открытых высокой серьезности нет; оставлены низкие -
   O(n^2) при загрузке огромного рисунка, запись модели во всю папку проекта (по ТЗ).
 - Ревью 33-34: NaN в LightParams -> 0, атомарное сохранение DBF (docs/review.md)
+
+- Dark theme pass: walked all tabs/dialogs; model-window controls stay a light surface (range tracks styled), dark custom checkboxes. Known: slider grooves in AudioPlayer are drawn black by the model SVG (core), not CSS.

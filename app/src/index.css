@@ -146,6 +146,10 @@ body {
 ::selection { background: var(--accent-soft); color: inherit; }
 * { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
 input[type="checkbox"], input[type="radio"], input[type="range"], progress { accent-color: var(--accent); }
+/* в тёмной теме родной флажок остаётся ярко-белым: рисуем свой */
+[data-theme="dark"] :not(.model .win) > input[type="checkbox"]:not(.ctl), [data-theme="dark"] :not(.model .win) > label > input[type="checkbox"]:not(.ctl) { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; border: 1px solid var(--border-strong); border-radius: 3px; background: var(--bg-sunken); display: inline-grid; place-content: center; vertical-align: middle; }
+[data-theme="dark"] :not(.model .win) > input[type="checkbox"]:not(.ctl):checked, [data-theme="dark"] :not(.model .win) > label > input[type="checkbox"]:not(.ctl):checked { background: var(--accent); border-color: var(--accent); }
+[data-theme="dark"] :not(.model .win) > input[type="checkbox"]:not(.ctl):checked::after, [data-theme="dark"] :not(.model .win) > label > input[type="checkbox"]:not(.ctl):checked::after { content: ""; width: 8px; height: 4px; border: solid var(--on-accent); border-width: 0 0 2px 2px; transform: rotate(-45deg) translate(1px, -1px); }
 button, input, select, textarea { font: inherit; color: inherit; }
 b, strong { font-weight: 600; }
 
@@ -541,6 +545,11 @@ table.vars button.small.ghost { min-height: 20px; padding: 0 5px; }
 /* недоступное поле Windows: серый фон, текст читается */
 .model .win input.ctl:disabled, .model .win textarea.ctl:disabled, .model .win select.ctl:disabled { opacity: 1; background: #f0f0f0; color: #6d6d6d; }
 .model .win label.ctl input:disabled { opacity: 1; }
+/* окно модели - своя светлая поверхность в любой теме: родные элементы остаются светлыми */
+.model .win { color-scheme: light; }
+.model .win input[type="range"].ctl { background: transparent; border: 0; padding: 0; accent-color: #606060; -webkit-appearance: none; appearance: none; }
+.model .win input[type="range"].ctl::-webkit-slider-runnable-track { height: 6px; background: #d4d4d4; border: 1px solid #7a7a7a; border-radius: 0; }
+.model .win input[type="range"].ctl::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 10px; height: 20px; margin-top: -8px; background: #f0f0f0; border: 1px solid #606060; border-radius: 1px; }
 /* скрываемые полосы: "Вид -> Строка состояния", "Вид -> Панель инструментов" */
 .ide.no-statusbar { grid-template-rows: auto 1fr; }
 .ide.no-statusbar > .statusbar { display: none; }
