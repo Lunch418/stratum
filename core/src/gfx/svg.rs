@@ -6,7 +6,36 @@ use std::fmt::Write;
 
 /// COLORREF (0x00BBGGRR) → `#rrggbb`.
 pub fn color(c: u32) -> String {
+    // 0x02000000 | индекс - системный цвет Windows (COLOR_BTNFACE и т.д.),
+    // а не RGB: иначе кнопки и желоба ползунков рисуются почти чёрными
+    let c = if c >> 24 == 0x02 { system_color(c & 0xFF).unwrap_or(c & 0xFF_FFFF) } else { c & 0xFF_FFFF };
     format!("#{:02x}{:02x}{:02x}", c & 0xFF, (c >> 8) & 0xFF, (c >> 16) & 0xFF)
+}
+
+/// Цвета схемы Windows по умолчанию (COLORREF) для индексов GetSysColor.
+fn system_color(i: u32) -> Option<u32> {
+    let rgb = |r: u32, g: u32, b: u32| r | g << 8 | b << 16;
+    Some(match i {
+        0 => rgb(192, 192, 192),
+        1 => rgb(58, 110, 165),
+        2 => rgb(0, 0, 128),
+        3 => rgb(128, 128, 128),
+        4 => rgb(192, 192, 192),
+        5 | 9 => rgb(255, 255, 255),
+        6 => rgb(0, 0, 0),
+        7 | 8 | 18 | 21 => rgb(0, 0, 0),
+        10 | 11 => rgb(192, 192, 192),
+        12 => rgb(128, 128, 128),
+        13 => rgb(0, 0, 128),
+        14 => rgb(255, 255, 255),
+        15 | 22 => rgb(192, 192, 192),
+        16 | 17 => rgb(128, 128, 128),
+        19 => rgb(192, 192, 192),
+        20 => rgb(255, 255, 255),
+        23 => rgb(0, 0, 0),
+        24 => rgb(255, 255, 225),
+        _ => return None,
+    })
 }
 
 fn esc(s: &str) -> String {
@@ -200,4 +229,16 @@ pub fn base64(data: &[u8]) -> String {
         out.push(if chunk.len() > 2 { T[n as usize & 63] as char } else { '=' });
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::color;
+
+    #[test]
+    fn system_colors_and_plain_rgb() {
+        assert_eq!(color(0x0200_000F), "#c0c0c0");
+        assert_eq!(color(0x0200_0010), "#808080");
+        assert_eq!(color(0x00FF_0000), "#0000ff");
+    }
 }
