@@ -119,7 +119,11 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
         "arcsin" => num(f(args, 0).clamp(-1.0, 1.0).asin()),
         "arccos" => num(f(args, 0).clamp(-1.0, 1.0).acos()),
         "arctan" | "atan" => num(f(args, 0).atan()),
-        "getanglebyxy" => num(f(args, 1).atan2(f(args, 0))),
+        // угол в 0 ... 2*pi (Wine: PINBALL_, (0, -1) -> 3*pi/2)
+        "getanglebyxy" => {
+            let a = f(args, 1).atan2(f(args, 0));
+            num(if a < 0.0 { a + std::f64::consts::TAU } else { a })
+        }
         "fileexist" => num(if super::extra::sandboxed(fx, &s(args, 0), false).is_some_and(|p| p.exists()) { 1.0 } else { 0.0 }),
         // диалог ввода строки: без окна возвращаем значение по умолчанию
         "inputbox" => {
