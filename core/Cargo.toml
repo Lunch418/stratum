@@ -1,6 +1,6 @@
 [package]
 name = "stratum-core"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 description = "Ядро Stratum Modern: чтение форматов Stratum 2000, язык моделирования и симуляция"
 license = "MIT"
