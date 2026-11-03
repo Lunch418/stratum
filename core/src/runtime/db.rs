@@ -620,10 +620,39 @@ fn index_name(args: &[Value]) -> String {
     n.to_lowercase()
 }
 
+/// Файл индекса не должен быть таблицей или MEMO: их он бы затёр.
+fn index_file_ok(p: &std::path::Path) -> bool {
+    !p.extension().and_then(|e| e.to_str()).is_some_and(|e| matches!(e.to_ascii_lowercase().as_str(), "dbf" | "dbt" | "fpt"))
+}
+
+/// Собственный текстовый формат индекса: заголовок, флаги, выражение ключа.
+/// Порядок записей при открытии строится заново по таблице.
+fn encode_index(spec: &str, flags: i64) -> String {
+    format!("STRATUM-IDX 1\n{}\n{}\n", flags, spec.replace(['\r', '\n'], " "))
+}
+
+fn read_index(p: &std::path::Path) -> Option<(String, i64)> {
+    if std::fs::metadata(p).ok()?.len() > 64 << 10 {
+        return None;
+    }
+    let text = String::from_utf8(std::fs::read(p).ok()?).ok()?;
+    let mut l = text.lines();
+    (l.next()? == "STRATUM-IDX 1").then_some(())?;
+    let flags = l.next()?.trim().parse::<i64>().ok()?;
+    Some((l.next()?.to_string(), flags))
+}
+
 /// Индексы, MEMO, сортировка и копирование таблицы.
 fn extended(name: &str, args: &[Value], fx: &mut Effects, h: u32) -> Option<Value> {
     let mut error = 0;
     let mut copy: Option<(Table, String, String)> = None;
+    // файл индекса: `($project)CUST1.IDX` в песочнице; пустое имя - индекс только в памяти
+    let ipath = match name {
+        "dbaddindex" | "dbdeleteindex" | "dbopenindex" | "dbregenindex" if !arg_s(args, 1).trim().is_empty() => {
+            sandbox_path(fx, &arg_s(args, 1), name != "dbopenindex" && name != "dbregenindex").filter(|p| index_file_ok(p)).map(|p| if p.extension().is_none() { p.with_extension("idx") } else { p })
+        }
+        _ => None,
+    };
     let o = fx.dbs.tables.get_mut(&h)?;
     let v = match name {
         "dbgetblob" | "dbputblob" | "dbfreeblob" => {
@@ -706,8 +735,19 @@ fn extended(name: &str, args: &[Value], fx: &mut Effects, h: u32) -> Option<Valu
             let flags = arg_f(args, 4) as i64;
             match parse_keys(&o.table, &spec, flags & 4 != 0) {
                 Some(keys) if o.defs.len() < 32 => {
-                    o.defs.insert(index_name(args), IndexDef { spec, keys, unique: flags & 2 != 0 });
-                    num(1.0)
+                    let def = IndexDef { spec, keys, unique: flags & 2 != 0 };
+                    // с именем файла индекс сохраняется на диск, чтобы DbOpenIndex открыл его снова
+                    let saved = match &ipath {
+                        Some(p) => write_atomic(p, encode_index(&def.spec, flags).as_bytes()),
+                        None => arg_s(args, 1).trim().is_empty(),
+                    };
+                    if saved {
+                        o.defs.insert(index_name(args), def);
+                        num(1.0)
+                    } else {
+                        error = 1;
+                        num(0.0)
+                    }
                 }
                 _ => {
                     error = 4;
@@ -717,7 +757,18 @@ fn extended(name: &str, args: &[Value], fx: &mut Effects, h: u32) -> Option<Valu
         }
         // индексы живут вместе с открытой таблицей: открыть можно только добавленный
         "dbopenindex" | "dbregenindex" => {
-            if o.defs.contains_key(&index_name(args)) {
+            let loaded = match (o.defs.contains_key(&index_name(args)), &ipath) {
+                (true, _) => true,
+                (false, Some(p)) => match read_index(p).and_then(|(spec, flags)| parse_keys(&o.table, &spec, flags & 4 != 0).map(|k| (spec, flags, k))) {
+                    Some((spec, flags, keys)) if o.defs.len() < 32 => {
+                        o.defs.insert(index_name(args), IndexDef { spec, keys, unique: flags & 2 != 0 });
+                        true
+                    }
+                    _ => false,
+                },
+                _ => false,
+            };
+            if loaded {
                 reindex(o);
                 num(1.0)
             } else {
@@ -730,7 +781,10 @@ fn extended(name: &str, args: &[Value], fx: &mut Effects, h: u32) -> Option<Valu
             if o.active.as_ref().is_some_and(|a| a.name == n) {
                 o.active = None;
             }
-            ok(o.defs.remove(&n).is_some())
+            let had = o.defs.remove(&n).is_some();
+            // удаление убирает и файл индекса; закрытие оставляет его
+            let gone = name == "dbdeleteindex" && ipath.as_ref().is_some_and(|p| std::fs::remove_file(p).is_ok());
+            ok(had || gone)
         }
         "dbswitchtoindex" => {
             let n = index_name(args);
@@ -917,6 +971,36 @@ mod tests {
         let bad = [Value::Handle(1.0), s("../../etc/passwd"), s(""), s(""), s(""), Value::Float(0.0), s("")];
         assert_eq!(call("dbopentable", &bad, &mut fx).unwrap().as_float(), 0.0);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn index_file_persists_and_reopens() {
+        let (mut fx, dir) = setup("idxfile");
+        let h = call("dbcreatetable", &[f(1.0), s("t.dbf"), s("NAME:C:8,AGE:N:3:0"), s("1251"), s("")], &mut fx).unwrap();
+        for (n, a) in [("bob", "30"), ("Ann", "25"), ("cat", "7")] {
+            call("dbappendrecord", &[h.clone()], &mut fx).unwrap();
+            call("dbsetfield", &[h.clone(), s("NAME"), s(n)], &mut fx).unwrap();
+            call("dbsetfield", &[h.clone(), s("AGE"), s(a)], &mut fx).unwrap();
+        }
+        let add = |fx: &mut Effects, h: &Value, name: &str| call("dbaddindex", &[h.clone(), s(name), f(1.0), s(""), f(0.0), f(0.0), s(""), s(""), s("AGE")], fx).unwrap().as_float();
+        assert_eq!(add(&mut fx, &h, "($project)ages.idx"), 1.0);
+        assert!(dir.join("ages.idx").is_file());
+        // индекс не может затереть таблицу
+        assert_eq!(add(&mut fx, &h, "t.dbf"), 0.0);
+        // выход из песочницы отвергается
+        assert_eq!(add(&mut fx, &h, "/etc/evil.idx"), 0.0);
+        call("dbclosetable", &[h.clone()], &mut fx).unwrap();
+        let h = call("dbopentable", &[f(1.0), s("t.dbf"), s(""), s(""), s(""), f(0.0), s("")], &mut fx).unwrap();
+        assert_eq!(call("dbswitchtoindex", &[h.clone(), s("ages.idx"), f(1.0), s(""), f(0.0)], &mut fx).unwrap().as_float(), 0.0);
+        assert_eq!(call("dbopenindex", &[h.clone(), s("($project)AGES.IDX"), f(1.0)], &mut fx).unwrap().as_float(), 1.0);
+        call("dbswitchtoindex", &[h.clone(), s("ages.idx"), f(1.0), s(""), f(0.0)], &mut fx).unwrap();
+        assert_eq!(call("dbgetfield", &[h.clone(), s("NAME")], &mut fx).unwrap().as_string(), "cat");
+        // повреждённый файл не открывается
+        std::fs::write(dir.join("bad.idx"), "junk").unwrap();
+        assert_eq!(call("dbopenindex", &[h.clone(), s("bad.idx"), f(1.0)], &mut fx).unwrap().as_float(), 0.0);
+        assert_eq!(call("dbdeleteindex", &[h.clone(), s("ages.idx")], &mut fx).unwrap().as_float(), 1.0);
+        assert!(!dir.join("ages.idx").exists());
+        let _ = std::fs::remove_dir_all(dir);
     }
 }
 
