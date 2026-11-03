@@ -46,7 +46,7 @@ docs/verification.md (сверка с оригиналом в Wine), docs/review
 ## Известные баги
 - Без снимка в Wine: sclogo (падает оригинал), NUI и TextAnalyser (внешние библиотеки),
   2d/api/Net (нет файла проекта).
-- DBF: dBASE читается и пишется (Db* и окно "Таблицы DBF"); нет SQL, индексов, MEMO, DbBrowse.
+- DBF: dBASE читается и пишется (Db* и окно "Таблицы DBF"); MEMO (.dbt), DbCreateTable (поля "ИМЯ:тип:длина:точн"), DbCopyTo (.dbf), DbSortTable, индексы в памяти (DbAddIndex/SwitchToIndex/SetToKey), DbSQL (CREATE/ALTER/DROP/INSERT/UPDATE/DELETE/SELECT, runtime/sql.rs), DbBrowse (очередь в состоянии плеера: поле browse; IDE ещё не открывает окно). Не сделано: QBE, форматы кроме dBASE, файлы индексов.
 - Звук: Audio* через Web Audio (WAV/MP3/OGG, что декодирует WebView); MIDI и MOD не играют.
 - Нет движка: Ogre3D, запись AVI - вызовы считаются и показываются
   плашкой "функции, которых здесь нет".

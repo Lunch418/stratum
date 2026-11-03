@@ -33,7 +33,8 @@
 - builtins.rs - встроенные функции: call, call_stub, Effects, DialogRequest
 - extra.rs - строки, файлы, папки, потоки: call, Stream, Streams
 - audio.rs - состояние Audio* по дескрипторам: Audios, Sound, AudioCmd, wav_info
-- db.rs - функции Db* языка поверх dbf.rs: Dbs, call
+- db.rs - функции Db* языка поверх dbf.rs (MEMO, индексы, сортировка, Browse): Dbs, call
+- sql.rs - SQL-подмножество для DbSQL: run, Done
 - data.rs - матрицы и динамические массивы: Matrix, Matrices, multiply, transpose, determinant
 - constants.rs - константы (PI, WM_*, стили окон): lookup (генерируется tools/gen_constants.py)
 - clock.rs - часы: local_now, tick_count, hundredths

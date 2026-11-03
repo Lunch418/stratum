@@ -1048,8 +1048,24 @@ fn frame_json(shared: &Arc<Mutex<Shared>>) -> String {
     let mut unsupported: Vec<(&String, &u32)> = s.sim.effects.missing.iter().collect();
     unsupported.sort();
     let unsupported: Vec<String> = unsupported.iter().map(|(n, c)| format!("{{\"name\":{},\"count\":{c}}}", json_string(n))).collect();
+    let browse: Vec<String> = s
+        .sim
+        .effects
+        .dbs
+        .browse
+        .iter()
+        .map(|b| {
+            let cols: Vec<String> = b
+                .columns
+                .iter()
+                .map(|c| format!("{{\"field\":{},\"width\":{},\"header\":{},\"readonly\":{}}}", json_string(&c.field), c.width, json_string(&c.header), c.readonly))
+                .collect();
+            let file = b.file.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+            format!("{{\"window\":{},\"file\":{},\"columns\":[{}]}}", json_string(&b.window), json_string(&file), cols.join(","))
+        })
+        .collect();
     format!(
-        "{{\"tick\":{},\"running\":{},\"stopped\":{},\"canBack\":{},\"canHyperBack\":{},\"halt\":{},\"dialog\":{},\"unsupported\":[{}],\"windows\":[{}],\"sounds\":[{}],\"audio\":[{}],\"hyper\":[{}],\"log\":[{}]}}",
+        "{{\"tick\":{},\"running\":{},\"stopped\":{},\"canBack\":{},\"canHyperBack\":{},\"halt\":{},\"dialog\":{},\"unsupported\":[{}],\"browse\":[{}],\"windows\":[{}],\"sounds\":[{}],\"audio\":[{}],\"hyper\":[{}],\"log\":[{}]}}",
         s.sim.tick_number(),
         s.running,
         s.sim.stopped,
@@ -1058,6 +1074,7 @@ fn frame_json(shared: &Arc<Mutex<Shared>>) -> String {
         halt,
         dialog,
         unsupported.join(","),
+        browse.join(","),
         windows.join(","),
         sounds.join(","),
         audio.join(","),

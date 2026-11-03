@@ -14,6 +14,11 @@ pub const MAX_CELLS: usize = 16 << 20;
 /// Наибольшее число полей (предел формата dBASE).
 pub const MAX_FIELDS: usize = 255;
 
+/// Наибольший размер одного MEMO (байт) и всего файла `.dbt`.
+pub const MAX_MEMO: usize = 16 << 20;
+pub const MAX_DBT: usize = 128 << 20;
+const BLOCK: usize = 512;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Codepage {
     Cp866,
@@ -88,6 +93,9 @@ pub struct Row {
     pub deleted: bool,
     /// Значения полей текстом, без хвостовых пробелов.
     pub cells: Vec<String>,
+    /// Сырое содержимое MEMO-полей (номер поля -> байты); для текстовых
+    /// MEMO совпадает с `cells[i]` в кодовой странице таблицы.
+    pub blobs: std::collections::BTreeMap<usize, Vec<u8>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -134,10 +142,39 @@ impl Table {
     }
 
     pub fn blank_row(&self) -> Row {
-        Row { deleted: false, cells: self.fields.iter().map(|_| String::new()).collect() }
+        Row { deleted: false, cells: self.fields.iter().map(|_| String::new()).collect(), blobs: Default::default() }
+    }
+
+    pub fn has_memo(&self) -> bool {
+        self.fields.iter().any(|f| f.kind == b'M')
     }
 
     pub fn parse(d: &[u8]) -> Result<Table, DbfError> {
+        Self::parse_with_memo(d, None)
+    }
+
+    /// Разбор вместе с файлом `.dbt` (dBASE III/IV). Без него MEMO пустые.
+    pub fn parse_with_memo(d: &[u8], dbt: Option<&[u8]>) -> Result<Table, DbfError> {
+        let mut t = Self::parse_raw(d)?;
+        t.load_memos(dbt);
+        Ok(t)
+    }
+
+    fn load_memos(&mut self, dbt: Option<&[u8]>) {
+        let cp = self.codepage;
+        let mem: Vec<usize> = self.fields.iter().enumerate().filter(|(_, f)| f.kind == b'M').map(|(i, _)| i).collect();
+        for r in &mut self.rows {
+            for &i in &mem {
+                let block = r.cells[i].trim().parse::<usize>().unwrap_or(0);
+                r.cells[i].clear();
+                let Some(bytes) = dbt.and_then(|d| read_block(d, block)) else { continue };
+                r.cells[i] = cp.decode(&bytes);
+                r.blobs.insert(i, bytes);
+            }
+        }
+    }
+
+    fn parse_raw(d: &[u8]) -> Result<Table, DbfError> {
         if d.len() < 33 {
             return err("файл короче заголовка dBASE");
         }
@@ -199,16 +236,23 @@ impl Table {
                 let t = codepage.decode(raw);
                 cells.push(t.trim_matches(|c| c == ' ' || c == '\0').to_string());
             }
-            rows.push(Row { deleted: rec[0] == b'*', cells });
+            rows.push(Row { deleted: rec[0] == b'*', cells, blobs: Default::default() });
         }
         Ok(Table { version, codepage, fields, rows })
     }
 
     pub fn to_bytes(&self) -> Vec<u8> {
+        self.to_files().0
+    }
+
+    /// Содержимое `.dbf` и, если есть MEMO-поля, `.dbt`.
+    pub fn to_files(&self) -> (Vec<u8>, Option<Vec<u8>>) {
+        let mut dbt: Option<Vec<u8>> = self.has_memo().then(|| vec![0u8; BLOCK]);
+        let mut next = 1usize;
         let rec_len: usize = 1 + self.fields.iter().map(|f| width(f.kind, f.len)).sum::<usize>();
         let header_len = 32 + 32 * self.fields.len() + 1;
         let mut out = vec![0u8; 32];
-        out[0] = 3;
+        out[0] = if dbt.is_some() { 0x83 } else { 3 };
         out[1] = 126; // 2026
         out[2] = 1;
         out[3] = 1;
@@ -231,7 +275,27 @@ impl Table {
             out.push(if r.deleted { b'*' } else { b' ' });
             for (i, f) in self.fields.iter().enumerate() {
                 let w = width(f.kind, f.len);
-                let mut b = self.codepage.encode(r.cells.get(i).map_or("", |s| s.as_str()));
+                let mut b = if f.kind == b'M' {
+                    let data = match r.blobs.get(&i) {
+                        Some(b) => b.clone(),
+                        None => self.codepage.encode(r.cells.get(i).map_or("", |s| s.as_str())),
+                    };
+                    let data = &data[..data.len().min(MAX_MEMO)];
+                    match (&mut dbt, data.is_empty()) {
+                        (Some(file), false) => {
+                            let at = next;
+                            file.extend_from_slice(data);
+                            file.extend_from_slice(&[0x1a, 0x1a]);
+                            let blocks = (data.len() + 2).div_ceil(BLOCK);
+                            file.resize((at + blocks) * BLOCK, 0);
+                            next = at + blocks;
+                            format!("{at:>10}").into_bytes()
+                        }
+                        _ => Vec::new(),
+                    }
+                } else {
+                    self.codepage.encode(r.cells.get(i).map_or("", |s| s.as_str()))
+                };
                 b.truncate(w);
                 let pad = w - b.len();
                 if matches!(f.kind, b'N' | b'F') {
@@ -244,8 +308,42 @@ impl Table {
             }
         }
         out.push(0x1a);
-        out
+        if let Some(file) = &mut dbt {
+            file[..4].copy_from_slice(&(next as u32).to_le_bytes());
+        }
+        (out, dbt)
     }
+}
+
+/// Сравнение значений ячеек одного поля: числа - как числа (пустое меньше
+/// всех), остальное - как текст, с учётом регистра или без.
+pub fn compare_cells(kind: u8, a: &str, b: &str, icase: bool) -> std::cmp::Ordering {
+    if matches!(kind, b'N' | b'F') {
+        let (x, y) = (a.trim().parse::<f64>().ok(), b.trim().parse::<f64>().ok());
+        return match (x, y) {
+            (Some(x), Some(y)) => x.partial_cmp(&y).unwrap_or(std::cmp::Ordering::Equal),
+            (x, y) => x.is_some().cmp(&y.is_some()),
+        };
+    }
+    if icase { a.to_lowercase().cmp(&b.to_lowercase()) } else { a.cmp(b) }
+}
+
+/// Блок `n` файла `.dbt`: dBASE IV (заголовок FF FF 08 00 + длина) или III
+/// (текст до 0x1A). Любая неувязка - `None`, а не паника.
+fn read_block(d: &[u8], n: usize) -> Option<Vec<u8>> {
+    if n == 0 || d.len() > MAX_DBT {
+        return None;
+    }
+    let start = n.checked_mul(BLOCK)?;
+    let tail = d.get(start..)?;
+    if tail.len() >= 8 && tail[..4] == [0xff, 0xff, 0x08, 0x00] {
+        let len = u32::from_le_bytes([tail[4], tail[5], tail[6], tail[7]]) as usize;
+        let body = tail.get(8..)?;
+        let len = len.saturating_sub(8).min(body.len()).min(MAX_MEMO);
+        return Some(body[..len].to_vec());
+    }
+    let end = tail.iter().take(MAX_MEMO).position(|&b| b == 0x1a).unwrap_or(tail.len().min(MAX_MEMO));
+    Some(tail[..end].to_vec())
 }
 
 #[cfg(test)]
@@ -255,8 +353,8 @@ mod tests {
     fn sample(cp: Codepage) -> Table {
         let f = |n: &str, k: u8, l: u8, d: u8| Field { name: n.into(), kind: k, len: l, dec: d };
         let mut t = Table::new(vec![f("NAME", b'C', 12, 0), f("AGE", b'N', 5, 0), f("SUM", b'F', 8, 2), f("BORN", b'D', 8, 0), f("OK", b'L', 1, 0)], cp);
-        t.rows.push(Row { deleted: false, cells: vec!["Иванов".into(), "26".into(), "12.50".into(), "20000101".into(), "T".into()] });
-        t.rows.push(Row { deleted: true, cells: vec!["Пётр".into(), "7".into(), "".into(), "".into(), "F".into()] });
+        t.rows.push(Row { deleted: false, cells: vec!["Иванов".into(), "26".into(), "12.50".into(), "20000101".into(), "T".into()], ..Default::default() });
+        t.rows.push(Row { deleted: true, cells: vec!["Пётр".into(), "7".into(), "".into(), "".into(), "F".into()], ..Default::default() });
         t
     }
 
@@ -310,5 +408,29 @@ mod tests {
         // нулевая длина текстового поля
         b[32 + 16] = 0;
         assert!(Table::parse(&b[..hl as usize + 256]).is_err());
+    }
+
+    #[test]
+    fn memo_round_trip_and_hostile_dbt() {
+        let f = |n: &str, k: u8, l: u8| Field { name: n.into(), kind: k, len: l, dec: 0 };
+        let mut t = Table::new(vec![f("ID", b'N', 3), f("NOTE", b'M', 10)], Codepage::Cp1251);
+        t.rows.push(Row { deleted: false, cells: vec!["1".into(), "Привет".into()], ..Default::default() });
+        t.rows.push(Row { deleted: false, cells: vec!["2".into(), "".into()], ..Default::default() });
+        let mut big = Row { deleted: false, cells: vec!["3".into(), "".into()], ..Default::default() };
+        big.blobs.insert(1, vec![0u8, 1, 2, 255, 7].repeat(300));
+        t.rows.push(big);
+        let (a, b) = t.to_files();
+        let b = b.unwrap();
+        let back = Table::parse_with_memo(&a, Some(&b)).unwrap();
+        assert_eq!(back.rows[0].cells[1], "Привет");
+        assert_eq!(back.rows[1].cells[1], "");
+        assert_eq!(back.rows[2].blobs[&1].len(), 1500);
+        // без .dbt память пуста, с мусорным - не паникует
+        assert_eq!(Table::parse(&a).unwrap().rows[0].cells[1], "");
+        for n in 0..b.len().min(2000) {
+            let _ = Table::parse_with_memo(&a, Some(&b[..n]));
+        }
+        let junk = vec![0xffu8; 4096];
+        let _ = Table::parse_with_memo(&a, Some(&junk));
     }
 }

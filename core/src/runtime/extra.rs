@@ -43,7 +43,7 @@ pub struct Streams {
 }
 
 impl Streams {
-    fn open(&mut self, st: Stream) -> u32 {
+    pub fn open(&mut self, st: Stream) -> u32 {
         self.next += 1;
         self.items.insert(self.next, st);
         self.next
