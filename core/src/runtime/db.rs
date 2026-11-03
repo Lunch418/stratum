@@ -134,7 +134,8 @@ pub fn load(fx: &mut Effects, name: &str, write: bool) -> Result<(Table, PathBuf
     };
     let data = read(&path).ok_or(1u32)?;
     // соседний .dbt тоже проходит песочницу: ссылка наружу не читается
-    let dbt = path.with_extension("dbt");
+    // (от исходного имени, а не от готового абсолютного пути: на Windows он не проходит повторно)
+    let dbt = std::path::Path::new(name.trim()).with_extension("dbt");
     let dbt = sandbox_path(fx, &dbt.to_string_lossy(), false).and_then(|p| read(&p));
     let table = Table::parse_with_memo(&data, dbt.as_deref()).map_err(|_| 2u32)?;
     Ok((table, path))
