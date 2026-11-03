@@ -207,6 +207,12 @@ make check                      # прогнать парсеры по всем�
 Ссылки вида `../help/topics/...` в `docs/lang/functions.md` начинают работать
 после `make help`: сама справка в репозитории не лежит.
 
+Установленное приложение ищет справку (папки `topics/` и `images/`) по порядку:
+переменная `STRATUM_HELP`, папка пользователя (`~/.local/share/stratum-modern/help`,
+`%APPDATA%\stratum-modern\help`, `~/Library/Application Support/stratum-modern/help`),
+рядом с программой (`help/`, `../share/stratum-modern/help`), затем `docs/help`
+от текущей папки. `make help-install` копирует собранную справку в папку пользователя.
+
 `make corpus` по умолчанию берёт `~/.wine32/drive_c/Program Files/Stratum`;
 другой путь — `make corpus STRATUM=...`.
 
@@ -253,7 +259,7 @@ make -C helpdeco/gcc
 | Звук | `Audio*` через Web Audio: WAV, MP3, OGG - что декодирует WebView. MIDI и MOD не играют |
 | 3D | пространства, камеры, тела `3DTOOLS`. Нет: текстуры, `CreateObjectFromFile3d` (v3d), `SweepAndExtrude3d`, Ogre3D |
 | Интерфейс оригинала | нет контактных площадок, параметров печати, OLE; окна MDI заменены панелями |
-| Справка F1 | нужна локальная сборка `make help` (из вашего `SC3.HLP`), в установщик не входит |
+| Справка F1 | нужна локальная сборка `make help && make help-install` (из вашего `SC3.HLP`), в установщик не входит |
 
 Вызовы функций, которых в среде нет, считаются и показываются плашкой
 «функции, которых здесь нет».

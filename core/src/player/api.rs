@@ -1134,7 +1134,7 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
         }
         ("GET", ["help", topic]) => {
             let topic = super::url_decode(topic);
-            let Some(dir) = help_dir() else { return error("404 Not Found", "справка не собрана: make help") };
+            let Some(dir) = help_dir() else { return error("404 Not Found", "справка не собрана: make help && make help-install (или STRATUM_HELP=папка с topics/ и images/)") };
             let found = std::fs::read_dir(&dir).ok().and_then(|rd| {
                 rd.filter_map(|e| e.ok().map(|e| e.path()))
                     .find(|p| p.file_stem().is_some_and(|s| s.to_string_lossy().eq_ignore_ascii_case(&topic)))
@@ -1655,17 +1655,55 @@ pub fn handle(method: &str, path: &str, query: &str, body: &str, shared: &Arc<Mu
 }
 
 /// Папка с темами справки: рядом с репозиторием или с исполняемым файлом.
+/// Папка пользовательских данных справки: `<данные>/stratum-modern/help`.
+fn user_help_root() -> Option<std::path::PathBuf> {
+    use std::path::PathBuf;
+    let env = |k: &str| std::env::var_os(k).filter(|v| !v.is_empty()).map(PathBuf::from);
+    if cfg!(windows) {
+        env("APPDATA").map(|p| p.join("stratum-modern").join("help"))
+    } else if cfg!(target_os = "macos") {
+        env("HOME").map(|p| p.join("Library/Application Support/stratum-modern/help"))
+    } else {
+        env("XDG_DATA_HOME")
+            .or_else(|| env("HOME").map(|h| h.join(".local/share")))
+            .map(|p| p.join("stratum-modern").join("help"))
+    }
+}
+
+/// Где искать темы справки (`topics/`), по порядку: STRATUM_HELP, папка
+/// пользователя, рядом с программой (`help/`, `../share/stratum-modern/help`),
+/// затем `docs/help` от текущей папки и выше.
+pub(crate) fn help_candidates(
+    env_help: Option<std::path::PathBuf>,
+    user: Option<std::path::PathBuf>,
+    exe: Option<std::path::PathBuf>,
+    cwd_chain: &[&str],
+) -> Vec<std::path::PathBuf> {
+    let mut roots: Vec<std::path::PathBuf> = Vec::new();
+    roots.extend(env_help);
+    roots.extend(user);
+    if let Some(dir) = exe.as_deref().and_then(|e| e.parent()) {
+        roots.push(dir.join("help"));
+        roots.push(dir.join("../share/stratum-modern/help"));
+    }
+    let mut out: Vec<std::path::PathBuf> = roots.into_iter().map(|r| r.join("topics")).collect();
+    out.extend(cwd_chain.iter().map(std::path::PathBuf::from));
+    out
+}
+
 fn help_dir() -> Option<std::path::PathBuf> {
-    let mut candidates: Vec<std::path::PathBuf> = ["docs/help/topics", "../docs/help/topics", "../../docs/help/topics", "../../../docs/help/topics"]
-        .iter()
-        .map(std::path::PathBuf::from)
-        .collect();
+    let mut list = help_candidates(
+        std::env::var_os("STRATUM_HELP").filter(|v| !v.is_empty()).map(Into::into),
+        user_help_root(),
+        std::env::current_exe().ok(),
+        &["docs/help/topics", "../docs/help/topics", "../../docs/help/topics", "../../../docs/help/topics"],
+    );
     if let Ok(exe) = std::env::current_exe() {
         for up in exe.ancestors().take(6) {
-            candidates.push(up.join("docs/help/topics"));
+            list.push(up.join("docs/help/topics"));
         }
     }
-    candidates.into_iter().find(|p| p.is_dir())
+    list.into_iter().find(|p| p.is_dir())
 }
 
 /// Меняет поле графического объекта (инспектор и редактор рисунка).
@@ -1877,6 +1915,16 @@ fn default_icon(name: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn help_lookup_order() {
+        use std::path::PathBuf as P;
+        let list = help_candidates(Some(P::from("/e")), Some(P::from("/u/help")), Some(P::from("/opt/app/stratum")), &["docs/help/topics"]);
+        let want: Vec<P> = ["/e/topics", "/u/help/topics", "/opt/app/help/topics", "/opt/app/../share/stratum-modern/help/topics", "docs/help/topics"].iter().map(P::from).collect();
+        assert_eq!(list, want);
+        let list = help_candidates(None, None, None, &["a", "b"]);
+        assert_eq!(list, vec![P::from("a"), P::from("b")]);
+    }
 
     #[test]
     fn search_matcher_respects_case_and_words() {

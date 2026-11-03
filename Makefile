@@ -1,7 +1,7 @@
 STRATUM ?= $(HOME)/.wine32/drive_c/Program Files/Stratum
 HELPDECO ?= helpdeco
 
-.PHONY: all corpus help lang texts icons check core clean
+.PHONY: all corpus help help-installlang texts icons check core clean
 
 all: lang texts check
 
@@ -12,6 +12,11 @@ corpus:
 ## decompile SC3.HLP into docs/help and rebuild the merged function reference
 help:
 	tools/decompile_help.sh "$(HELPDECO)"
+
+## copy the built help (docs/help) to the per-user data dir the installed app searches
+help-install:
+	@test -d docs/help/topics || { echo "run 'make help' first"; exit 1; }
+	@tools/help_install.sh
 
 ## compiler tables -> docs/lang/{builtins,operators,constants,tdl}.json
 lang:
