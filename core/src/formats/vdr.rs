@@ -324,6 +324,17 @@ pub enum ObjectKind {
         space: u16,
         camera: u16,
     },
+    /// Тип 25: видеофрейм - `num x,y,w,h, строка "VIDEO2D"`, затем
+    /// `u32 44, u32 2, u16 0, u16 ширина, u16 высота, u32 1, u32 позиция,
+    /// u32 14, 10 байт, строка файла с нулём` (сверено по VIDEO2D).
+    Video {
+        x: f64,
+        y: f64,
+        w: f64,
+        h: f64,
+        file: String,
+        pos: u32,
+    },
     /// Тип, который ещё не разобран.
     Unknown {
         kind: u16,
@@ -898,6 +909,25 @@ fn read_object(r: &mut Reader, ctx: &Ctx, kind: u16, attachment: &mut Option<Vec
             r.bytes(10)?;
             ObjectKind::Control { x, y, w, h, class, caption, style }
         }
+        25 => {
+            let _class = r.string()?;
+            r.bytes(8)?;
+            r.u16()?;
+            r.bytes(4)?;
+            r.u32()?;
+            let pos = r.u32()?;
+            r.bytes(14)?;
+            let mut raw = Vec::new();
+            while let Ok(b) = r.u8() {
+                if b == 0 {
+                    break;
+                }
+                raw.push(b);
+            }
+            let file = super::cp1251::decode(&raw);
+            let file = file.strip_prefix('?').unwrap_or(&file).to_string();
+            ObjectKind::Video { x, y, w, h, file, pos }
+        }
         24 => ObjectKind::View3d { x, y, w, h, space: r.u16()?, camera: r.u16()? },
         other => return r.err(format!("объект типа {other} не разобран")),
     })
@@ -1050,6 +1080,7 @@ pub fn write(pic: &Picture) -> Vec<u8> {
                 ObjectKind::Control { .. } => 26,
                 ObjectKind::Group { .. } => 3,
                 ObjectKind::View3d { .. } => 24,
+                ObjectKind::Video { .. } => 25,
                 ObjectKind::Unknown { kind } => *kind,
             };
             record(w, kind, false, |w| {
@@ -1118,6 +1149,23 @@ pub fn write(pic: &Picture) -> Vec<u8> {
                         }
                         w.u16(*space);
                         w.u16(*camera);
+                    }
+                    ObjectKind::Video { x, y, w: ww, h, file, pos } => {
+                        for v in [*x, *y, *ww, *h] {
+                            w.f64(v);
+                        }
+                        w.string("VIDEO2D");
+                        w.u32(44);
+                        w.u32(2);
+                        w.u16(0);
+                        w.u16(*ww as u16);
+                        w.u16(*h as u16);
+                        w.u32(1);
+                        w.u32(*pos);
+                        w.u32(14);
+                        w.bytes(&[0u8; 10]);
+                        w.bytes(&super::cp1251::encode(&format!("?{file}")));
+                        w.u8(0);
                     }
                     ObjectKind::Unknown { .. } => {}
                 }

@@ -34,6 +34,10 @@ def main():
     r = subprocess.run([str(CORE), 'instrument', str(project), str(WORK), '--ticks', str(ticks)], capture_output=True, text=True)
     if r.returncode:
         sys.exit(f'{project.name}: подготовка не удалась: {r.stderr.strip() or r.stdout.strip()}')
+    # проект в родном формате: после instrument ядро должно читать .spj с счётчиком, а не project.json
+    for extra in ('project.json', 'state.json'):
+        (WORK / extra).unlink(missing_ok=True)
+    shutil.rmtree(WORK / 'classes', ignore_errors=True)
     vo.reset_desktop(PREFIX)
     proc = subprocess.Popen(['wine', EXE, r'C:\verify\project.spj', '/run'], env=env, cwd='/tmp', stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     deadline = time.time() + max(60, ticks)

@@ -61,6 +61,9 @@ pub struct Instance {
     pub parent: Option<usize>,
     /// handle экземпляра на схеме родителя (0 у корня).
     pub handle: u16,
+    /// У экземпляра на схеме нет собственного имени (имя взято из класса): путь по имени
+    /// его не находит (сверено в Wine, tools/verify_msg_nested.py).
+    pub unnamed: bool,
     class: usize,
     /// Имя переменной в нижнем регистре → номер ячейки.
     vars: HashMap<String, usize>,
@@ -190,6 +193,14 @@ impl Simulation {
             .or_else(|| {
                 self.instances.iter().position(|i| crate::lang::same_name(&i.class_name, needle))
             })
+    }
+
+    /// Как `find`, но экземпляры без собственного имени по имени класса не находятся.
+    fn find_named(&self, needle: &str) -> Option<usize> {
+        self.instances
+            .iter()
+            .position(|i| !i.unnamed && crate::lang::same_name(&i.path, needle))
+            .or_else(|| self.instances.iter().position(|i| !i.unnamed && crate::lang::same_name(&i.name, needle)))
     }
 
     /// Собирает модель проекта: разбирает тексты, строит дерево экземпляров,
@@ -352,6 +363,7 @@ impl Simulation {
             path,
             parent,
             handle,
+            unnamed: false,
             class,
             vars: HashMap::new(),
             order: Vec::new(),
@@ -417,6 +429,7 @@ impl Simulation {
                 &parent_path,
                 child.handle,
             )?;
+            self.instances[index].unnamed = child.name.is_empty();
             by_handle.insert(child.handle, index);
             self.expand(project, child_class, index, merges)?;
         }
@@ -1031,12 +1044,12 @@ impl Simulation {
         };
         // относительный путь ищется в схеме текущего имиджа
         if !path.starts_with("..") {
-            return self.walk_path(current, &path).or_else(|| self.find(&path));
+            return self.walk_path(current, &path).or_else(|| self.find_named(&path));
         }
         for part in path.split('\\').filter(|p| !p.is_empty()) {
             current = match part {
                 ".." => self.instances[current].parent?,
-                _ => self.child_named(current, part).or_else(|| self.find(part))?,
+                _ => self.child_named(current, part).or_else(|| self.find_named(part))?,
             };
         }
         Some(current)
@@ -1059,7 +1072,8 @@ impl Simulation {
         }
         (0..self.instances.len()).find(|&i| {
             self.instances[i].parent == Some(parent)
-                && (glob_match(part, &self.instances[i].name) || glob_match(part, &self.instances[i].class_name))
+                && !self.instances[i].unnamed
+                && glob_match(part, &self.instances[i].name)
         })
     }
 
@@ -1612,6 +1626,7 @@ impl Simulation {
             path: format!("<{}>", cls.name),
             parent: None,
             handle: 0,
+            unnamed: false,
             class,
             vars: HashMap::new(),
             order: Vec::new(),

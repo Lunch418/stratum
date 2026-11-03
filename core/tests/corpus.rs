@@ -208,6 +208,8 @@ fn same_picture(a: &stratum_core::formats::vdr::Picture, b: &stratum_core::forma
             (ObjectKind::Group { children: g1 }, ObjectKind::Group { children: g2 }) => g1 == g2,
             (ObjectKind::View3d { x: a1, y: a2, w: a3, h: a4, space: s1, camera: c1 }, ObjectKind::View3d { x: b1, y: b2, w: b3, h: b4, space: s2, camera: c2 }) =>
                 (a1, a2, a3, a4, s1, c1) == (b1, b2, b3, b4, s2, c2),
+            (ObjectKind::Video { x: a1, y: a2, w: a3, h: a4, file: f1, pos: p1 }, ObjectKind::Video { x: b1, y: b2, w: b3, h: b4, file: f2, pos: p2 }) =>
+                (a1, a2, a3, a4, f1, p1) == (b1, b2, b3, b4, f2, p2),
             (ObjectKind::Unknown { .. }, ObjectKind::Unknown { .. }) => true,
             _ => false,
         };

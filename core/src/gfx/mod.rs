@@ -204,6 +204,8 @@ pub struct Space {
     /// (`LoadSpaceWindow`) — для `GetWindowProp`.
     pub source_class: String,
     pub source_file: String,
+    /// Видеофреймы из файла рисунка: (объект, растр, файл, позиция); `resolve_dibs` открывает поток.
+    pub pending_videos: Vec<(Handle, Handle, String, u32)>,
     /// Маска видимых слоёв 0–31 (`SetSpaceLayers2d`, «Параметры листа → Слои»).
     pub layers: u32,
     /// Размер окна из «Параметров листа»: "max" — на всю вкладку.
@@ -420,6 +422,11 @@ impl Space {
                 // `Gfx::bind_views` заменяет его настоящим
                 ObjectKind::View3d { x, y, w, h: hh, space, camera } => {
                     Object::new(h, *x, *y, *w, *hh, Shape::View3d { space: *space as Handle, camera: *camera as Handle })
+                }
+                ObjectKind::Video { x, y, w, h: hh, file, pos } => {
+                    let dib = self.add_dib(Dib::new(Vec::new(), Vec::new(), None));
+                    self.pending_videos.push((h, dib, file.clone(), *pos));
+                    Object::new(h, *x, *y, *w, *hh, Shape::Bitmap { dib, src: (0.0, 0.0, *w, *hh), masked: false })
                 }
                 ObjectKind::Unknown { .. } => Object::new(h, 0.0, 0.0, 0.0, 0.0, Shape::Unknown),
             };
@@ -1152,6 +1159,17 @@ impl Gfx {
 
     /// Подгружает растры, заданные ссылкой на файл (`default.dbm` и т. п.).
     pub fn resolve_dibs(&mut self, space: Handle) {
+        let videos = self.spaces.get_mut(&space).map(|sp| std::mem::take(&mut sp.pending_videos)).unwrap_or_default();
+        for (obj, dib, file, pos) in videos {
+            let vid = self.open_video(&file);
+            if vid == 0 {
+                continue;
+            }
+            if let Some(v) = self.videos.get_mut(&vid) {
+                v.frames.push((space, obj, dib));
+            }
+            self.video_seek(vid, pos as f64);
+        }
         let Some(sp) = self.spaces.get(&space) else { return };
         let pending: Vec<(Handle, String)> = sp
             .dibs
