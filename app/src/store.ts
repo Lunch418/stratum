@@ -44,6 +44,9 @@ interface State {
   setPaletteOpen: (v: boolean) => void;
   dialog: DialogId | null;
   setDialog: (d: DialogId | null) => void;
+  /// таблица, которую просит открыть DbBrowse (окно DBF откроется на ней)
+  dbfFile: string | null;
+  openDbf: (file: string) => void;
   /// связь, выбранная для диалога свойств (класс схемы + handle)
   dialogLink: { class: string; handle: number } | null;
   setDialogLink: (l: { class: string; handle: number } | null) => void;
@@ -115,7 +118,9 @@ export const useStore = create<State>((set, get) => ({
   paletteOpen: false,
   setPaletteOpen: paletteOpen => set({ paletteOpen }),
   dialog: null,
-  setDialog: dialog => set({ dialog }),
+  setDialog: dialog => set(dialog === 'dbf' ? { dialog } : { dialog, dbfFile: null }),
+  dbfFile: null,
+  openDbf: file => set({ dialog: 'dbf', dbfFile: file }),
   dialogLink: null,
   setDialogLink: dialogLink => set({ dialogLink }),
   layers: { grid: true, images: true, links: true, graphics: true },

@@ -2,19 +2,21 @@
 // столбцов, поиск. Только чтение.
 import { useEffect, useState } from 'react';
 import { api, type DbfPage } from '../api';
+import { useStore } from '../store';
 
 const PAGE = 100;
 
 export function DbfViewer({ onClose }: { onClose: () => void }) {
   const [files, setFiles] = useState<string[]>([]);
-  const [file, setFile] = useState('');
+  const initial = useStore(st => st.dbfFile);
+  const [file, setFile] = useState(initial ?? '');
   const [query, setQuery] = useState('');
   const [offset, setOffset] = useState(0);
   const [page, setPage] = useState<DbfPage | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    api.dbfFiles().then(f => { setFiles(f); if (f[0]) setFile(f[0]); }).catch(() => setError('ядро недоступно'));
+    api.dbfFiles().then(f => { setFiles(f); setFile(cur => (cur && f.includes(cur) ? cur : f[0] ?? '')); }).catch(() => setError('ядро недоступно'));
   }, []);
   useEffect(() => {
     if (!file) return;

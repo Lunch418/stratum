@@ -34,6 +34,8 @@ export interface Frame {
   windows: { id: number; name: string; w: number; h: number; size?: string; style?: string; svg: string; controls: Control[] }[];
   sounds: { cmd: 'play' | 'stop'; file: string; loop: boolean }[];
   audio?: AudioCmd[];
+  /// запросы DbBrowse: окно, файл таблицы, столбцы
+  browse?: { window: string; file: string; columns: { field: string; width: number; header: string; readonly: boolean }[] }[];
   /// гиперпереходы кадра: смена страницы с эффектом (0), запуск приложения (1), загрузка проекта (2)
   hyper?: { mode: number; target: string; window: string; effect: string }[];
   log: string[];

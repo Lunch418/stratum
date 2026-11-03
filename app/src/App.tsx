@@ -17,6 +17,7 @@ import { Debug } from './components/Debug';
 import { Help } from './components/Help';
 import { Search } from './components/Search';
 import { handleAudio, unlockAudio } from './audio';
+import { handleBrowse } from './dbBrowse';
 import { DbfViewer } from './components/DbfViewer';
 import { NewProjectDialog, InfoDialog } from './components/ProjectDialogs';
 import { OpenDialog } from './components/OpenDialog';
@@ -98,7 +99,7 @@ export default function App() {
   useEffect(() => {
     let alive = true;
     const poll = async () => {
-      try { const f = await api.frame(); if (alive) { s.setFrame(f); handleSounds(f.sounds); handleAudio(f.audio); handleHyper(f.hyper); } } catch { /* ядро недоступно */ }
+      try { const f = await api.frame(); if (alive) { s.setFrame(f); handleSounds(f.sounds); handleAudio(f.audio); handleHyper(f.hyper); handleBrowse(f.browse); } } catch { /* ядро недоступно */ }
       if (alive) setTimeout(poll, s.tab === 'model' ? env.pollMs : 250);
     };
     poll();
