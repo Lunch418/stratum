@@ -173,24 +173,43 @@ impl Ogre {
         }
     }
 
-    /// Кадр для списка окон IDE: (ширина, высота, SVG с вложенным BMP).
-    pub fn frame_svg(&mut self) -> Option<(f64, f64, String)> {
+    /// Кадры для списка окон IDE: (имя, ширина, высота, SVG с вложенным BMP).
+    /// Первое окно называется `Ogre3D`, остальные - `Ogre3D 2` и так далее;
+    /// лишние окна без областей рендеринга не показываются.
+    pub fn frames_svg(&mut self) -> Vec<(String, f64, f64, String)> {
+        let mut out = Vec::new();
         if !self.initialised {
-            return None;
+            return out;
         }
-        if self.cached.0.is_none() || self.rendered_at != Some(self.frames) {
-            let fr = self.render(None)?;
-            let svg = format!(
-                "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"{w}\" height=\"{h}\" viewBox=\"0 0 {w} {h}\">\
-                 <image x=\"0\" y=\"0\" width=\"{w}\" height=\"{h}\" preserveAspectRatio=\"none\" xlink:href=\"data:image/bmp;base64,{}\"/></svg>",
-                crate::gfx::svg::base64(&fr.to_bmp()),
-                w = fr.width,
-                h = fr.height
-            );
-            self.cached = FrameCache(Some((fr.width as f64, fr.height as f64, svg)));
-            self.rendered_at = Some(self.frames);
+        let wins: Vec<u32> = self.objs.iter().filter(|(_, o)| o.kind == Kind::Window).map(|(k, _)| *k).collect();
+        self.cached.0.retain(|k, _| wins.contains(k));
+        for (n, win) in wins.into_iter().enumerate() {
+            if n > 0 && self.viewports_of(win).is_empty() {
+                continue;
+            }
+            let fresh = self.cached.0.get(&win).is_some_and(|c| c.0 == self.frames);
+            if !fresh {
+                let Some(fr) = self.render(Some(win)) else { continue };
+                let svg = format!(
+                    "<svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"{w}\" height=\"{h}\" viewBox=\"0 0 {w} {h}\">\
+                     <image x=\"0\" y=\"0\" width=\"{w}\" height=\"{h}\" preserveAspectRatio=\"none\" xlink:href=\"data:image/bmp;base64,{}\"/></svg>",
+                    crate::gfx::svg::base64(&fr.to_bmp()),
+                    w = fr.width,
+                    h = fr.height
+                );
+                self.cached.0.insert(win, (self.frames, fr.width as f64, fr.height as f64, svg));
+            }
+            if let Some(c) = self.cached.0.get(&win) {
+                let name = if n == 0 { WINDOW_NAME.to_string() } else { format!("{WINDOW_NAME} {}", n + 1) };
+                out.push((name, c.1, c.2, c.3.clone()));
+            }
         }
-        self.cached.0.clone()
+        out
+    }
+
+    /// Кадр первого окна (для проверок).
+    pub fn frame_svg(&mut self) -> Option<(f64, f64, String)> {
+        self.frames_svg().into_iter().next().map(|f| (f.1, f.2, f.3))
     }
 
     /// Сообщение мыши окна Ogre3D (WM_*), координаты в пикселях кадра.
@@ -490,6 +509,7 @@ impl Ogre {
             }
         }
         let scene = self.objs[&cam].scene;
+        self.draw_sky(scene, cr, cam, rgb, w, (x0, y0, vw, vh));
         let near = self.pf(cam, "camera.nearclipdistance")[0].max(1e-4);
         let th = (self.pf(cam, "camera.fov")[0] / 2.0).tan();
         let fog = self.objs.get(&scene).and_then(|s| s.f.get("scene.fog")).filter(|f| f.len() >= 7 && f[0] != 0.0).map(|f| [f[0], f[1], f[2], f[3], f[4], f[5], f[6]]);
@@ -575,33 +595,221 @@ impl Ogre {
                 continue;
             }
             let (np, nr, ns) = self.derived(o.parent);
-            let bp = self.pf(*id, "billboard.position");
-            let bp = if bp.len() == 3 { bp } else { vec![0.0; 3] };
-            let wp = qrot(nr, [bp[0] * ns[0], bp[1] * ns[1], bp[2] * ns[2]]);
-            let c = to_cam_pt(inv, cp, [np[0] + wp[0], np[1] + wp[1], np[2] + wp[2]]);
             let dim = self.pf(*id, "billboardset.defaultdimensions");
             let (hw, hh2) = (dim[0] / 2.0, dim[1] / 2.0);
-            let rot = self.pf(*id, "billboard.rotation").first().copied().unwrap_or(0.0);
-            let (sn, cs) = rot.sin_cos();
-            let col = self.pf(*id, "billboard.colour");
-            let col = if col.len() == 4 { col } else { vec![1.0; 4] };
             let mut m = self.material_look(o.st.get("billboardset.materialname").map(|s| s.as_str()).unwrap_or(""));
             m.lit = false;
-            m.diff = [col[0], col[1], col[2], col[3]];
             m.cull = 1;
             m.depth_write = false;
-            let corner = |dx: f64, dy: f64, u: f64, v: f64| {
-                let (rx, ry) = (dx * cs - dy * sn, dx * sn + dy * cs);
-                Pv { p: [c[0] + rx, c[1] + ry, c[2]], col: [m.diff[0], m.diff[1], m.diff[2]], uv: [u, v] }
+            let ids: Vec<u32> = if o.children.is_empty() { vec![*id] } else { o.children.clone() };
+            for b in ids {
+                let bp = self.pf(b, "billboard.position");
+                let bp = if bp.len() == 3 { bp } else { vec![0.0; 3] };
+                let wp = qrot(nr, [bp[0] * ns[0], bp[1] * ns[1], bp[2] * ns[2]]);
+                let c = to_cam_pt(inv, cp, [np[0] + wp[0], np[1] + wp[1], np[2] + wp[2]]);
+                let rot = self.pf(b, "billboard.rotation").first().copied().unwrap_or(0.0);
+                let col = self.pf(b, "billboard.colour");
+                let col = if col.len() == 4 { col } else { vec![1.0; 4] };
+                m.diff = [col[0], col[1], col[2], col[3]];
+            draw_cam_quad(&mut surf, &camc, &m, c, hw, hh2, rot);
+            }
+        }
+        // частицы: плоскости лицом к камере
+        for (id, o) in &self.objs {
+            if o.scene != scene || o.kind != Kind::ParticleSystem {
+                continue;
+            }
+            let (Some(ps), Some(tpl)) = (self.pstate.get(id), o.st.get("particlesystem.template").and_then(|n| self.ptemplates.get(&n.to_ascii_lowercase()))) else { continue };
+            let mut m = self.material_look(&tpl.material);
+            m.lit = false;
+            m.cull = 1;
+            m.depth_write = false;
+            let mut order: Vec<&fx::Particle> = ps.parts.iter().collect();
+            order.sort_by(|a, b| {
+                let (da, db) = (len(sub(a.pos, cp)), len(sub(b.pos, cp)));
+                db.partial_cmp(&da).unwrap_or(std::cmp::Ordering::Equal)
+            });
+            for p in order {
+                m.diff = p.col;
+                draw_cam_quad(&mut surf, &camc, &m, to_cam_pt(inv, cp, p.pos), p.w / 2.0, p.h / 2.0, 0.0);
+            }
+        }
+        // подписи MovableText
+        for (id, o) in &self.objs {
+            if o.kind != Kind::MovableText || o.parent == 0 || self.pf(*id, "movable.visible")[0] == 0.0 || self.objs.get(&o.parent).map(|n| n.scene) != Some(scene) {
+                continue;
+            }
+            let cap = o.st.get("movabletext.caption").cloned().unwrap_or_default();
+            let (np, nr, ns) = self.derived(o.parent);
+            let lt = self.pf(*id, "movabletext.localtranslation");
+            let gt = self.pf(*id, "movabletext.globaltranslation");
+            let lt = if lt.len() == 3 { lt } else { vec![0.0; 3] };
+            let gt = if gt.len() == 3 { gt } else { vec![0.0; 3] };
+            let lw = qrot(nr, [lt[0] * ns[0], lt[1] * ns[1], lt[2] * ns[2]]);
+            let c = to_cam_pt(inv, cp, [np[0] + lw[0] + gt[0], np[1] + lw[1] + gt[1], np[2] + lw[2] + gt[2]]);
+            if c[2] > -camc.near {
+                continue;
+            }
+            let sp = project(&camc, &surf, c);
+            let chh = self.pf(*id, "movabletext.characterheight")[0];
+            let px = (chh / (2.0 * sp[2] * camc.th) * vh as f64).clamp(1.0, 256.0);
+            let al = self.pf(*id, "movabletext.textalignment");
+            let (ha, va) = (al.first().copied().unwrap_or(0.0), al.get(1).copied().unwrap_or(0.0));
+            let tw = fx::text_width(&cap, px);
+            let x = if ha == 1.0 { sp[0] - tw / 2.0 } else { sp[0] };
+            let y = match va as i64 {
+                1 => sp[1] - px,
+                2 => sp[1] - px / 2.0,
+                _ => sp[1],
             };
-            let q = [corner(-hw, hh2, 0.0, 0.0), corner(hw, hh2, 1.0, 0.0), corner(hw, -hh2, 1.0, 1.0), corner(-hw, -hh2, 0.0, 1.0)];
-            for tri in [[q[0], q[3], q[2]], [q[0], q[2], q[1]]] {
-                for poly in clip_near(&tri, camc.near) {
-                    for k in 1..poly.len().saturating_sub(1) {
-                        draw_tri(&mut surf, &camc, [poly[0], poly[k], poly[k + 1]], &m);
+            let col = self.pf(*id, "movabletext.color");
+            let col = if col.len() == 4 { col } else { vec![1.0; 4] };
+            put_text(&mut surf, &cap, x, y, px, [col[0], col[1], col[2]], col[3]);
+        }
+        // наложения (Overlay)
+        if self.pf(vp, "viewport.overlaysenabled")[0] != 0.0 {
+            self.draw_overlays(&mut surf);
+        }
+    }
+
+    fn draw_sky(&self, scene: u32, cr: Q, cam: u32, rgb: &mut [u8], w: usize, vp: (usize, usize, usize, usize)) {
+        let Some(sc) = self.objs.get(&scene) else { return };
+        if !sc.f.get("scene.skybox").is_some_and(|v| v[0] != 0.0) {
+            return;
+        }
+        let Some(&mid) = sc.st.get("scene.skybox").and_then(|n| self.materials.get(&n.to_ascii_lowercase())) else { return };
+        let Some(pass) = self.objs[&mid].children.first().and_then(|t| self.objs[t].children.first()).copied() else { return };
+        let Some(cubic) = self.objs[&pass].children.first().and_then(|tu| self.objs[tu].st.get("textureunitstate.cubic")) else { return };
+        let faces: Vec<Option<Arc<Tex>>> = cubic.split('|').map(|n| self.textures.get(&n.to_ascii_lowercase()).cloned().flatten()).collect();
+        if faces.len() != 6 || faces.iter().all(|f| f.is_none()) {
+            return;
+        }
+        let th = (self.pf(cam, "camera.fov")[0] / 2.0).tan();
+        let (x0, y0, vw, vh) = vp;
+        let aspect = vw as f64 / vh as f64;
+        for y in 0..vh {
+            for x in 0..vw {
+                let nx = (x as f64 + 0.5) / vw as f64 * 2.0 - 1.0;
+                let ny = 1.0 - (y as f64 + 0.5) / vh as f64 * 2.0;
+                let d = qrot(cr, [nx * th * aspect, ny * th, -1.0]);
+                let (ax, ay, az) = (d[0].abs(), d[1].abs(), d[2].abs());
+                // грани: fr -Z, bk +Z, lf -X, rt +X, up +Y, dn -Y
+                let (face, u, v) = if az >= ax && az >= ay {
+                    if d[2] < 0.0 { (0, d[0] / az, -d[1] / az) } else { (1, -d[0] / az, -d[1] / az) }
+                } else if ax >= ay {
+                    if d[0] < 0.0 { (2, -d[2] / ax, -d[1] / ax) } else { (3, d[2] / ax, -d[1] / ax) }
+                } else if d[1] > 0.0 {
+                    (4, d[0] / ay, -d[2] / ay)
+                } else {
+                    (5, d[0] / ay, d[2] / ay)
+                };
+                if let Some(tx) = &faces[face] {
+                    let c = texel(tx, (u + 1.0) / 2.0, (v + 1.0) / 2.0);
+                    let o = ((y0 + y) * w + x0 + x) * 3;
+                    for k in 0..3 {
+                        rgb[o + k] = (c[k] * 255.0) as u8;
                     }
                 }
             }
+        }
+    }
+
+    /// Прямоугольник элемента наложения (пиксели области) внутри прямоугольника родителя.
+    pub(super) fn element_rect(&self, e: u32, parent: (f64, f64, f64, f64)) -> (f64, f64, f64, f64) {
+        let mode = self.pf(e, "overlayelement.metricsmode").first().copied().unwrap_or(0.0);
+        let pos = self.pf(e, "overlayelement.position");
+        let size = self.pf(e, "overlayelement.size");
+        let (l, t) = (pos.first().copied().unwrap_or(0.0), pos.get(1).copied().unwrap_or(0.0));
+        let (ew, eh) = (size.first().copied().unwrap_or(0.0), size.get(1).copied().unwrap_or(0.0));
+        let (pw, ph) = (parent.2, parent.3);
+        let (mut x, mut y, w, h) = if mode == 1.0 { (l, t, ew, eh) } else { (l * pw, t * ph, ew * pw, eh * ph) };
+        let al = self.pf(e, "overlayelement.alignment");
+        let (ha, va) = (al.first().copied().unwrap_or(0.0), al.get(1).copied().unwrap_or(0.0));
+        x += match ha as i64 {
+            1 => parent.0 + pw / 2.0,
+            2 => parent.0 + pw - w,
+            _ => parent.0,
+        };
+        y += match va as i64 {
+            1 => parent.1 + ph / 2.0,
+            2 => parent.1 + ph - h,
+            _ => parent.1,
+        };
+        (x, y, w, h)
+    }
+
+    pub(super) fn find_element(&self, e: u32, parent: (f64, f64, f64, f64), px: f64, py: f64, depth: usize) -> Option<u32> {
+        if depth > 16 || self.pf(e, "overlayelement.visible")[0] == 0.0 {
+            return None;
+        }
+        let r = self.element_rect(e, parent);
+        for &c in self.objs[&e].children.iter().rev() {
+            if let Some(x) = self.find_element(c, r, px, py, depth + 1) {
+                return Some(x);
+            }
+        }
+        (px >= r.0 && py >= r.1 && px < r.0 + r.2 && py < r.1 + r.3).then_some(e)
+    }
+
+    fn draw_overlays(&self, s: &mut Surf) {
+        let mut ovs: Vec<(f64, u32)> = self.objs.iter().filter(|(_, o)| o.kind == Kind::Overlay).map(|(i, _)| (self.pf(*i, "overlay.zorder").first().copied().unwrap_or(0.0), *i)).collect();
+        ovs.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
+        for (_, ov) in ovs {
+            if self.pf(ov, "overlay.visible").first().copied().unwrap_or(0.0) == 0.0 {
+                continue;
+            }
+            let sc = self.pf(ov, "overlay.scale");
+            let sr = self.pf(ov, "overlay.scroll");
+            let xf = ([sc[0], sc.get(1).copied().unwrap_or(1.0)], [sr.first().copied().unwrap_or(0.0), sr.get(1).copied().unwrap_or(0.0)]);
+            for &e in &self.objs[&ov].children {
+                self.draw_element(s, e, (0.0, 0.0, s.vw as f64, s.vh as f64), xf, 0);
+            }
+        }
+    }
+
+    fn draw_element(&self, s: &mut Surf, e: u32, parent: (f64, f64, f64, f64), xf: ([f64; 2], [f64; 2]), depth: usize) {
+        let o = &self.objs[&e];
+        if depth > 16 || self.pf(e, "overlayelement.visible")[0] == 0.0 {
+            return;
+        }
+        let mode = self.pf(e, "overlayelement.metricsmode").first().copied().unwrap_or(0.0);
+        let rect = self.element_rect(e, parent);
+        let (x, y, w, h) = rect;
+        // преобразование наложения: масштаб относительно центра экрана и прокрутка
+        let (cx, cy) = (s.vw as f64 / 2.0, s.vh as f64 / 2.0);
+        let (fx_, fy_) = (cx + (x - cx) * xf.0[0] + xf.1[0] * 0.5 * s.vw as f64, cy + (y - cy) * xf.0[1] - xf.1[1] * 0.5 * s.vh as f64);
+        let (dw, dh) = (w * xf.0[0], h * xf.0[1]);
+        let ty = o.st.get("overlayelement.type").map(|v| v.as_str()).unwrap_or("");
+        if ty == "textarea" {
+            let cap = o.st.get("overlayelement.caption").cloned().unwrap_or_default();
+            let chp = o.params.iter().find(|p| p.0 == "char_height").and_then(|p| p.1.parse::<f64>().ok()).unwrap_or(0.03);
+            let px = (if mode == 1.0 { chp } else { chp * s.vh as f64 } * xf.0[1]).clamp(1.0, 256.0);
+            let c = self.pf(e, "overlayelement.colour");
+            put_text(s, &cap, fx_, fy_, px, [c[0], c[1], c[2]], c.get(3).copied().unwrap_or(1.0));
+        } else if let Some(mat) = o.st.get("overlayelement.materialname").filter(|m| !m.is_empty()) {
+            let mut m = self.material_look(mat);
+            m.lit = false;
+            m.depth_check = false;
+            m.depth_write = false;
+            let oc = Cam { near: 1.0, th: 1.0, aspect: 1.0, ortho: false, fog: None };
+            let (x1, y1) = ((fx_ + dw).ceil().min(s.vw as f64), (fy_ + dh).ceil().min(s.vh as f64));
+            for py in fy_.floor().max(0.0) as usize..y1.max(0.0) as usize {
+                for px in fx_.floor().max(0.0) as usize..x1.max(0.0) as usize {
+                    let mut col = [m.diff[0], m.diff[1], m.diff[2]];
+                    let mut a = m.diff[3];
+                    if let Some(tx) = &m.tex {
+                        let tc = texel(tx, (px as f64 + 0.5 - fx_) / dw.max(1.0), (py as f64 + 0.5 - fy_) / dh.max(1.0));
+                        for k in 0..3 {
+                            col[k] *= tc[k];
+                        }
+                        a *= tc[3];
+                    }
+                    put(s, &oc, px, py, 0.0, col, a, &m);
+                }
+            }
+        }
+        for &c in &o.children {
+            self.draw_element(s, c, rect, xf, depth + 1);
         }
     }
 
@@ -782,5 +990,36 @@ fn draw_line(s: &mut Surf, c: &Cam, a: Pv, b: Pv, m: &MatLook) {
         let col = lerp3(a.col, b.col, t);
         let col = if m.lit { [col[0].max(0.2), col[1].max(0.2), col[2].max(0.2)] } else { col };
         put(s, c, x as usize, y as usize, z - 1e-3, col, m.diff[3], m);
+    }
+}
+
+fn put_text(s: &mut Surf, text: &str, x: f64, y: f64, px: f64, col: [f64; 3], alpha: f64) {
+    let c = [(col[0].clamp(0.0, 1.0) * 255.0) as u8, (col[1].clamp(0.0, 1.0) * 255.0) as u8, (col[2].clamp(0.0, 1.0) * 255.0) as u8];
+    let (vw, vh, full, x0, y0) = (s.vw as i64, s.vh as i64, s.full_w, s.x0, s.y0);
+    let a = alpha.clamp(0.0, 1.0);
+    let rgb = &mut *s.rgb;
+    fx::draw_text(text, x, y, px, |px_, py_| {
+        if px_ >= 0 && py_ >= 0 && px_ < vw && py_ < vh {
+            let o = ((y0 + py_ as usize) * full + x0 + px_ as usize) * 3;
+            for k in 0..3 {
+                rgb[o + k] = (c[k] as f64 * a + rgb[o + k] as f64 * (1.0 - a)) as u8;
+            }
+        }
+    });
+}
+
+fn draw_cam_quad(s: &mut Surf, camc: &Cam, m: &MatLook, c: V3, hw: f64, hh: f64, rot: f64) {
+    let (sn, cs) = rot.sin_cos();
+    let corner = |dx: f64, dy: f64, u: f64, v: f64| {
+        let (rx, ry) = (dx * cs - dy * sn, dx * sn + dy * cs);
+        Pv { p: [c[0] + rx, c[1] + ry, c[2]], col: [m.diff[0], m.diff[1], m.diff[2]], uv: [u, v] }
+    };
+    let q = [corner(-hw, hh, 0.0, 0.0), corner(hw, hh, 1.0, 0.0), corner(hw, -hh, 1.0, 1.0), corner(-hw, -hh, 0.0, 1.0)];
+    for tri in [[q[0], q[3], q[2]], [q[0], q[2], q[1]]] {
+        for poly in clip_near(&tri, camc.near) {
+            for k in 1..poly.len().saturating_sub(1) {
+                draw_tri(s, camc, [poly[0], poly[k], poly[k + 1]], m);
+            }
+        }
     }
 }

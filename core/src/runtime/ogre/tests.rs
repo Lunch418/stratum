@@ -16,12 +16,13 @@ fn f(x: f64) -> Value {
 fn boot(fx: &mut Effects) -> Value {
     c(fx, "Root_Create", &[st(""), st("none.cfg"), st("")]);
     c(fx, "Root_Initialise", &[]);
+    c(fx, "RenderWindow_Create2", &[Value::Handle(0.0), st("t"), f(800.0), f(600.0), f(0.0), f(0.0), f(0.0), f(0.0)]);
     c(fx, "Scene_Create", &[st("OctreeSceneManager")])
 }
 
 #[test]
 fn every_function_is_implemented() {
-    assert_eq!(function_names().len(), 299);
+    assert_eq!(function_names().len(), 315);
     let mut fx = Effects::default();
     for n in function_names() {
         let sig = sigs().get(&n).unwrap();
@@ -248,13 +249,12 @@ fn skinned_files(dir: &std::path::Path) {
         sub.extend_from_slice(&i.to_le_bytes());
     }
     sub.extend(chunk(0x5000, &geom));
-    let mut asg = Vec::new();
     for v in 0..3u32 {
-        asg.extend_from_slice(&v.to_le_bytes());
+        let mut asg = v.to_le_bytes().to_vec();
         asg.extend_from_slice(&1u16.to_le_bytes());
         asg.extend_from_slice(&1f32.to_le_bytes());
+        sub.extend(chunk(0x4100, &asg));
     }
-    sub.extend(chunk(0x4100, &asg));
     let mut mesh_body = vec![1u8];
     mesh_body.extend(chunk(0x4000, &sub));
     mesh_body.extend(chunk(0x6000, b"anim.skeleton\n"));
@@ -431,4 +431,122 @@ fn fog_and_texture_affect_pixels() {
     c(&mut fx, "Light_SetAttenuation", &[hv(&lt), f(100.0), f(1.0), f(0.0), f(0.0)]);
     let lit = mid(&fx.ogre.render(None).unwrap());
     assert!(lit[0] > 100, "{lit:?}");
+}
+
+#[test]
+fn sinbad_skeleton_from_zip() {
+    let dir = fixture_dir().join("SkeletalAnimationDemo");
+    if !dir.join("Data/Sinbad.zip").exists() {
+        return;
+    }
+    let mut fx = Effects::default();
+    fx.gfx.project_dir = dir;
+    let sc = boot(&mut fx);
+    c(&mut fx, "Root_AddResourceLocationFromConfigFile", &[st("Resources.cfg")]);
+    let e = c(&mut fx, "Entity_Create", &[hv(&sc), st("sinbad"), st("Sinbad.mesh")]);
+    assert!(e.as_float() >= 1.0, "{:?}", fx.log);
+    let n = c(&mut fx, "SceneNode_Create", &[hv(&sc), st("n")]);
+    c(&mut fx, "SceneNode_AttachObject", &[hv(&n), hv(&e)]);
+    assert!(c(&mut fx, "Entity_GetSubEntityCount", &[hv(&e)]).as_float() >= 1.0);
+    let bounds = |fx: &mut Effects| {
+        let mut mn = [f64::MAX; 3];
+        let mut mx = [f64::MIN; 3];
+        for t in fx.ogre.world_tris(e.as_float() as u32) {
+            for v in t {
+                for k in 0..3 {
+                    assert!(v[k].is_finite());
+                    mn[k] = mn[k].min(v[k]);
+                    mx[k] = mx[k].max(v[k]);
+                }
+            }
+        }
+        (mn, mx)
+    };
+    if let Some(m) = &fx.ogre.objs[&(e.as_float() as u32)].mesh {
+        eprintln!("mesh bounds {:?} {:?}", m.min, m.max);
+        for s in &m.subs {
+            eprintln!("sub {} v={} i={} bones={} nrm={} uv={}", s.material, s.verts.len(), s.idx.len(), s.bones.len(), s.nrm.len(), s.uv.len());
+        }
+    }
+    let (bmin, bmax) = bounds(&mut fx);
+    eprintln!("bind: {bmin:?} {bmax:?}");
+    let a = c(&mut fx, "Entity_GetAnimationState", &[hv(&e), st("RunBase")]);
+    assert!(a.as_float() >= 1.0, "animation RunBase");
+    let len = c(&mut fx, "AnimationState_GetLength", &[hv(&a)]).as_float();
+    assert!(len > 0.1);
+    c(&mut fx, "AnimationState_SetEnabled", &[hv(&a), f(1.0)]);
+    c(&mut fx, "AnimationState_SetTimePosition", &[hv(&a), f(len / 3.0)]);
+    let (amin, amax) = bounds(&mut fx);
+    eprintln!("anim: {amin:?} {amax:?}");
+    // кожа не разваливается: размеры поз соизмеримы
+    for k in 0..3 {
+        let (b, an) = (bmax[k] - bmin[k], amax[k] - amin[k]);
+        assert!(an > b * 0.3 && an < b * 3.0, "axis {k}: bind {b} anim {an}");
+    }
+    assert!(c(&mut fx, "Entity_GetBone", &[hv(&e), st("Handle.L")]).as_float() >= 0.0);
+}
+
+
+fn crc_less_zip(entries: &[(&str, &[u8])]) -> Vec<u8> {
+    let mut out = Vec::new();
+    let mut cd = Vec::new();
+    for (name, data) in entries {
+        let off = out.len() as u32;
+        out.extend_from_slice(&0x04034b50u32.to_le_bytes());
+        out.extend_from_slice(&[20, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+        out.extend_from_slice(&0u32.to_le_bytes());
+        out.extend_from_slice(&(data.len() as u32).to_le_bytes());
+        out.extend_from_slice(&(data.len() as u32).to_le_bytes());
+        out.extend_from_slice(&(name.len() as u16).to_le_bytes());
+        out.extend_from_slice(&0u16.to_le_bytes());
+        out.extend_from_slice(name.as_bytes());
+        out.extend_from_slice(data);
+        cd.extend_from_slice(&0x02014b50u32.to_le_bytes());
+        cd.extend_from_slice(&[20, 0, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+        cd.extend_from_slice(&0u32.to_le_bytes());
+        cd.extend_from_slice(&(data.len() as u32).to_le_bytes());
+        cd.extend_from_slice(&(data.len() as u32).to_le_bytes());
+        cd.extend_from_slice(&(name.len() as u16).to_le_bytes());
+        cd.extend_from_slice(&[0; 12]);
+        cd.extend_from_slice(&off.to_le_bytes());
+        cd.extend_from_slice(name.as_bytes());
+    }
+    let cdoff = out.len() as u32;
+    out.extend_from_slice(&cd);
+    out.extend_from_slice(&0x06054b50u32.to_le_bytes());
+    out.extend_from_slice(&[0, 0, 0, 0]);
+    out.extend_from_slice(&(entries.len() as u16).to_le_bytes());
+    out.extend_from_slice(&(entries.len() as u16).to_le_bytes());
+    out.extend_from_slice(&(cd.len() as u32).to_le_bytes());
+    out.extend_from_slice(&cdoff.to_le_bytes());
+    out.extend_from_slice(&0u16.to_le_bytes());
+    out
+}
+
+#[test]
+fn zip_stored_roundtrip_and_path_guards() {
+    let z = super::zip::Zip::open(crc_less_zip(&[("a/b.txt", b"hello"), ("../evil.txt", b"x")])).expect("zip");
+    assert_eq!(z.read("a/b.txt").as_deref(), Some(&b"hello"[..]));
+    assert!(z.read("../evil.txt").is_none());
+    assert!(z.names().iter().all(|n| !n.contains("..")));
+    assert!(z.read("missing").is_none());
+}
+
+#[test]
+fn zip_fuzz_does_not_panic() {
+    let base = crc_less_zip(&[("a.txt", b"hello world"), ("b.txt", b"0123456789")]);
+    let mut x = 99u64;
+    for _ in 0..500 {
+        let mut d = base.clone();
+        for _ in 0..4 {
+            x = x.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            let i = (x >> 33) as usize % d.len();
+            d[i] = (x >> 20) as u8;
+        }
+        if let Some(z) = super::zip::Zip::open(d) {
+            for n in z.names() {
+                let _ = z.read(&n);
+            }
+        }
+    }
 }

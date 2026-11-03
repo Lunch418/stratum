@@ -161,11 +161,20 @@ impl Huff {
 }
 
 fn inflate(d: &[u8], cap: usize) -> Option<Vec<u8>> {
+    inflate_at(d, 2, cap)
+}
+
+/// Сырой deflate (без заголовка zlib) - для записей zip.
+pub fn inflate_raw(d: &[u8], cap: usize) -> Option<Vec<u8>> {
+    inflate_at(d, 0, cap)
+}
+
+fn inflate_at(d: &[u8], start: usize, cap: usize) -> Option<Vec<u8>> {
     const LB: [u16; 29] = [3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31, 35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258];
     const LE: [u8; 29] = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0];
     const DB: [u16; 30] = [1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257, 385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577];
     const DE: [u8; 30] = [0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13];
-    let mut b = Bits { d, p: 2, b: 0, n: 0 };
+    let mut b = Bits { d, p: start, b: 0, n: 0 };
     let mut out: Vec<u8> = Vec::new();
     loop {
         let last = b.get(1)?;

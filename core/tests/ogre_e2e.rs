@@ -47,7 +47,7 @@ if(~!init)
   Node_AddChild(Scene_GetRootSceneNode(~sc), ~ln)
   Node_SetRotationEulerXYZ(~ln, 0.5, -0.6, 0)
   SceneNode_AttachObject(~ln, ~lt)
-  win := RenderWindow_GetPrimary()
+  win := RenderWindow_Create2(#0, "Ogre", 800, 600, 0, 0, 0, 0)
   vp := Viewport_Create(~win, ~cam, 0)
   Viewport_SetBackgroundColour(~vp, 0.1, 0.1, 0.4)
 endif

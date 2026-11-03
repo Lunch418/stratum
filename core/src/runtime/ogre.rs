@@ -40,6 +40,7 @@ pub enum Kind {
     Entity,
     Node,
     BillboardSet,
+    Billboard,
     ManualObject,
     MovableText,
     ParticleSystem,
@@ -222,18 +223,21 @@ pub struct Ogre {
     cursor: [f64; 2],
     wheel: f64,
     textures: BTreeMap<String, Option<Arc<Tex>>>,
+    zips: BTreeMap<String, Option<Arc<zip::Zip>>>,
+    zip_bytes: u64,
+    ptemplates: BTreeMap<String, Arc<fx::PTemplate>>,
+    pstate: BTreeMap<u32, fx::PState>,
     pending_tex: Vec<String>,
-    rendered_at: Option<u64>,
     cached: FrameCache,
 }
 
 /// Кэш картинки кадра: не копируется при снимках состояния.
 #[derive(Debug, Default)]
-struct FrameCache(Option<(f64, f64, String)>);
+struct FrameCache(BTreeMap<u32, (u64, f64, f64, String)>);
 
 impl Clone for FrameCache {
     fn clone(&self) -> Self {
-        FrameCache(None)
+        FrameCache(BTreeMap::new())
     }
 }
 
@@ -279,14 +283,35 @@ pub fn function_names() -> Vec<String> {
 /// Вызов функции Ogre. `None` - имя не из семейства.
 pub fn call(lower: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
     let sig = sigs().get(lower)?;
+    static TRACE: OnceLock<bool> = OnceLock::new();
+    if *TRACE.get_or_init(|| std::env::var_os("STRATUM_OGRE_TRACE").is_some()) {
+        eprintln!("ogre: {lower}({})", args.iter().map(|a| a.to_string()).collect::<Vec<_>>().join(", "));
+    }
     let mut og = std::mem::take(&mut fx.ogre);
     let mut outs = Vec::new();
-    let r = if args.len() < sig.params.len() {
-        og.fail(format!("{lower}: мало аргументов"));
-        zero(sig)
+    // недостающие хвостовые аргументы добираем значениями по умолчанию
+    // (альфа цвета - 1, остальное - 0 или пустая строка)
+    let padded: Vec<Value>;
+    let args = if args.len() < sig.params.len() {
+        let colour = ["colour", "color", "diffuse", "ambient", "specular", "selfillum"].iter().any(|k| lower.contains(k));
+        let mut v = args.to_vec();
+        let mut floats = sig.params[..v.len()].iter().filter(|p| p.0 == 'F' && !p.1).count();
+        for &(c, out) in &sig.params[v.len()..] {
+            v.push(match c {
+                'S' => Value::Str(String::new()),
+                'H' => Value::Handle(0.0),
+                _ => {
+                    floats += if out { 0 } else { 1 };
+                    Value::Float(if colour && !out && floats == 4 { 1.0 } else { 0.0 })
+                }
+            });
+        }
+        padded = v;
+        &padded[..]
     } else {
-        og.run(fx, lower, sig, args, &mut outs)
+        args
     };
+    let r = og.run(fx, lower, sig, args, &mut outs);
     for m in og.pending_log.drain(..) {
         if fx.log.len() < 1000 {
             fx.log.push(m);
@@ -475,7 +500,8 @@ fn allowed_kinds(prefix: &str) -> Option<&'static [Kind]> {
     Some(match prefix {
         "camera" => &[Camera],
         "light" => &[Light],
-        "billboardset" | "billboard" => &[BillboardSet],
+        "billboardset" => &[BillboardSet],
+        "billboard" => &[Billboard, BillboardSet],
         "animationstate" => &[AnimState],
         "bone" => &[Bone],
         "entity" => &[Entity],
@@ -613,6 +639,11 @@ impl Ogre {
     fn remove_obj(&mut self, id: u32) {
         self.detach(id);
         let Some(o) = self.objs.remove(&id) else { return };
+        if o.kind == Kind::BillboardSet {
+            for c in &o.children {
+                self.objs.remove(c);
+            }
+        }
         for c in o.children {
             if let Some(co) = self.objs.get_mut(&c) {
                 if o.kind == Kind::Node || o.kind == Kind::Bone {
@@ -745,8 +776,43 @@ impl Ogre {
         None
     }
 
+    fn get_zip(&mut self, fx: &mut Effects, loc: &str) -> Option<Arc<zip::Zip>> {
+        let key = loc.to_ascii_lowercase();
+        if let Some(z) = self.zips.get(&key) {
+            return z.clone();
+        }
+        let total: u64 = self.zip_bytes;
+        let z = (|| {
+            let p = super::extra::sandboxed(fx, loc, false)?;
+            let len = std::fs::metadata(&p).ok()?.len();
+            if len > zip::MAX_ARCHIVE || total + len > 2 * zip::MAX_ARCHIVE {
+                return None;
+            }
+            self.zip_bytes += len;
+            zip::Zip::open(std::fs::read(p).ok()?).map(Arc::new)
+        })();
+        if z.is_none() && self.zips.len() < MAX_LOCATIONS {
+            self.pending_log.push(format!("Ogre: архив '{loc}' не прочитан"));
+        }
+        if self.zips.len() < MAX_LOCATIONS {
+            self.zips.insert(key, z.clone());
+        }
+        z
+    }
+
+    fn zip_locations(&self) -> Vec<String> {
+        self.locations.iter().filter(|(l, _)| l.to_ascii_lowercase().ends_with(".zip")).map(|(l, _)| l.clone()).collect()
+    }
+
     fn read_file(&mut self, fx: &mut Effects, name: &str) -> Option<Vec<u8>> {
-        let p = self.find_resource(fx, name)?;
+        let Some(p) = self.find_resource(fx, name) else {
+            for l in self.zip_locations() {
+                if let Some(d) = self.get_zip(fx, &l).and_then(|z| z.read(name)) {
+                    return Some(d);
+                }
+            }
+            return None;
+        };
         if std::fs::metadata(&p).ok()?.len() > MAX_FILE {
             self.fail(format!("файл '{name}' слишком велик"));
             return None;
@@ -777,6 +843,17 @@ impl Ogre {
     }
 
     fn scan_resources(&mut self, fx: &mut Effects) {
+        for l in self.zip_locations() {
+            let Some(z) = self.get_zip(fx, &l) else { continue };
+            for n in z.names() {
+                let ext = n.rsplit('.').next().unwrap_or("");
+                if matches!(ext, "material" | "compositor" | "particle" | "overlay") {
+                    if let Some(d) = z.read(&n) {
+                        self.ingest_script(ext, &String::from_utf8_lossy(&d));
+                    }
+                }
+            }
+        }
         let mut files = 0usize;
         for (l, rec) in self.locations.clone() {
             let Some(dir) = super::extra::sandboxed(fx, &l, false) else { continue };
@@ -784,7 +861,7 @@ impl Ogre {
             collect_files(&dir, rec, 6, &mut found, &mut files);
             for p in found {
                 let ext = p.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
-                if ext != "material" && ext != "compositor" {
+                if !matches!(ext.as_str(), "material" | "compositor" | "particle" | "overlay") {
                     continue;
                 }
                 let Ok(md) = std::fs::metadata(&p) else { continue };
@@ -792,18 +869,24 @@ impl Ogre {
                     continue;
                 }
                 let Ok(text) = std::fs::read(&p) else { continue };
-                let text = String::from_utf8_lossy(&text).into_owned();
-                if ext == "material" {
-                    self.parse_materials(&text);
-                } else {
-                    let toks = tokenize(&text);
-                    for w in toks.windows(2) {
-                        if w[0] == "compositor" && self.compositors.len() < MAX_OBJECTS {
-                            self.compositors.insert(w[1].to_ascii_lowercase());
-                        }
+                self.ingest_script(&ext, &String::from_utf8_lossy(&text));
+            }
+        }
+    }
+
+    fn ingest_script(&mut self, ext: &str, text: &str) {
+        match ext {
+            "material" => self.parse_materials(text),
+            "compositor" => {
+                let toks = tokenize(text);
+                for w in toks.windows(2) {
+                    if w[0] == "compositor" && self.compositors.len() < MAX_OBJECTS {
+                        self.compositors.insert(w[1].to_ascii_lowercase());
                     }
                 }
             }
+            "overlay" => self.parse_overlays(text),
+            _ => self.parse_particles(text),
         }
     }
 
@@ -966,6 +1049,21 @@ impl Ogre {
                             };
                             o.f.insert("pass.sceneblending".into(), v);
                         }
+                        "cubic_texture" if tu != 0 => {
+                            let names: Vec<String> = args.iter().filter(|a| a.contains('.')).map(|a| a.to_string()).collect();
+                            let faces: Vec<String> = if names.len() == 1 {
+                                let (stem, ext) = names[0].rsplit_once('.').unwrap_or((&names[0], ""));
+                                ["fr", "bk", "lf", "rt", "up", "dn"].iter().map(|s| format!("{stem}_{s}.{ext}")).collect()
+                            } else {
+                                names.into_iter().take(6).collect()
+                            };
+                            if faces.len() == 6 {
+                                self.objs.get_mut(&tu).unwrap().st.insert("textureunitstate.cubic".into(), faces.join("|"));
+                                for f in &faces {
+                                    self.want_texture(f);
+                                }
+                            }
+                        }
                         "texture" if tu != 0 => {
                             if let Some(a) = args.first() {
                                 self.objs.get_mut(&tu).unwrap().st.insert("textureunitstate.texture".into(), a.to_string());
@@ -1037,11 +1135,6 @@ impl Ogre {
             "root_initialise" => {
                 if self.root_created && !self.initialised {
                     self.initialised = true;
-                    let (w, hh) = self.config_video_mode(fx);
-                    let win = self.add(Obj::new(Kind::Window, "Primary", 0));
-                    if win != 0 {
-                        self.objs.get_mut(&win).unwrap().f.insert("renderwindow.size".into(), vec![w, hh]);
-                    }
                 } else if !self.root_created {
                     self.fail("Root_Initialise до Root_Create".into());
                 }
@@ -1076,7 +1169,7 @@ impl Ogre {
                             for line in String::from_utf8_lossy(&text).lines() {
                                 let line = line.trim();
                                 if let Some((k, v)) = line.split_once('=') {
-                                    if k.trim().eq_ignore_ascii_case("FileSystem") && self.locations.len() < MAX_LOCATIONS {
+                                    if (k.trim().eq_ignore_ascii_case("FileSystem") || k.trim().eq_ignore_ascii_case("Zip")) && self.locations.len() < MAX_LOCATIONS {
                                         self.locations.push((clean_name(v.trim()), true));
                                     }
                                 }
@@ -1093,6 +1186,8 @@ impl Ogre {
             "root_renderoneframe" => {
                 if self.initialised && self.objs.values().any(|o| o.kind == Kind::Window) {
                     self.frames += 1;
+                    // шаг частиц фиксированный (30 кадров в секунду): ход детерминирован
+                    self.step_particles(1.0 / 30.0);
                     fl(1.0)
                 } else {
                     fl(0.0)
@@ -1169,7 +1264,7 @@ impl Ogre {
             }
             // ---- создание объектов сцены ------------------------------------
             "camera_create" | "light_create" | "entity_create" | "scenenode_create" | "billboardset_create" | "manualobject_create"
-            | "particlesystem_create" => {
+            | "particlesystem_create" | "particlesystem_createex" => {
                 let Some(sc) = self.get_kind(&a[0], &[Kind::Scene]) else {
                     self.fail(format!("{name}: нужна сцена"));
                     return h(0);
@@ -1183,6 +1278,10 @@ impl Ogre {
                     "manualobject" => Kind::ManualObject,
                     _ => Kind::ParticleSystem,
                 };
+                if kind == Kind::ParticleSystem && !self.ptemplates.is_empty() && !self.ptemplates.contains_key(&s(2).to_ascii_lowercase()) {
+                    self.fail(format!("ParticleSystem_Create: шаблон '{}' не найден", s(2)));
+                    return h(0);
+                }
                 if kind == Kind::BillboardSet {
                     let pool = n(2);
                     if !(1.0..=100_000.0).contains(&pool) {
@@ -1243,9 +1342,16 @@ impl Ogre {
                 fl(0.0)
             }
             "movabletext_create" => {
-                let nm = clean_name(&s(0));
-                if nm.is_empty() || self.texts.contains_key(&nm.to_ascii_lowercase()) {
-                    self.fail("MovableText_Create: имя пустое или занято".into());
+                let mut nm = clean_name(&s(0));
+                if nm.is_empty() {
+                    let mut n = self.texts.len() + 1;
+                    while self.texts.contains_key(&format!("movabletext{n}")) {
+                        n += 1;
+                    }
+                    nm = format!("MovableText{n}");
+                }
+                if self.texts.contains_key(&nm.to_ascii_lowercase()) {
+                    self.fail("MovableText_Create: имя занято".into());
                     return h(0);
                 }
                 let nid = self.add(Obj::new(Kind::MovableText, &nm, 0));
@@ -1721,19 +1827,103 @@ impl Ogre {
                 }
                 h(nid)
             }
-            "rendertexture_createex" => {
+            "renderwindow_create" | "renderwindow_create2" | "renderwindow_createex" | "rendertexture_createex" => {
                 if !self.root_created {
-                    self.fail("RenderTexture_CreateEx до Root_Create".into());
+                    self.fail(format!("{name} до Root_Create"));
                     return h(0);
                 }
-                let nid = self.add(Obj::new(Kind::Window, "Window", 0));
+                let (dw, dh) = self.config_video_mode(fx);
+                // Create/CreateEx встраивают окно в пространство Stratum (его размер), Create2 берёт размер из аргументов
+                let host = fx.gfx.spaces.get(&(n(0).max(0.0) as u32)).map(|sp| sp.client);
+                let (mut w, mut hh) = match name {
+                    "renderwindow_create2" => (n(2), n(3)),
+                    _ => host.unwrap_or((dw, dh)),
+                };
+                if !((1.0..=MAX_SURFACE as f64).contains(&w) && (1.0..=MAX_SURFACE as f64).contains(&hh)) {
+                    (w, hh) = (dw, dh);
+                }
+                let nid = if self.objs.values().filter(|o| o.kind == Kind::Window).count() >= 16 {
+                    self.fail("слишком много окон рендеринга".into());
+                    0
+                } else {
+                    self.add(Obj::new(Kind::Window, &clean_name(&if name == "renderwindow_create2" { s(1) } else { String::new() }), 0))
+                };
                 if nid != 0 {
-                    let (w, hh) = self.config_video_mode(fx);
                     let o = self.objs.get_mut(&nid).unwrap();
-                    o.f.insert("renderwindow.size".into(), vec![w, hh]);
-                    o.f.insert("renderwindow.fullscreen".into(), vec![bl(n(1) != 0.0).as_float()]);
+                    o.f.insert("renderwindow.size".into(), vec![w.floor(), hh.floor()]);
+                    let fs = match name {
+                        "renderwindow_create2" => n(4),
+                        "renderwindow_createex" | "rendertexture_createex" => n(1),
+                        _ => 0.0,
+                    };
+                    o.f.insert("renderwindow.fullscreen".into(), vec![bl(fs != 0.0).as_float()]);
                 }
                 h(nid)
+            }
+            "renderwindow_destroy" => {
+                for v in self.viewports_of(id) {
+                    self.remove_tree(v);
+                }
+                self.remove_obj(id);
+                fl(0.0)
+            }
+            "renderwindow_getcursorhovered" => {
+                let s = self.window_size(id);
+                bl(self.cursor[0] >= 0.0 && self.cursor[1] >= 0.0 && self.cursor[0] < s[0] && self.cursor[1] < s[1])
+            }
+            "viewport_setdimensions" => {
+                let d: Vec<f64> = (1..5).map(|i| n(i).clamp(0.0, 1.0)).collect();
+                self.objs.get_mut(&id).unwrap().f.insert("viewport.dimensions".into(), d);
+                fl(0.0)
+            }
+            "scenenode_getscene" => h(self.objs[&id].scene),
+            "textureunitstate_gettexture" => {
+                outs.push((1, Value::Str(self.objs[&id].st.get("textureunitstate.texture").cloned().unwrap_or_default())));
+                outs.push((2, Value::Handle(self.pf(id, "textureunitstate.texturetype").first().copied().unwrap_or(0.0))));
+                fl(0.0)
+            }
+            "entity_getmaterial" => {
+                let i = n(1);
+                outs.push((2, Value::Str(if i >= 0.0 { self.objs[&id].sub_mat.get(i as usize).cloned().unwrap_or_default() } else { String::new() })));
+                fl(0.0)
+            }
+            "billboardset_createbillboard" => {
+                if self.objs[&id].children.len() >= self.objs[&id].f.get("billboardset.pool").map(|p| p[0] as usize).unwrap_or(0) {
+                    self.fail("BillboardSet_CreateBillboard: пул исчерпан".into());
+                    return h(0);
+                }
+                let b = self.add_child(id, Kind::Billboard, "");
+                if b != 0 {
+                    self.objs.get_mut(&b).unwrap().f.insert("billboard.position".into(), vec![n(1), n(2), n(3)]);
+                    self.objs.get_mut(&b).unwrap().scene = self.objs[&id].scene;
+                }
+                h(b)
+            }
+            "billboardset_getnumbillboards" => fl(self.objs[&id].children.len() as f64),
+            "billboardset_getbillboard" => {
+                let i = n(1);
+                h(if i >= 0.0 { self.objs[&id].children.get(i as usize).copied().unwrap_or(0) } else { 0 })
+            }
+            "billboardset_removebillboard" => {
+                if let Some(b) = self.get_kind(&a[1], &[Kind::Billboard]) {
+                    if self.objs[&b].parent == id {
+                        self.remove_obj(b);
+                    }
+                }
+                fl(0.0)
+            }
+            "overlay_findelementat" => {
+                let ws = self.window_size(self.objs.iter().find(|(_, o)| o.kind == Kind::Window).map(|(k, _)| *k).unwrap_or(0));
+                let (px, py) = (n(1) * ws[0], n(2) * ws[1]);
+                let sc = self.pf(id, "overlay.scale");
+                let _ = sc;
+                let mut hit = 0;
+                for &e in &self.objs[&id].children {
+                    if let Some(x) = self.find_element(e, (0.0, 0.0, ws[0], ws[1]), px, py, 0) {
+                        hit = x;
+                    }
+                }
+                h(hit)
             }
             "viewport_create" => {
                 let Some(t) = self.get_kind(&a[0], &[Kind::Window, Kind::Texture]) else {
@@ -2119,7 +2309,7 @@ impl Ogre {
 }
 
 fn is_creator(name: &str) -> bool {
-    name.ends_with("_create") || name == "rendertexture_createex" || name == "collision_raycast"
+    name.starts_with("renderwindow_create") || name.ends_with("_create") || name == "particlesystem_createex" || name == "rendertexture_createex" || name == "collision_raycast"
 }
 
 fn tri_list(op: u16, idx: &[u32]) -> Vec<[u32; 3]> {
@@ -2260,7 +2450,7 @@ fn is_keyword(w: &str) -> bool {
     matches!(
         w,
         "ambient" | "diffuse" | "specular" | "emissive" | "lighting" | "depth_check" | "depth_write" | "cull_hardware" | "scene_blend" | "texture"
-            | "technique" | "pass" | "texture_unit" | "material"
+            | "technique" | "pass" | "texture_unit" | "material" | "cubic_texture"
     )
 }
 
@@ -2302,6 +2492,10 @@ impl<'a> Rd<'a> {
         }
         None
     }
+    fn peek16(&self) -> Option<u16> {
+        Some(u16::from_le_bytes([*self.d.get(self.p)?, *self.d.get(self.p + 1)?]))
+    }
+    #[allow(dead_code)]
     fn chunk(&mut self) -> Option<(u16, usize)> {
         let id = self.u16()?;
         let l = self.u32()? as usize;
@@ -2321,15 +2515,6 @@ struct Geom {
     uv: Vec<[f32; 2]>,
 }
 
-fn read_bone_assignments(r: &mut Rd, end: usize, out: &mut Vec<(usize, u16, f32)>) -> Option<()> {
-    while r.p + 10 <= end && out.len() < MAX_VERTS * 4 {
-        let v = r.u32()? as usize;
-        let b = r.u16()?;
-        let w = r.f32()?;
-        out.push((v, b, w));
-    }
-    Some(())
-}
 
 fn spread_bones(n: usize, asg: &[(usize, u16, f32)]) -> Vec<Vec<(u16, f32)>> {
     if asg.is_empty() {
@@ -2344,6 +2529,8 @@ fn spread_bones(n: usize, asg: &[(usize, u16, f32)]) -> Vec<Vec<(u16, f32)>> {
     v
 }
 
+/// Разбор идёт последовательно, как в Ogre: длины блоков у некоторых
+/// экспортёров неверны (например, у Sinbad.mesh), поэтому на них не опираемся.
 pub fn parse_mesh(data: &[u8]) -> Option<Mesh> {
     let mut r = Rd { d: data, p: 0 };
     if r.u16()? != 0x1000 {
@@ -2356,17 +2543,23 @@ pub fn parse_mesh(data: &[u8]) -> Option<Mesh> {
     let mut mesh = Mesh { min: [f32::MAX; 3], max: [f32::MIN; 3], ..Default::default() };
     let mut shared = Geom::default();
     let mut shared_asg: Vec<(usize, u16, f32)> = Vec::new();
-    let (id, mend) = r.chunk()?;
-    if id != 0x3000 {
+    if r.u16()? != 0x3000 {
         return None;
     }
+    r.u32()?;
     r.u8()?;
     let mut subs: Vec<(SubMesh, bool, Vec<(usize, u16, f32)>)> = Vec::new();
-    while r.p + 6 <= mend {
-        let (id, end) = r.chunk()?;
+    while let Some(id) = r.peek16() {
         match id {
-            0x5000 => shared = parse_geometry(&mut r, end)?,
+            0x5000 => {
+                r.p += 6;
+                shared = parse_geometry(&mut r)?;
+            }
             0x4000 => {
+                r.p += 6;
+                if subs.len() >= 1024 {
+                    return None;
+                }
                 let mut sm = SubMesh { material: r.line()?, op: 4, ..Default::default() };
                 let use_shared = r.u8()? != 0;
                 let ic = r.u32()? as usize;
@@ -2377,37 +2570,68 @@ pub fn parse_mesh(data: &[u8]) -> Option<Mesh> {
                 for _ in 0..ic {
                     sm.idx.push(if wide { r.u32()? } else { r.u16()? as u32 });
                 }
-                let mut asg = Vec::new();
-                while r.p + 6 <= end {
-                    let (sid, send) = r.chunk()?;
-                    match sid {
-                        0x5000 if !use_shared => {
-                            let g = parse_geometry(&mut r, send)?;
-                            sm.verts = g.pos;
-                            sm.nrm = g.nrm;
-                            sm.uv = g.uv;
-                        }
-                        0x4010 => sm.op = r.u16()?,
-                        0x4100 => read_bone_assignments(&mut r, send, &mut asg)?,
-                        _ => {}
+                if !use_shared {
+                    if r.u16()? != 0x5000 {
+                        return None;
                     }
-                    r.p = send;
+                    r.u32()?;
+                    let g = parse_geometry(&mut r)?;
+                    sm.verts = g.pos;
+                    sm.nrm = g.nrm;
+                    sm.uv = g.uv;
+                }
+                let mut asg = Vec::new();
+                while let Some(sid) = r.peek16() {
+                    match sid {
+                        0x4010 => {
+                            r.p += 6;
+                            sm.op = r.u16()?;
+                        }
+                        0x4100 => {
+                            r.p += 6;
+                            let v = r.u32()? as usize;
+                            let b = r.u16()?;
+                            let w = r.f32()?;
+                            if asg.len() < MAX_VERTS * 4 {
+                                asg.push((v, b, w));
+                            }
+                        }
+                        0x4200 => {
+                            r.p += 6;
+                            r.line()?;
+                            r.line()?;
+                        }
+                        _ => break,
+                    }
                 }
                 subs.push((sm, use_shared, asg));
             }
-            0x6000 => mesh.skeleton = Some(r.line()?),
-            0x7000 => read_bone_assignments(&mut r, end, &mut shared_asg)?,
+            0x6000 => {
+                r.p += 6;
+                mesh.skeleton = Some(r.line()?);
+            }
+            0x7000 => {
+                r.p += 6;
+                let v = r.u32()? as usize;
+                let b = r.u16()?;
+                let w = r.f32()?;
+                if shared_asg.len() < MAX_VERTS * 4 {
+                    shared_asg.push((v, b, w));
+                }
+            }
             0x9000 => {
+                r.p += 6;
                 for k in 0..3 {
                     mesh.min[k] = r.f32()?;
                 }
                 for k in 0..3 {
                     mesh.max[k] = r.f32()?;
                 }
+                r.f32()?;
             }
-            _ => {}
+            // LOD, таблицы имён, списки рёбер: нам не нужны, длины неточны
+            _ => break,
         }
-        r.p = end;
     }
     for (mut sm, use_shared, asg) in subs {
         if use_shared {
@@ -2421,68 +2645,74 @@ pub fn parse_mesh(data: &[u8]) -> Option<Mesh> {
         if sm.idx.iter().any(|&i| i as usize >= sm.verts.len()) {
             return None;
         }
+        mesh.subs.push(sm);
+    }
+    // границы считаем по вершинам (заголовочные могут быть неверны)
+    mesh.min = [f32::MAX; 3];
+    mesh.max = [f32::MIN; 3];
+    for sm in &mesh.subs {
         for v in &sm.verts {
             for k in 0..3 {
                 mesh.min[k] = mesh.min[k].min(v[k]);
                 mesh.max[k] = mesh.max[k].max(v[k]);
             }
         }
-        mesh.subs.push(sm);
     }
     if mesh.min[0] > mesh.max[0] {
         mesh.min = [0.0; 3];
         mesh.max = [0.0; 3];
     }
+    if mesh.subs.is_empty() {
+        return None;
+    }
     Some(mesh)
 }
 
-fn parse_geometry(r: &mut Rd, end: usize) -> Option<Geom> {
+/// Геометрия: вызывается после заголовка блока 0x5000.
+fn parse_geometry(r: &mut Rd) -> Option<Geom> {
     let vc = r.u32()? as usize;
     if vc > MAX_VERTS {
         return None;
     }
-    // (источник, смещение) для положения, нормали, первой текстурной координаты
     let (mut pos_e, mut nrm_e, mut uv_e): (Option<(u16, u16)>, Option<(u16, u16)>, Option<(u16, u16)>) = (None, None, None);
-    let mut bufs: HashMap<u16, (usize, usize)> = HashMap::new();
+    let mut bufs: HashMap<u16, usize> = HashMap::new();
     let mut sizes: HashMap<u16, usize> = HashMap::new();
-    while r.p + 6 <= end {
-        let (id, cend) = r.chunk()?;
+    while let Some(id) = r.peek16() {
         match id {
             0x5100 => {
-                while r.p + 6 <= cend {
-                    let (eid, eend) = r.chunk()?;
-                    if eid == 0x5110 {
-                        let (src, ty, sem, off, idx) = (r.u16()?, r.u16()?, r.u16()?, r.u16()?, r.u16()?);
-                        match (sem, ty) {
-                            (1, 2) if pos_e.is_none() => pos_e = Some((src, off)),
-                            (4, 2) if nrm_e.is_none() => nrm_e = Some((src, off)),
-                            (7, 1) if uv_e.is_none() && idx == 0 => uv_e = Some((src, off)),
-                            _ => {}
-                        }
+                r.p += 6;
+                while r.peek16() == Some(0x5110) {
+                    r.p += 6;
+                    let (src, ty, sem, off, idx) = (r.u16()?, r.u16()?, r.u16()?, r.u16()?, r.u16()?);
+                    match (sem, ty) {
+                        (1, 2) if pos_e.is_none() => pos_e = Some((src, off)),
+                        (4, 2) if nrm_e.is_none() => nrm_e = Some((src, off)),
+                        (7, 1) if uv_e.is_none() && idx == 0 => uv_e = Some((src, off)),
+                        _ => {}
                     }
-                    r.p = eend;
                 }
             }
             0x5200 => {
+                r.p += 6;
                 let idx = r.u16()?;
                 let vsize = r.u16()? as usize;
-                sizes.insert(idx, vsize);
-                while r.p + 6 <= cend {
-                    let (did, dend) = r.chunk()?;
-                    if did == 0x5210 {
-                        bufs.insert(idx, (r.p, dend));
-                    }
-                    r.p = dend;
+                if r.u16()? != 0x5210 {
+                    return None;
                 }
+                r.u32()?;
+                let start = r.p;
+                let total = vc.checked_mul(vsize)?;
+                r.take(total)?;
+                sizes.insert(idx, vsize);
+                bufs.insert(idx, start);
             }
-            _ => {}
+            _ => break,
         }
-        r.p = cend;
     }
     let read = |e: (u16, u16), n: usize| -> Option<Vec<Vec<f32>>> {
-        let (start, bend) = *bufs.get(&e.0)?;
+        let start = *bufs.get(&e.0)?;
         let vsize = *sizes.get(&e.0)?;
-        if vsize < e.1 as usize + n * 4 || start.checked_add(vc.checked_mul(vsize)?)? > bend {
+        if vsize < e.1 as usize + n * 4 {
             return None;
         }
         let mut out = Vec::with_capacity(vc);
@@ -2510,50 +2740,67 @@ pub fn parse_skeleton(data: &[u8]) -> Option<Skeleton> {
     r.line()?;
     let mut sk = Skeleton::default();
     let mut parents: Vec<(u16, u16)> = Vec::new();
-    while r.p + 6 <= data.len() {
-        let (id, end) = r.chunk()?;
+    // после поворота ключа/кости может идти необязательный масштаб (3 числа):
+    // он есть, если дальше не начинается известный блок
+    let known = |id: Option<u16>| matches!(id, None | Some(0x2000) | Some(0x3000) | Some(0x4000) | Some(0x4100) | Some(0x4110) | Some(0x5000));
+    while let Some(id) = r.peek16() {
         match id {
-            0x2000 if sk.bones.len() < 4096 => {
+            0x2000 => {
+                r.p += 6;
+                if sk.bones.len() >= 4096 {
+                    return None;
+                }
                 let name = r.line()?;
                 let handle = r.u16()?;
                 let pos = [r.f32()? as f64, r.f32()? as f64, r.f32()? as f64];
                 let (qx, qy, qz, qw) = (r.f32()? as f64, r.f32()? as f64, r.f32()? as f64, r.f32()? as f64);
+                if !known(r.peek16()) {
+                    r.take(12)?;
+                }
                 sk.bones.push(BoneDef { name, handle, parent: None, pos, rot: qnorm([qw, qx, qy, qz]) });
             }
-            0x3000 if parents.len() < 4096 => parents.push((r.u16()?, r.u16()?)),
-            0x4000 if sk.anims.len() < 4096 => {
+            0x3000 => {
+                r.p += 6;
+                if parents.len() >= 4096 {
+                    return None;
+                }
+                parents.push((r.u16()?, r.u16()?));
+            }
+            0x4000 => {
+                r.p += 6;
+                if sk.anims.len() >= 4096 {
+                    return None;
+                }
                 let name = r.line()?;
                 let l = r.f32()? as f64;
                 let mut an = Anim { name, length: if l.is_finite() && l >= 0.0 { l } else { 0.0 }, tracks: Vec::new() };
-                while r.p + 6 <= end {
-                    let (tid, tend) = r.chunk()?;
-                    if tid == 0x4100 && an.tracks.len() < 4096 {
-                        let bh = r.u16()?;
-                        let mut keys = Vec::new();
-                        while r.p + 6 <= tend && keys.len() < 100_000 {
-                            let (kid, kend) = r.chunk()?;
-                            if kid == 0x4110 {
-                                let t = r.f32()? as f64;
-                                let (qx, qy, qz, qw) = (r.f32()? as f64, r.f32()? as f64, r.f32()? as f64, r.f32()? as f64);
-                                let pos = [r.f32()? as f64, r.f32()? as f64, r.f32()? as f64];
-                                if t.is_finite() && pos.iter().all(|v| v.is_finite()) {
-                                    keys.push(Key { t, rot: qnorm([qw, qx, qy, qz]), pos });
-                                }
-                            }
-                            r.p = kend;
+                while r.peek16() == Some(0x4100) {
+                    r.p += 6;
+                    let bh = r.u16()?;
+                    let mut keys = Vec::new();
+                    while r.peek16() == Some(0x4110) {
+                        r.p += 6;
+                        let t = r.f32()? as f64;
+                        let (qx, qy, qz, qw) = (r.f32()? as f64, r.f32()? as f64, r.f32()? as f64, r.f32()? as f64);
+                        let pos = [r.f32()? as f64, r.f32()? as f64, r.f32()? as f64];
+                        if !known(r.peek16()) {
+                            r.take(12)?;
                         }
+                        if keys.len() < 100_000 && t.is_finite() && pos.iter().all(|v| v.is_finite()) {
+                            keys.push(Key { t, rot: qnorm([qw, qx, qy, qz]), pos });
+                        }
+                    }
+                    if an.tracks.len() < 4096 {
                         if let Some(bi) = sk.bones.iter().position(|b| b.handle == bh) {
                             keys.sort_by(|a, b| a.t.partial_cmp(&b.t).unwrap_or(std::cmp::Ordering::Equal));
                             an.tracks.push((bi, keys));
                         }
                     }
-                    r.p = tend;
                 }
                 sk.anims.push(an);
             }
-            _ => {}
+            _ => break,
         }
-        r.p = end;
     }
     for (c, p) in parents {
         let pi = sk.bones.iter().position(|b| b.handle == p);
@@ -2561,7 +2808,6 @@ pub fn parse_skeleton(data: &[u8]) -> Option<Skeleton> {
             b.parent = pi;
         }
     }
-    // защита от циклов: родитель должен идти до потомка по цепочке не длиннее числа костей
     for i in 0..sk.bones.len() {
         let mut cur = Some(i);
         let mut n = 0;
@@ -2577,9 +2823,11 @@ pub fn parse_skeleton(data: &[u8]) -> Option<Skeleton> {
     Some(sk)
 }
 
+mod fx;
 mod image;
 mod render;
 mod scene;
+mod zip;
 pub use render::WINDOW_NAME;
 
 #[cfg(test)]

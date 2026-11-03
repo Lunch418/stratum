@@ -10,11 +10,16 @@ AnimationState_SetLoop V HF
 AnimationState_SetTimePosition V HF
 AnimationState_SetWeight V HF
 BillboardSet_Create H HSF
+BillboardSet_CreateBillboard H HFFF
 BillboardSet_Destroy V H
+BillboardSet_GetBillboard H HF
 BillboardSet_GetBillboardType F H
+BillboardSet_GetCommonDirection V H&F&F&F
 BillboardSet_GetCommonUpVector V H&F&F&F
 BillboardSet_GetDefaultDimensions V H&F&F
 BillboardSet_GetMaterialName V H&S
+BillboardSet_GetNumBillboards F H
+BillboardSet_RemoveBillboard V HH
 BillboardSet_SetBillboardType V HF
 BillboardSet_SetCommonDirection V HFFF
 BillboardSet_SetCommonUpVector V HFFF
@@ -57,6 +62,7 @@ Entity_Destroy V H
 Entity_GetAnimationState H HS
 Entity_GetBone H HS
 Entity_GetIndexCount F HF
+Entity_GetMaterial V HF&S
 Entity_GetSubEntityCount F H
 Entity_GetVertexCount F HF
 Entity_SetMaterial V HFS
@@ -166,6 +172,7 @@ OverlayElement_SetSize V HFF
 OverlayElement_SetVisible V HF
 Overlay_AddChild V HH
 Overlay_Create H S
+Overlay_FindElementAt H HFF
 Overlay_Get H S
 Overlay_GetName V H&S
 Overlay_GetRotate F H
@@ -180,6 +187,7 @@ Overlay_SetScroll V HFF
 Overlay_SetVisible V HF
 Overlay_SetZOrder V HF
 ParticleSystem_Create H HSS
+ParticleSystem_CreateEx H HSS
 ParticleSystem_Destroy V H
 ParticleSystem_GetName V H&S
 ParticleSystem_GetParent H H
@@ -222,8 +230,13 @@ Pass_SetSpecular V HFFFF
 RenderTexture_Create H SFF
 RenderTexture_CreateEx H HFFF
 RenderTexture_Destroy V H
+RenderWindow_Create H HFF
+RenderWindow_Create2 H HSFFFFFF
+RenderWindow_CreateEx H HFFF
+RenderWindow_Destroy V H
 RenderWindow_Get H F
 RenderWindow_GetCount F 
+RenderWindow_GetCursorHovered F H
 RenderWindow_GetCursorPosition V H&F&F
 RenderWindow_GetKeyboardButtonPressed F HF
 RenderWindow_GetMouseButtonPressed F HF
@@ -254,6 +267,7 @@ SceneNode_Destroy V H
 SceneNode_DetachObject V HH
 SceneNode_GetNumObjects F H
 SceneNode_GetObject H HF
+SceneNode_GetScene H H
 SceneNode_SetAutoTracking V HHFFF
 SceneNode_SetVisible V HFF
 Scene_Clear V H
@@ -282,6 +296,7 @@ Technique_Create H HS
 Technique_GetPassByIndex H HF
 Technique_GetPassByName H HS
 TextureUnitState_Create H HS
+TextureUnitState_GetTexture V H&S&H
 TextureUnitState_SetTexture V HSF
 Viewport_AddCompositor H HSF
 Viewport_Create H HHF
@@ -296,4 +311,5 @@ Viewport_GetRay V HFF&F&F&F&F&F&F
 Viewport_RemoveCompositor V HH
 Viewport_SetBackgroundColour V HFFF
 Viewport_SetCamera V HH
+Viewport_SetDimensions V HFFFF
 Viewport_SetOverlaysEnabled V HF

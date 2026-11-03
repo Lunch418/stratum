@@ -971,7 +971,7 @@ fn frame_json(shared: &Arc<Mutex<Shared>>) -> String {
     let pending_sounds = std::mem::take(&mut s.sim.effects.sounds);
     s.sim.effects.sounds = pending_sounds.clone();
     // окно рендеринга Ogre: картинка обновляется, когда модель отрисовала кадр
-    let ogre_frame = s.sim.effects.ogre.frame_svg();
+    let ogre_frames = s.sim.effects.ogre.frames_svg();
     let gfx = &s.sim.effects.gfx;
     let mut windows = Vec::new();
     for (i, name) in gfx.window_order.iter().enumerate() {
@@ -1007,12 +1007,12 @@ fn frame_json(shared: &Arc<Mutex<Shared>>) -> String {
             controls.join(",")
         ));
     }
-    if let Some((w, h, svg)) = ogre_frame {
+    for (k, (name, w, h, svg)) in ogre_frames.iter().enumerate() {
         windows.push(format!(
             "{{\"id\":{},\"name\":{},\"w\":{w},\"h\":{h},\"size\":\"default\",\"style\":\"default\",\"svg\":{},\"controls\":[]}}",
-            gfx.window_order.len(),
-            json_string(crate::runtime::ogre::WINDOW_NAME),
-            json_string(&svg)
+            gfx.window_order.len() + k,
+            json_string(name),
+            json_string(svg)
         ));
     }
     let hyper: Vec<String> = std::mem::take(&mut s.hyper_events)
