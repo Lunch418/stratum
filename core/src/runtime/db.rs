@@ -464,7 +464,8 @@ fn finish(fx: &mut Effects, error: u32, v: Value) -> Option<Value> {
     Some(v)
 }
 
-/// `DbCreateTable(hBase, name, fields, codepage, flags)`: поля - строка
+/// `DbCreateTable(hBase, name, fields, codepage, flags)`: flags - число,
+/// бит 1 - перезаписать существующий файл. Поля - строка
 /// `ИМЯ:тип:длина:точность` через запятую (типы C N F D L M).
 fn create_table(args: &[Value], fx: &mut Effects) -> Value {
     use crate::formats::dbf::{Field, MAX_FIELDS};
@@ -503,8 +504,8 @@ fn create_table(args: &[Value], fx: &mut Effects) -> Value {
         fx.dbs.error = 1;
         return Value::Handle(0.0);
     };
-    // не затираем существующую таблицу без явного флага OVERWRITE
-    if path.exists() && !arg_s(args, 4).to_ascii_uppercase().contains("OVERWRITE") {
+    // не затираем существующую таблицу без флага перезаписи (бит 1 числа flags)
+    if path.exists() && arg_f(args, 4) as i64 & 1 == 0 {
         fx.dbs.error = 1;
         return Value::Handle(0.0);
     }
@@ -619,7 +620,7 @@ fn index_name(args: &[Value]) -> String {
 /// Индексы, MEMO, сортировка и копирование таблицы.
 fn extended(name: &str, args: &[Value], fx: &mut Effects, h: u32) -> Option<Value> {
     let mut error = 0;
-    let mut copy: Option<(Table, String)> = None;
+    let mut copy: Option<(Table, String, String)> = None;
     let o = fx.dbs.tables.get_mut(&h)?;
     let v = match name {
         "dbgetblob" | "dbputblob" | "dbfreeblob" => {
@@ -693,7 +694,7 @@ fn extended(name: &str, args: &[Value], fx: &mut Effects, h: u32) -> Option<Valu
             }
         }
         "dbcopyto" => {
-            copy = Some((o.table.clone(), arg_s(args, 1)));
+            copy = Some((o.table.clone(), arg_s(args, 1), arg_s(args, 2)));
             num(0.0)
         }
         // DbAddIndex(h, имя, номер, тег, флаги, тип, выражение, условие, поля)
@@ -768,15 +769,18 @@ fn extended(name: &str, args: &[Value], fx: &mut Effects, h: u32) -> Option<Valu
         },
         _ => return None,
     };
-    if let Some((t, target)) = copy {
-        let ok_copy = copy_to(fx, t, &target);
+    if let Some((t, target, kind)) = copy {
+        let ok_copy = copy_to(fx, t, &target, &kind);
         return finish(fx, if ok_copy { 0 } else { 1 }, ok(ok_copy));
     }
     finish(fx, error, v)
 }
 
 /// Копия в `.dbf` песочницы; другие форматы (Paradox и т.п.) не поддержаны.
-fn copy_to(fx: &mut Effects, t: Table, target: &str) -> bool {
+fn copy_to(fx: &mut Effects, t: Table, target: &str, kind: &str) -> bool {
+    if !matches!(kind.trim().to_ascii_lowercase().as_str(), "" | "dbase" | "dbf") {
+        return false;
+    }
     let Some(path) = sandbox_path(fx, target, true) else { return false };
     if path.extension().is_some_and(|e| !e.eq_ignore_ascii_case("dbf")) {
         return false;

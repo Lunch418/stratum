@@ -454,7 +454,13 @@ impl Compiler<'_> {
         };
         let Some(f) = overloads.iter().find(fits) else {
             let got: Vec<&str> = arg_types.iter().map(|t| t.name()).collect();
-            return self.err(format!("{name}: нет варианта для аргументов ({})", got.join(", ")));
+            let sigs: Vec<String> = overloads.iter().map(|f| {
+                let names: Vec<&str> = f.1.chars().filter_map(Ty::code).map(Ty::name).collect();
+                let opt: Vec<&str> = f.2.chars().filter_map(Ty::code).map(Ty::name).collect();
+                let tail = if opt.is_empty() { String::new() } else { format!("[, {}]", opt.join(", ")) };
+                format!("({}{tail})", names.join(", "))
+            }).collect();
+            return self.err(format!("{name}: нет варианта для аргументов ({}); ожидается {}", got.join(", "), sigs.join(" или ")));
         };
         // аргументы по ссылке (&FLOAT…) передаются адресом переменной: 477 i
         let byref: Vec<bool> = {

@@ -46,6 +46,7 @@ docs/verification.md (сверка с оригиналом в Wine), docs/review
 ## Известные баги
 - Без снимка в Wine: sclogo (падает оригинал), NUI и TextAnalyser (внешние библиотеки),
   2d/api/Net (нет файла проекта).
+- DBF: DbCreateTable флаги - число (бит 1 = перезапись), DbCopyTo учитывает тип (не dBASE -> ошибка), сообщение компилятора перечисляет ожидаемые сигнатуры; сквозной тест core/tests/db_e2e.rs. Литерал 0 не HANDLE (нужен #0) - как в оригинале.
 - DBF: dBASE читается и пишется (Db* и окно "Таблицы DBF"); MEMO (.dbt), DbCreateTable (поля "ИМЯ:тип:длина:точн"), DbCopyTo (.dbf), DbSortTable, индексы в памяти (DbAddIndex/SwitchToIndex/SetToKey), DbSQL (CREATE/ALTER/DROP/INSERT/UPDATE/DELETE/SELECT, runtime/sql.rs), DbBrowse (очередь в состоянии плеера: поле browse; IDE открывает окно DBF на нужной таблице один раз на запрос, app/src/dbBrowse.ts). Не сделано: QBE, форматы кроме dBASE, файлы индексов.
 - Звук: Audio* через Web Audio (WAV/MP3/OGG, что декодирует WebView); MIDI и MOD не играют.
 - Нет движка: Ogre3D, запись AVI - вызовы считаются и показываются
