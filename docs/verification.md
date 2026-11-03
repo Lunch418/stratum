@@ -282,3 +282,19 @@ python3 tools/verify_trajectory.py fixtures/PROJECTS/samples/GIST --ticks 50
 - Эталона для `arcsin(2)` и других ошибок, на которых оригинал зависает.
 
 | Enter-ответчик закрывал и окна модели оригинала | отвечает только окнам с рамкой менеджера (не override_redirect) типа DIALOG или с владельцем; окно модели WindowRegion (300x299, override_redirect) больше не закрывается | Wine, tools/wine_dialogs.py; WindowRegion и AudioPlayer прогнаны заново - расхождения те же, значит x0/y0/msg не артефакт |
+
+## Итоговый прогон (20 тактов, все примеры)
+
+`verify_trajectory.py ... --ticks 20` по всем примерам. Совпали полностью: BALLS, BALLS2, DIFF, GIST, L1-L4, MOUSE, PHISICS, PixelAccess, linear_brush,
+solar_system (746/746), PNG и transparent_rotate_raster (149/149), ROBOT 2615, ROBOT2, SMO2, Trigger, ENGINE, HIST3D, Surf3d, ANATOMY, T80, Osc3d,
+IRONCLAD, MENU, VIDEO, VIDEO2, WRITEAVI, Example.33. Исправлены настоящие ошибки ядра:
+`GetObjectAlpha2d`/`SetObjectAlpha2d` работают в шкале 0..1 (было 0..255), `GetAngleByXY` возвращает 0..2*pi (было -pi..pi).
+
+Остаток (артефакты стенда или известные пределы):
+
+- CHOPPER.3D 2, EDS_IND 1: путь файла `C:\verify\...` в оригинале и путь префикса Wine у ядра (строка `LoadSpace`) - артефакт стенда.
+- Brushes 1 (`CheckBox.rez`), hyper 4 (x0/y0 окна LGSpace): положение окна задаёт оконный менеджер Wine.
+- furie 6: `x`, `sy`, `i` меняются местами - порядок вычисления в одном такте, не разобран.
+- PINBALL_ 9: `HObject` у экземпляров, которые вызывают `GetSchemeObject("..")` (ядро возвращает 0, оригинал - номер объекта схемы), и цвет фона `Schet.BackColor` (0x800000 против 0x8000FF).
+- AudioPlayer 45, WindowRegion 5: завершение стенда (`Quit` даёт лишний такт, `msg`, `__r`, `__tick`) и положение окон; номера объектов в оригинале не успели создаться к такту 20.
+- DIALOG: оригинал за 20 тактов не сохраняет состояние (модальное окно), тест на 1 такт - 441/0.
