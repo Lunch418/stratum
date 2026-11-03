@@ -195,6 +195,8 @@ pub struct Space {
     pub client: (f64, f64),
     /// Окно с полосами прокрутки (флаги OpenSchemeWindow): посылает WM_SIZE после смены размера.
     pub scroll_size_msg: bool,
+    /// Флаг WS_BYSPACE: окно верхнего уровня в экранных координатах, 300x200 без каскада.
+    pub by_space: bool,
     /// Левый верхний угол окна в рабочей области главного окна.
     pub org: (f64, f64),
     pub visible: bool,
@@ -222,6 +224,8 @@ pub struct Space {
 /// tools/verify/windows.txt.
 pub const DEFAULT_CLIENT: (f64, f64) = (625.0, 611.0);
 /// Рамка и заголовок: окно больше клиентской области на столько.
+/// Клиентская область окна WS_BYSPACE по умолчанию (окно 300x200).
+pub const BYSPACE_CLIENT: (f64, f64) = (292.0, 166.0);
 pub const WINDOW_FRAME: (f64, f64) = (8.0, 34.0);
 /// Смещение клиентской области от угла окна: рамка слева и рамка с заголовком сверху.
 pub const WINDOW_BORDER: (f64, f64) = (4.0, 30.0);
@@ -241,6 +245,7 @@ impl Space {
             scale: (1.0, 1.0),
             client: DEFAULT_CLIENT,
             scroll_size_msg: false,
+            by_space: false,
             visible: true,
             layers: u32::MAX,
             next: 1,
@@ -995,6 +1000,8 @@ pub struct Gfx {
     pub project_dir: std::path::PathBuf,
     pub library_dirs: Vec<std::path::PathBuf>,
     next_space: Handle,
+    /// Положение главного окна Stratum на экране (None - эталонное окружение: 46, 39).
+    pub frame_org: Option<(f64, f64)>,
     /// Открытые записи видео: номер -> записанных кадров (кадры не пишутся, движка нет).
     pub video_writers: BTreeMap<Handle, u32>,
     /// Порядок открытия окон — для стабильного вывода.
@@ -1320,3 +1327,6 @@ mod wine_parity_tests {
         assert!(!g.video_writers.contains_key(&hv));
     }
 }
+
+/// Положение главного окна Stratum в эталонном окружении (Wine, экран 1920x1080).
+pub const FRAME_ORG: (f64, f64) = (46.0, 39.0);

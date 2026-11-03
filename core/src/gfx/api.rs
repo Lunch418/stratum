@@ -46,6 +46,11 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
             let flags = s(args, 2).to_uppercase();
             if let Some(space) = gfx.space_mut(sp) {
                 space.scroll_size_msg = flags.contains("SCROLL");
+                if flags.contains("WS_BYSPACE") {
+                    space.by_space = true;
+                    space.org = (0.0, 0.0);
+                    space.client = super::BYSPACE_CLIENT;
+                }
             }
             handle(sp)
         }
@@ -136,6 +141,10 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
         }
         "setwindoworg" => {
             let org = (f(args, 1).trunc(), f(args, 2).trunc());
+            if is_frame(&s(args, 0)) {
+                gfx.frame_org = Some(org);
+                return Some(ok(true));
+            }
             ok(window_space_mut(gfx, &s(args, 0)).map(|sp| sp.org = org).is_some())
         }
         // SetWindowPos(окно, x, y, ширина, высота): размеры — всего окна
@@ -149,6 +158,8 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
         "setwindowtitle" | "setwindowprop" | "bringwindowtotop"
         | "setwindowtransparent" | "setwindowtransparentcolor" => ok(window_space(gfx, &s(args, 0)).is_some()),
         // положение — в экранных координатах, размер — с рамкой и заголовком
+        "getwindoworgx" if is_frame(&s(args, 0)) => num(gfx.frame_org.unwrap_or(super::FRAME_ORG).0),
+        "getwindoworgy" if is_frame(&s(args, 0)) => num(gfx.frame_org.unwrap_or(super::FRAME_ORG).1),
         "getwindoworgx" => num(window_screen_org(gfx, &s(args, 0), 0).map(|o| o.0).unwrap_or(0.0)),
         "getwindoworgy" => num(window_screen_org(gfx, &s(args, 0), 0).map(|o| o.1).unwrap_or(0.0)),
         "getwindowwidth" => num(window_space(gfx, &s(args, 0)).map(|sp| sp.client.0 + if sp.child_of.is_some() { 0.0 } else { WINDOW_FRAME.0 }).unwrap_or(0.0)),
@@ -954,6 +965,11 @@ pub fn bitmap_src(gfx: &Gfx, args: &[Value]) -> Option<(f64, f64, f64, f64)> {
     }
 }
 
+/// Главное окно Stratum ("@StratumFrame@"): есть всегда, положение хранится отдельно.
+fn is_frame(name: &str) -> bool {
+    name.eq_ignore_ascii_case("@StratumFrame@")
+}
+
 fn window_space<'a>(gfx: &'a Gfx, name: &str) -> Option<&'a Space> {
     gfx.window_space(name).and_then(|h| gfx.space(h))
 }
@@ -963,6 +979,7 @@ fn window_screen_org(gfx: &Gfx, name: &str, depth: u32) -> Option<(f64, f64)> {
     let sp = window_space(gfx, name)?;
     match &sp.child_of {
         Some((parent, off)) if depth < 16 => window_screen_org(gfx, parent, depth + 1).map(|p| (p.0 + off.0, p.1 + off.1)),
+        _ if sp.by_space => Some(sp.org),
         _ => Some((sp.org.0 + WORKSPACE_ON_SCREEN.0, sp.org.1 + WORKSPACE_ON_SCREEN.1)),
     }
 }

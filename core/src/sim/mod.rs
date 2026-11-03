@@ -578,7 +578,7 @@ impl Simulation {
     }
 
     /// Один такт: снимок старых значений, затем тексты в порядке вычисления.
-    /// Имиджи с `_enable = 0` или `_disable = 1` пропускаются вместе со своей
+    /// Имиджи с `_enable <= 0` или `_disable > 0` (отрицательные значения в оригинале не считаются) пропускаются вместе со своей
     /// подсхемой — они работают только по сообщениям.
     pub fn step(&mut self) -> Result<(), RuntimeError> {
         self.old.clone_from(&self.cells);
@@ -653,7 +653,7 @@ impl Simulation {
         let vars = &self.instances[index].vars;
         let enable = vars.get("_enable").map(|&c| self.cells[c].as_float());
         let disable = vars.get("_disable").map(|&c| self.cells[c].as_float());
-        enable == Some(0.0) || disable.is_some_and(|d| d != 0.0)
+        enable.is_some_and(|e| e <= 0.0) || disable.is_some_and(|d| d > 0.0)
     }
 
     /// Дети каждого экземпляра в порядке схемы: экземпляры создаются в нём.
