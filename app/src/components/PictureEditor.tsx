@@ -7,7 +7,8 @@ import { type ObjectProps } from '../api';
 import { ObjectDialog } from './ObjectDialog';
 import { classByName, useStore } from '../store';
 import { Icon } from './Icon';
-import { FilePickDialog, loadEnv } from './Options';
+import { FilePickDialog } from './Options';
+import { loadEnv } from '../env';
 import { BitmapEditor } from './BitmapEditor';
 import { ZoomSelect } from './ZoomSelect';
 

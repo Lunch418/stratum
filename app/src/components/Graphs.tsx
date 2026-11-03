@@ -8,7 +8,7 @@ import { useStore } from '../store';
 const COLORS = Array.from({ length: 8 }, (_, i) => `var(--series-${i + 1})`);
 
 export function Graphs() {
-  const frame = useStore(s => s.frame);
+  const running = useStore(s => s.frame?.running);
   const setTraceCount = useStore(s => s.setTraceCount);
   const [traces, setTraces] = useState<Trace[]>([]);
   const [window_, setWindow] = useState(300);
@@ -22,12 +22,11 @@ export function Graphs() {
     let alive = true;
     const poll = async () => {
       try { const r = await api.traces(); if (alive) { setTraces(r.traces); setTraceCount(r.traces.length); } } catch { /* ядро недоступно */ }
-      if (alive) setTimeout(poll, frame?.running ? 150 : 700);
+      if (alive) setTimeout(poll, running ? 150 : 700);
     };
     poll();
     return () => { alive = false; };
-  // oxlint-disable-next-line react-hooks/exhaustive-deps -- intentional
-  }, [frame?.running]);
+  }, [running, setTraceCount]);
 
   useEffect(() => {
     const el = box.current;

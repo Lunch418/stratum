@@ -10,7 +10,7 @@ self.MonacoEnvironment = { getWorker: () => new EditorWorker() };
 loader.config({ monaco: monacoLib });
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api';
-import { loadEnv } from './Options';
+import { loadEnv } from '../env';
 import { classByName, useStore } from '../store';
 import langData from '../lang-data.json';
 

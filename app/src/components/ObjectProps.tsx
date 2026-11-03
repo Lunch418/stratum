@@ -13,13 +13,14 @@ export function ObjectProps() {
   const [oRaw, setO] = useState<Props | null>(null);
   const o = picked ? oRaw : null;
 
+  const pickedWin = picked?.win, pickedHandle = picked?.handle, tick = frame?.tick;
   useEffect(() => {
-    if (!picked) return;
+    if (pickedWin === undefined || pickedHandle === undefined) return;
     let alive = true;
-    api.object(picked.win, picked.handle).then(r => alive && setO(r)).catch(() => alive && setO(null));
+    api.object(pickedWin, pickedHandle).then(r => alive && setO(r)).catch(() => alive && setO(null));
     return () => { alive = false; };
-  // oxlint-disable-next-line react-hooks/exhaustive-deps -- intentional
-  }, [picked?.win, picked?.handle, frame?.tick]);
+    // tick: свойства объекта перечитываются каждый такт
+  }, [pickedWin, pickedHandle, tick]);
 
   if (!picked) return null;
   if (!o) return <div className="muted" style={{ padding: 10, fontSize: 12 }}>Объект #{picked.handle} исчез.</div>;

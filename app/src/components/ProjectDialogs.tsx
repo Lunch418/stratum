@@ -1,7 +1,7 @@
 // Диалоги проекта: "Создание проекта" (папка и корневой имидж) и
 // "Информация" (сводка: имиджи, экземпляры, связи, уравнения, функции).
 import { useEffect, useState } from 'react';
-import { loadEnv } from './Options';
+import { loadEnv } from '../env';
 import { api } from '../api';
 import { useStore } from '../store';
 import { Icon } from './Icon';

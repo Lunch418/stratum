@@ -6,7 +6,9 @@ import { SchemeCanvas } from './components/SchemeCanvas';
 import { CodeEditor } from './components/CodeEditor';
 import { Hierarchy } from './components/Hierarchy';
 import { Inspector } from './components/Inspector';
-import { ModelView, handleSounds } from './components/ModelView';
+import { ModelView } from './components/ModelView';
+import { handleSounds } from './sounds';
+import { loadEnv } from './env';
 import { handleHyper } from './hyper';
 import { Messages } from './components/Messages';
 import { PathDialog } from './components/PathDialog';
@@ -24,7 +26,7 @@ import { OpenDialog } from './components/OpenDialog';
 import { Palette, type Command } from './components/Palette';
 import { Icon } from './components/Icon';
 import { MenuBar } from './components/MenuBar';
-import { SheetDialog, ProjectOptionsDialog, EnvOptionsDialog, ClassPropsDialog, CalcOrderDialog, FilePickDialog, AboutDialog, DeleteClassesDialog, loadEnv } from './components/Options';
+import { SheetDialog, ProjectOptionsDialog, EnvOptionsDialog, ClassPropsDialog, CalcOrderDialog, FilePickDialog, AboutDialog, DeleteClassesDialog } from './components/Options';
 import { buildMenus, commandsFromMenus } from './menus';
 import { PrintDialog } from './components/PrintDialog';
 import { ChooseClassDialog } from './components/ChooseClassDialog';
@@ -145,8 +147,7 @@ export default function App() {
     }, env.autosave * 1000);
     return () => clearInterval(id);
   }, [env.autosave]);
-  // oxlint-disable-next-line react-hooks/exhaustive-deps -- intentional
-  useEffect(() => { document.documentElement.style.setProperty('--font-size', env.fontSize + 'px'); }, []);
+  useEffect(() => { document.documentElement.style.setProperty('--font-size', env.fontSize + 'px'); }, [env.fontSize]);
 
   useEffect(() => {
     const guard = (e: BeforeUnloadEvent) => { if (useStore.getState().unsaved && loadEnv().confirmClose) e.preventDefault(); };

@@ -182,7 +182,7 @@ export function buildMenus(ctx: MenuContext): Menu[] {
         { label: 'Обнулить переменные', run: () => st('default') },
         { label: 'Закрыть потоки', run: () => api.event('type=closestreams').then(() => s.showToast('Потоки модели закрыты')) },
         { label: 'Закрыть окна', run: () => api.event('type=closewindows').then(() => s.showToast('Окна модели закрыты')) },
-        { label: 'Закрыть все базы', disabled: true, why: 'Базы данных не поддерживаются' },
+        { label: 'Закрыть все базы', disabled: true, why: 'Таблицы DBF открывает и закрывает сама модель (функции Db*)' },
       ] },
       { label: 'По умолчанию', run: () => st('default') },
       { label: 'Установить переменные...', run: () => s.showToast('Значения правятся в инспекторе справа на паузе') },
@@ -202,7 +202,7 @@ export function buildMenus(ctx: MenuContext): Menu[] {
       { label: 'Параметры среды...', run: () => ctx.open('envOptions') },
       { label: 'Параметры проекта...', run: () => ctx.open('projectOptions'), disabled: noProject },
       { sep: true },
-      { label: 'Дополнительные модули...', disabled: true, why: 'Плагины Ogre3D, видео и БД не переносятся' },
+      { label: 'Дополнительные модули...', disabled: true, why: 'DBF, видео и звук встроены; Ogre3D и запись AVI не поддерживаются' },
       { label: 'Database Explorer...', run: () => ctx.open('dbf') },
     ] },
     { title: 'Окна', items: [
