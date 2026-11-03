@@ -342,12 +342,36 @@ fn cell_val(f: &Field, c: &str) -> Val {
 }
 
 fn like(t: &[char], p: &[char]) -> bool {
-    match p.first() {
-        None => t.is_empty(),
-        Some('%') => (0..=t.len()).any(|k| like(&t[k..], &p[1..])),
-        Some('_') => !t.is_empty() && like(&t[1..], &p[1..]),
-        Some(&c) => t.first().is_some_and(|x| x.to_lowercase().eq(c.to_lowercase())) && like(&t[1..], &p[1..]),
+    // итеративный разбор с одной точкой возврата: O(|t| * |p|), без
+    // экспоненты на шаблонах вида %a%a%a%b
+    let eq = |x: char, c: char| x.to_lowercase().eq(c.to_lowercase());
+    let (mut i, mut j) = (0usize, 0usize);
+    let mut star: Option<(usize, usize)> = None;
+    while i < t.len() {
+        match p.get(j) {
+            Some('%') => {
+                star = Some((j, i));
+                j += 1;
+            }
+            Some('_') => {
+                i += 1;
+                j += 1;
+            }
+            Some(&c) if eq(t[i], c) => {
+                i += 1;
+                j += 1;
+            }
+            _ => match star {
+                Some((sj, si)) => {
+                    star = Some((sj, si + 1));
+                    j = sj + 1;
+                    i = si + 1;
+                }
+                None => return false,
+            },
+        }
     }
+    p[j..].iter().all(|&c| c == '%')
 }
 
 fn truthy(v: &Val) -> bool {
@@ -833,6 +857,20 @@ mod tests {
         run(&mut fx, "DROP TABLE tea").unwrap();
         assert!(!dir.join("tea.dbf").exists());
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn like_is_linear_and_correct() {
+        let c = |s: &str| s.chars().collect::<Vec<_>>();
+        assert!(like(&c("Hello"), &c("h%LLO")));
+        assert!(like(&c("abc"), &c("a_c")));
+        assert!(!like(&c("abc"), &c("a_")));
+        assert!(like(&c(""), &c("%%")));
+        let t = c(&"a".repeat(2000));
+        let p = c(&format!("{}b", "%a".repeat(2000)));
+        let st = std::time::Instant::now();
+        assert!(!like(&t, &p));
+        assert!(st.elapsed().as_secs() < 5);
     }
 
     #[test]

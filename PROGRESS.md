@@ -57,3 +57,5 @@ docs/verification.md (сверка с оригиналом в Wine), docs/review
 
 - Dark theme pass: walked all tabs/dialogs; model-window controls stay a light surface (range tracks styled), dark custom checkboxes. Known: slider grooves in AudioPlayer are drawn black by the model SVG (core), not CSS.
 - Тёмная тема: проверены окно DBF/Database Explorer, инспектор (имидж, элемент), справка, окно модели - контраст в норме. Желоба ползунков AudioPlayer были чёрными: svg::color не знал системных цветов Windows (0x02000000|индекс); теперь они серые (схема Windows по умолчанию), тест в gfx/svg.rs. Из Wine не сверялось.
+
+- Ревизия DbSQL/DBF/MEMO (находки 35-38): LIKE без экспоненты, бюджет MEMO, песочница для .dbt, безопасный временный файл; тесты в sql.rs, dbf.rs, fuzz_builtins.rs.

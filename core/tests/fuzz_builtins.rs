@@ -131,3 +131,24 @@ fn builtins_survive_extreme_arguments() {
     let _ = std::fs::remove_dir_all(&dir);
     assert!(failures.is_empty(), "{} сбоев:\n{}", failures.len(), failures.join("\n"));
 }
+
+#[test]
+fn dbsql_hostile_queries_are_bounded() {
+    let dir = std::env::temp_dir().join(format!("stratum_sqlfuzz_{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let mut fx = populated(&dir);
+    let _ = call("DbSQL", &[Value::Str(format!("CREATE TABLE t (a CHAR(40))")), Value::Str(String::new())], &mut fx);
+    let long_like = format!("SELECT * FROM t WHERE a LIKE '{}b'", "%a".repeat(3000));
+    let deep = format!("SELECT * FROM t WHERE {}1{}", "(".repeat(5000), ")".repeat(5000));
+    let nots = format!("SELECT * FROM t WHERE {}1", "NOT ".repeat(5000));
+    let big = format!("SELECT {} FROM t", "a,".repeat(100_000));
+    let st = Instant::now();
+    for q in [long_like, deep, nots, big, "SELECT 9e999 FROM t".into(), "INSERT INTO t VALUES ('".repeat(10)] {
+        let r = catch_unwind(AssertUnwindSafe(|| {
+            let _ = call("DbSQL", &[Value::Str(q.clone()), Value::Str(String::new())], &mut fx);
+        }));
+        assert!(r.is_ok());
+    }
+    assert!(st.elapsed() < Duration::from_secs(20));
+    let _ = std::fs::remove_dir_all(&dir);
+}

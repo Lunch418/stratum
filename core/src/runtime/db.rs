@@ -133,7 +133,9 @@ pub fn load(fx: &mut Effects, name: &str, write: bool) -> Result<(Table, PathBuf
         _ => None,
     };
     let data = read(&path).ok_or(1u32)?;
-    let dbt = read(&path.with_extension("dbt"));
+    // соседний .dbt тоже проходит песочницу: ссылка наружу не читается
+    let dbt = path.with_extension("dbt");
+    let dbt = sandbox_path(fx, &dbt.to_string_lossy(), false).and_then(|p| read(&p));
     let table = Table::parse_with_memo(&data, dbt.as_deref()).map_err(|_| 2u32)?;
     Ok((table, path))
 }
@@ -922,7 +924,10 @@ fn write_atomic(path: &std::path::Path, data: &[u8]) -> bool {
     let mut tmp = path.as_os_str().to_owned();
     tmp.push(".tmp~");
     let tmp = std::path::PathBuf::from(tmp);
-    if std::fs::write(&tmp, data).is_err() {
+    // заранее подложенная ссылка на месте временного файла не выбирается
+    let _ = std::fs::remove_file(&tmp);
+    let wrote = std::fs::OpenOptions::new().write(true).create_new(true).open(&tmp).and_then(|mut f| std::io::Write::write_all(&mut f, data));
+    if wrote.is_err() {
         let _ = std::fs::remove_file(&tmp);
         return false;
     }

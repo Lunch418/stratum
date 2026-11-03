@@ -163,11 +163,18 @@ impl Table {
     fn load_memos(&mut self, dbt: Option<&[u8]>) {
         let cp = self.codepage;
         let mem: Vec<usize> = self.fields.iter().enumerate().filter(|(_, f)| f.kind == b'M').map(|(i, _)| i).collect();
+        // общий предел: тысячи строк с одним указателем на большой блок не
+        // должны раздуть память в тысячи раз
+        let mut budget = MAX_DBT;
         for r in &mut self.rows {
             for &i in &mem {
                 let block = r.cells[i].trim().parse::<usize>().unwrap_or(0);
                 r.cells[i].clear();
                 let Some(bytes) = dbt.and_then(|d| read_block(d, block)) else { continue };
+                if bytes.len().saturating_mul(2) > budget {
+                    continue;
+                }
+                budget -= bytes.len() * 2;
                 r.cells[i] = cp.decode(&bytes);
                 r.blobs.insert(i, bytes);
             }
@@ -432,5 +439,22 @@ mod tests {
         }
         let junk = vec![0xffu8; 4096];
         let _ = Table::parse_with_memo(&a, Some(&junk));
+    }
+
+    #[test]
+    fn memo_pointers_to_one_big_block_are_budgeted() {
+        let f = |n: &str, k: u8, l: u8| Field { name: n.into(), kind: k, len: l, dec: 0 };
+        let mut t = Table::new(vec![f("M", b'M', 10)], Codepage::Cp1251);
+        for _ in 0..40 {
+            t.rows.push(Row { deleted: false, cells: vec!["1".into()], ..Default::default() });
+        }
+        let (a, _) = t.to_files();
+        let mut dbt = vec![0u8; 512];
+        dbt.extend([0xff, 0xff, 0x08, 0x00]);
+        dbt.extend((MAX_MEMO as u32).to_le_bytes());
+        dbt.resize(512 + MAX_MEMO, b'x');
+        let back = Table::parse_with_memo(&a, Some(&dbt)).unwrap();
+        let total: usize = back.rows.iter().map(|r| r.blobs.values().map(|b| b.len()).sum::<usize>()).sum();
+        assert!(total <= MAX_DBT);
     }
 }
