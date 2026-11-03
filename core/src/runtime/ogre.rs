@@ -13,7 +13,7 @@
 
 use super::builtins::Effects;
 use super::value::Value;
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
 
@@ -198,6 +198,8 @@ pub struct Frame {
 #[derive(Debug, Default, Clone)]
 pub struct Ogre {
     objs: BTreeMap<u32, Obj>,
+    /// (сцена, вид, имя в нижнем регистре) всех объектов: проверка занятости имени за O(1).
+    names: HashSet<(u32, Kind, String)>,
     next: u32,
     /// Счётчики автоматических имён по видам: `__Camera_0`, `__SceneNode_1`.
     auto_names: BTreeMap<Kind, u32>,
@@ -569,12 +571,20 @@ impl Ogre {
         }
         self.next = self.next.saturating_add(1).max(1);
         let id = self.next;
+        self.names.insert((o.scene, o.kind, o.name.to_ascii_lowercase()));
         self.objs.insert(id, o);
         id
     }
 
+    /// Убирает объект из таблицы и из индекса имён.
+    fn take_obj(&mut self, id: u32) -> Option<Obj> {
+        let o = self.objs.remove(&id)?;
+        self.names.remove(&(o.scene, o.kind, o.name.to_ascii_lowercase()));
+        Some(o)
+    }
+
     fn name_taken(&self, scene: u32, kind: Kind, name: &str) -> bool {
-        self.objs.values().any(|o| o.kind == kind && o.scene == scene && o.name.eq_ignore_ascii_case(name))
+        self.names.contains(&(scene, kind, name.to_ascii_lowercase()))
     }
 
     /// Создаёт объект сцены с уникальным именем (пустое имя - автоматическое).
@@ -674,10 +684,10 @@ impl Ogre {
     /// Удаление одного объекта без обхода всей таблицы; вид удалённого.
     fn remove_obj_core(&mut self, id: u32) -> Option<Kind> {
         self.detach(id);
-        let o = self.objs.remove(&id)?;
+        let o = self.take_obj(id)?;
         if o.kind == Kind::BillboardSet {
             for c in &o.children {
-                self.objs.remove(c);
+                self.take_obj(*c);
             }
         }
         for c in o.children {
@@ -1261,7 +1271,7 @@ impl Ogre {
                 }
                 let rn = self.add(Obj::new(Kind::Node, "Ogre/SceneRoot", sc));
                 if rn == 0 {
-                    self.objs.remove(&sc);
+                    self.take_obj(sc);
                     return h(0);
                 }
                 self.objs.get_mut(&rn).unwrap().scene = sc;

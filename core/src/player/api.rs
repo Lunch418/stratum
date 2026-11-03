@@ -1691,15 +1691,23 @@ pub(crate) fn help_candidates(
     out
 }
 
+/// Корень репозитория: есть `core/Cargo.toml` и `docs/help`.
+fn is_repo_dir(d: &std::path::Path) -> bool {
+    d.join("core/Cargo.toml").is_file() && d.join("docs/help").is_dir()
+}
+
 fn help_dir() -> Option<std::path::PathBuf> {
+    let cwd_chain: Vec<String> = [".", "..", "../.."].iter().filter(|p| is_repo_dir(std::path::Path::new(p))).map(|p| format!("{p}/docs/help/topics")).collect();
     let mut list = help_candidates(
         std::env::var_os("STRATUM_HELP").filter(|v| !v.is_empty()).map(Into::into),
         user_help_root(),
         std::env::current_exe().ok(),
-        &["docs/help/topics", "../docs/help/topics", "../../docs/help/topics", "../../../docs/help/topics"],
+        // `docs/help` от текущей папки и от exe - только в рабочей копии репозитория
+        // (рядом Cargo.toml ядра), иначе справку подсунула бы чужая папка проекта
+        &cwd_chain.iter().map(String::as_str).collect::<Vec<_>>(),
     );
     if let Ok(exe) = std::env::current_exe() {
-        for up in exe.ancestors().take(6) {
+        for up in exe.ancestors().take(6).filter(|u| is_repo_dir(u)) {
             list.push(up.join("docs/help/topics"));
         }
     }
@@ -1915,6 +1923,17 @@ fn default_icon(name: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn foreign_folder_is_not_a_repo() {
+        let d = std::env::temp_dir().join(format!("stratum-help-repo-{}", std::process::id()));
+        std::fs::create_dir_all(d.join("docs/help/topics")).unwrap();
+        assert!(!is_repo_dir(&d));
+        std::fs::create_dir_all(d.join("core")).unwrap();
+        std::fs::write(d.join("core/Cargo.toml"), "").unwrap();
+        assert!(is_repo_dir(&d));
+        let _ = std::fs::remove_dir_all(d);
+    }
 
     #[test]
     fn help_lookup_order() {

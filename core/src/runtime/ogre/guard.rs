@@ -549,3 +549,23 @@ fn texture_and_object_tables_are_capped() {
     assert!(fx.ogre.objs.len() <= MAX_OBJECTS + 16);
     assert!(fx.ogre.errors > 0);
 }
+
+#[test]
+fn frame_size_is_capped_by_pixels() {
+    let mut fx = Effects::default();
+    c(&mut fx, "Root_Create", &[st(""), st("none.cfg"), st("")]);
+    c(&mut fx, "Root_Initialise", &[]);
+    c(&mut fx, "RenderWindow_Create2", &[Value::Handle(0.0), st("t"), f(4096.0), f(4096.0), f(0.0), f(0.0), f(0.0), f(0.0)]);
+    let fr = fx.ogre.render(None).unwrap();
+    assert!(fr.width * fr.height <= render::MAX_FRAME_PIXELS && fr.width >= 2000);
+}
+
+#[test]
+fn names_index_follows_create_and_destroy() {
+    let mut fx = Effects::default();
+    let sc = boot_plain(&mut fx);
+    let a = c(&mut fx, "SceneNode_Create", &[hv(&sc), st("Dup")]);
+    assert_eq!(c(&mut fx, "SceneNode_Create", &[hv(&sc), st("dup")]).as_float(), 0.0);
+    c(&mut fx, "SceneNode_Destroy", &[hv(&a)]);
+    assert!(c(&mut fx, "SceneNode_Create", &[hv(&sc), st("DUP")]).as_float() >= 1.0);
+}

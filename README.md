@@ -211,7 +211,8 @@ make check                      # прогнать парсеры по всем�
 переменная `STRATUM_HELP`, папка пользователя (`~/.local/share/stratum-modern/help`,
 `%APPDATA%\stratum-modern\help`, `~/Library/Application Support/stratum-modern/help`),
 рядом с программой (`help/`, `../share/stratum-modern/help`), затем `docs/help`
-от текущей папки. `make help-install` копирует собранную справку в папку пользователя.
+рабочей копии репозитория (только если в ней есть `core/Cargo.toml`; из чужой папки
+проекта справка не берётся). `make help-install` копирует собранную справку в папку пользователя.
 
 `make corpus` по умолчанию берёт `~/.wine32/drive_c/Program Files/Stratum`;
 другой путь — `make corpus STRATUM=...`.

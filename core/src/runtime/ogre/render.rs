@@ -4,6 +4,9 @@
 use super::*;
 
 /// Имя окна рендеринга в списке окон модели.
+/// Наибольший кадр, пикселей.
+pub(super) const MAX_FRAME_PIXELS: usize = 4 << 20;
+
 pub const WINDOW_NAME: &str = "Ogre3D";
 
 pub(super) struct Geo {
@@ -457,7 +460,13 @@ impl Ogre {
             return None;
         }
         let ws = self.window_size(win);
-        let (w, hh) = ((ws[0] as usize).clamp(1, 4096), (ws[1] as usize).clamp(1, 4096));
+        let (mut w, mut hh) = ((ws[0] as usize).clamp(1, 4096), (ws[1] as usize).clamp(1, 4096));
+        // предел кадра по пикселям (SVG с BMP на каждый кадр): больше - уменьшается с тем же отношением сторон
+        if w * hh > MAX_FRAME_PIXELS {
+            let k = (MAX_FRAME_PIXELS as f64 / (w * hh) as f64).sqrt();
+            w = ((w as f64 * k) as usize).max(1);
+            hh = ((hh as f64 * k) as usize).max(1);
+        }
         let mut rgb = vec![0u8; w * hh * 3];
         for vp in self.viewports_of(win) {
             self.render_viewport(vp, w, hh, &mut rgb);
