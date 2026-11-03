@@ -44,7 +44,16 @@ fn main() {
                 Err(_) => return Err("ядро не запустилось".into()),
             };
             let url = format!("http://127.0.0.1:{port}/?token={token}").parse()?;
+            // «Выход» в IDE переходит на /__quit: окно внешнее, IPC Tauri ему недоступен
             WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url))
+                .on_navigation(move |u| {
+                    if u.path() == "/__quit" {
+                        // выход из обработчика прямо в потоке окна зависает
+                        std::thread::spawn(|| std::process::exit(0));
+                        return false;
+                    }
+                    true
+                })
                 .title("Stratum Modern")
                 .inner_size(1440.0, 900.0)
                 .min_inner_size(900.0, 600.0)

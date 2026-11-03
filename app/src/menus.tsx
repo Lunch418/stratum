@@ -70,7 +70,7 @@ export function buildMenus(ctx: MenuContext): Menu[] {
       { label: 'Печать...', hint: 'Ctrl+P', run: () => ctx.open('print'), disabled: noProject },
       { label: 'Параметры печати...', run: () => ctx.open('print'), disabled: noProject },
       { sep: true },
-      { label: 'Выход', run: () => window.close(), why: 'В браузере вкладка закрывается сама' },
+      { label: 'Выход', run: () => { location.assign('/__quit'); }, why: 'В браузере закройте вкладку' },
     ] },
     { title: 'Правка', items: [
       { label: 'Отмена', hint: 'Ctrl+Z', run: s.undo, disabled: !s.project?.canUndo },
