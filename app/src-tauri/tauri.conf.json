@@ -29,6 +29,7 @@
     ],
     "category": "Education",
     "publisher": "Lunch418",
+    "copyright": "Copyright (c) 2026 Lunch418. MIT License",
     "shortDescription": "Среда визуального моделирования, совместимая со Stratum 2000",
     "longDescription": "IDE и ядро моделирования, читающие проекты Stratum 2000: схема, тексты имиджей, окно модели, отладка. Библиотека и примеры оригинала в пакет не входят и подключаются из установленной копии Stratum.",
     "linux": {
