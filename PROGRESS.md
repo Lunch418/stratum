@@ -46,7 +46,7 @@ docs/verification.md (сверка с оригиналом в Wine), docs/review
 ## Известные баги
 - Без снимка в Wine: sclogo (падает оригинал), NUI и TextAnalyser (внешние библиотеки),
   2d/api/Net (нет файла проекта).
-- DBF: dBASE читается и пишется (Db* и окно "Таблицы DBF"); MEMO (.dbt), DbCreateTable (поля "ИМЯ:тип:длина:точн"), DbCopyTo (.dbf), DbSortTable, индексы в памяти (DbAddIndex/SwitchToIndex/SetToKey), DbSQL (CREATE/ALTER/DROP/INSERT/UPDATE/DELETE/SELECT, runtime/sql.rs), DbBrowse (очередь в состоянии плеера: поле browse; IDE ещё не открывает окно). Не сделано: QBE, форматы кроме dBASE, файлы индексов.
+- DBF: dBASE читается и пишется (Db* и окно "Таблицы DBF"); MEMO (.dbt), DbCreateTable (поля "ИМЯ:тип:длина:точн"), DbCopyTo (.dbf), DbSortTable, индексы в памяти (DbAddIndex/SwitchToIndex/SetToKey), DbSQL (CREATE/ALTER/DROP/INSERT/UPDATE/DELETE/SELECT, runtime/sql.rs), DbBrowse (очередь в состоянии плеера: поле browse; IDE открывает окно DBF на нужной таблице один раз на запрос, app/src/dbBrowse.ts). Не сделано: QBE, форматы кроме dBASE, файлы индексов.
 - Звук: Audio* через Web Audio (WAV/MP3/OGG, что декодирует WebView); MIDI и MOD не играют.
 - Нет движка: Ogre3D, запись AVI - вызовы считаются и показываются
   плашкой "функции, которых здесь нет".
@@ -55,3 +55,4 @@ docs/verification.md (сверка с оригиналом в Wine), docs/review
 - Ревью 33-34: NaN в LightParams -> 0, атомарное сохранение DBF (docs/review.md)
 
 - Dark theme pass: walked all tabs/dialogs; model-window controls stay a light surface (range tracks styled), dark custom checkboxes. Known: slider grooves in AudioPlayer are drawn black by the model SVG (core), not CSS.
+- Тёмная тема: проверены окно DBF/Database Explorer, инспектор (имидж, элемент), справка, окно модели - контраст в норме. Желоба ползунков AudioPlayer были чёрными: svg::color не знал системных цветов Windows (0x02000000|индекс); теперь они серые (схема Windows по умолчанию), тест в gfx/svg.rs. Из Wine не сверялось.

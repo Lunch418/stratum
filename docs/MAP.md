@@ -64,7 +64,7 @@
 - player_guard.rs - защита сервера на живом сервере | semantics.rs - семантика языка (регистр, фазы)
 
 ## app/src (React/TS IDE)
-- audio.ts - Web Audio: handleAudio, unlockAudio
+- audio.ts - Web Audio: handleAudio, unlockAudio | dbBrowse.ts - запросы DbBrowse из кадра: handleBrowse
 - main.tsx, App.tsx - вход и корневой макет | store.ts - состояние (useStore, classByName)
 - api.ts - клиент JSON-API ядра (api) | hyper.ts - обработка гиперсобытий (handleHyper)
 - menus.tsx - меню и команды | print.ts - печать | a11y.ts - доступность | autolink.ts - автоссылки | hooks.ts
