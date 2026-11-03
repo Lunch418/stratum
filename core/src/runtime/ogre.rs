@@ -72,6 +72,10 @@ pub struct SubMesh {
     pub idx: Vec<u32>,
     pub material: String,
     pub op: u16,
+    pub nrm: Vec<[f32; 3]>,
+    pub uv: Vec<[f32; 2]>,
+    /// Привязки вершин к костям: на вершину пары (кость, вес).
+    pub bones: Vec<Vec<(u16, f32)>>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -83,9 +87,41 @@ pub struct Mesh {
 }
 
 #[derive(Debug, Clone, Default)]
-struct Skeleton {
-    bones: Vec<String>,
-    anims: Vec<(String, f64)>,
+pub struct BoneDef {
+    pub name: String,
+    pub handle: u16,
+    pub parent: Option<usize>,
+    pub pos: V3,
+    pub rot: Q,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct Key {
+    pub t: f64,
+    pub rot: Q,
+    pub pos: V3,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct Anim {
+    pub name: String,
+    pub length: f64,
+    /// Дорожки: индекс кости, ключи по времени.
+    pub tracks: Vec<(usize, Vec<Key>)>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct Skeleton {
+    pub bones: Vec<BoneDef>,
+    pub anims: Vec<Anim>,
+}
+
+/// Текстура: RGBA построчно сверху вниз.
+#[derive(Debug, Clone)]
+pub struct Tex {
+    pub w: usize,
+    pub h: usize,
+    pub rgba: Vec<u8>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -125,6 +161,7 @@ struct Obj {
     track: u32,
     track_off: V3,
     container: bool,
+    skel: Option<Arc<Skeleton>>,
 }
 
 impl Obj {
@@ -145,6 +182,7 @@ impl Obj {
             track: 0,
             track_off: [0.0; 3],
             container: false,
+            skel: None,
         }
     }
 }
@@ -183,6 +221,20 @@ pub struct Ogre {
     mouse: [bool; 3],
     cursor: [f64; 2],
     wheel: f64,
+    textures: BTreeMap<String, Option<Arc<Tex>>>,
+    pending_tex: Vec<String>,
+    rendered_at: Option<u64>,
+    cached: FrameCache,
+}
+
+/// Кэш картинки кадра: не копируется при снимках состояния.
+#[derive(Debug, Default)]
+struct FrameCache(Option<(f64, f64, String)>);
+
+impl Clone for FrameCache {
+    fn clone(&self) -> Self {
+        FrameCache(None)
+    }
 }
 
 struct Sig {
@@ -235,6 +287,12 @@ pub fn call(lower: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
     } else {
         og.run(fx, lower, sig, args, &mut outs)
     };
+    for m in og.pending_log.drain(..) {
+        if fx.log.len() < 1000 {
+            fx.log.push(m);
+        }
+    }
+    og.flush_textures(fx);
     for m in og.pending_log.drain(..) {
         if fx.log.len() < 1000 {
             fx.log.push(m);
@@ -360,7 +418,8 @@ fn euler(order: &str, yaw: f64, pitch: f64, roll: f64) -> Q {
             'y' => qaxis(yaw, [0.0, 1.0, 0.0]),
             _ => qaxis(roll, [0.0, 0.0, 1.0]),
         };
-        q = qmul(q, r);
+        // справка: "поворот вокруг осей в порядке Z, Y, X" - последовательно, вокруг неподвижных осей
+        q = qmul(r, q);
     }
     qnorm(q)
 }
@@ -910,6 +969,7 @@ impl Ogre {
                         "texture" if tu != 0 => {
                             if let Some(a) = args.first() {
                                 self.objs.get_mut(&tu).unwrap().st.insert("textureunitstate.texture".into(), a.to_string());
+                                self.want_texture(a);
                             }
                         }
                         _ => {}
@@ -1102,8 +1162,9 @@ impl Ogre {
                 fl(0.0)
             }
             "scene_load" => {
-                self.objs.get_mut(&id).unwrap().st.insert("scene.loaded".into(), clean_name(&s(1)));
-                self.fail("Scene_Load: загрузка .scene не реализована".into());
+                let file = s(1);
+                self.objs.get_mut(&id).unwrap().st.insert("scene.loaded".into(), clean_name(&file));
+                self.load_scene(fx, id, &file);
                 fl(0.0)
             }
             // ---- создание объектов сцены ------------------------------------
@@ -1140,6 +1201,10 @@ impl Ogre {
                 } else {
                     None
                 };
+                let skel = match mesh.as_ref().and_then(|m| m.skeleton.clone()) {
+                    Some(k) => self.load_skeleton(fx, &k),
+                    None => None,
+                };
                 let nid = self.create_in_scene(sc, kind, &s(1));
                 if nid == 0 {
                     return h(0);
@@ -1150,6 +1215,7 @@ impl Ogre {
                     o.st.insert("entity.mesh".into(), clean_name(&s(2)));
                     o.mesh = Some(m);
                 }
+                o.skel = skel;
                 if kind == Kind::ParticleSystem {
                     o.st.insert("particlesystem.template".into(), clean_name(&s(2)));
                 }
@@ -1355,13 +1421,12 @@ impl Ogre {
                 fl(0.0)
             }
             "entity_getanimationstate" | "entity_getbone" => {
-                let skname = self.objs[&id].mesh.as_ref().and_then(|m| m.skeleton.clone());
-                let Some(sk) = skname.and_then(|k| self.load_skeleton(fx, &k)) else { return h(0) };
+                let Some(sk) = self.objs[&id].skel.clone() else { return h(0) };
                 let want = s(1);
                 let (kind, exists, len) = if name == "entity_getbone" {
-                    (Kind::Bone, sk.bones.iter().any(|b| b == &want), 0.0)
+                    (Kind::Bone, sk.bones.iter().any(|b| b.name == want), 0.0)
                 } else {
-                    let l = sk.anims.iter().find(|x| x.0 == want).map(|x| x.1);
+                    let l = sk.anims.iter().find(|x| x.name == want).map(|x| x.length);
                     (Kind::AnimState, l.is_some(), l.unwrap_or(0.0))
                 };
                 if !exists {
@@ -1372,6 +1437,7 @@ impl Ogre {
                 }
                 let mut o = Obj::new(kind, &want, self.scene_of(id));
                 o.parent = id;
+                o.skel = Some(sk.clone());
                 if kind == Kind::AnimState {
                     o.f.insert("animationstate.length".into(), vec![len]);
                 }
@@ -1486,7 +1552,16 @@ impl Ogre {
                             mesh.max[k] = mesh.max[k].max(v[k]);
                         }
                     }
-                    mesh.subs.push(SubMesh { verts: sec.verts.clone(), idx: sec.idx.clone(), material: sec.material.clone(), op: sec.op });
+                    let nz = sec.norms.iter().any(|n| n.iter().any(|v| *v != 0.0));
+                    mesh.subs.push(SubMesh {
+                        verts: sec.verts.clone(),
+                        idx: sec.idx.clone(),
+                        material: sec.material.clone(),
+                        op: sec.op,
+                        nrm: if nz { sec.norms.clone() } else { Vec::new() },
+                        uv: sec.uvs.clone(),
+                        bones: Vec::new(),
+                    });
                 }
                 self.meshes.insert(key, Arc::new(mesh));
                 fl(0.0)
@@ -1528,6 +1603,7 @@ impl Ogre {
             }
             "textureunitstate_settexture" => {
                 self.objs.get_mut(&id).unwrap().st.insert("textureunitstate.texture".into(), clean_name(&s(1)));
+                self.want_texture(&s(1));
                 self.objs.get_mut(&id).unwrap().f.insert("textureunitstate.texturetype".into(), vec![n(2)]);
                 fl(0.0)
             }
@@ -1966,38 +2042,6 @@ impl Ogre {
         if any { vec![mn[0], mn[1], mn[2], mx[0], mx[1], mx[2]] } else { vec![0.0; 6] }
     }
 
-    /// Все треугольники объекта в мировых координатах.
-    fn world_tris(&self, id: u32) -> Vec<[V3; 3]> {
-        let o = &self.objs[&id];
-        if o.parent == 0 {
-            return Vec::new();
-        }
-        let (p, r, s) = self.derived(o.parent);
-        let tf = |v: &[f32; 3]| -> V3 {
-            let q = qrot(r, [v[0] as f64 * s[0], v[1] as f64 * s[1], v[2] as f64 * s[2]]);
-            [q[0] + p[0], q[1] + p[1], q[2] + p[2]]
-        };
-        let mut out = Vec::new();
-        let mut emit = |verts: &[[f32; 3]], idx: &[u32], op: u16| {
-            for t in tri_list(op, idx) {
-                if let (Some(a), Some(b), Some(c)) = (verts.get(t[0] as usize), verts.get(t[1] as usize), verts.get(t[2] as usize)) {
-                    out.push([tf(a), tf(b), tf(c)]);
-                }
-            }
-        };
-        if let Some(m) = &o.mesh {
-            for sm in &m.subs {
-                emit(&sm.verts, &sm.idx, if sm.op == 0 { 4 } else { sm.op });
-            }
-        }
-        if let Some(m) = &o.manual {
-            for sec in &m.sections {
-                emit(&sec.verts, &sec.idx, sec.op);
-            }
-        }
-        out
-    }
-
     fn camera_pose(&self, cam: u32) -> Option<(V3, Q)> {
         let node = self.objs.get(&cam)?.parent;
         if node == 0 {
@@ -2018,7 +2062,8 @@ impl Ogre {
         let t = (fov / 2.0).tan();
         let (x, y) = ((2.0 * sx.clamp(0.0, 1.0) - 1.0) * t * aspect, (1.0 - 2.0 * sy.clamp(0.0, 1.0)) * t);
         if self.pf(cam, "camera.projectiontype")[0] == 0.0 {
-            let o = qrot(r, [x * 100.0, y * 100.0, 0.0]);
+            let near = self.pf(cam, "camera.nearclipdistance")[0];
+            let o = qrot(r, [x * near, y * near, 0.0]);
             Some(([p[0] + o[0], p[1] + o[1], p[2] + o[2]], unit(qrot(r, [0.0, 0.0, -1.0]))))
         } else {
             Some((p, unit(qrot(r, [x, y, -1.0]))))
@@ -2071,116 +2116,6 @@ impl Ogre {
         self.root_created
     }
 
-    // ---- отрисовка -------------------------------------------------------------------------
-
-    /// Рисует все области окна рендеринга (или текстуры) программным
-    /// растеризатором: плоская закраска по свету сцены, буфер глубины.
-    pub fn render(&self, window: Option<u32>) -> Option<Frame> {
-        let win = window.or_else(|| self.objs.iter().find(|(_, o)| o.kind == Kind::Window).map(|(k, _)| *k))?;
-        if !matches!(self.objs.get(&win)?.kind, Kind::Window | Kind::Texture) {
-            return None;
-        }
-        let ws = self.window_size(win);
-        let (w, hh) = ((ws[0] as usize).clamp(1, 4096), (ws[1] as usize).clamp(1, 4096));
-        let mut rgb = vec![0u8; w * hh * 3];
-        for vp in self.viewports_of(win) {
-            self.render_viewport(vp, w, hh, &mut rgb);
-        }
-        Some(Frame { width: w, height: hh, rgb })
-    }
-
-    fn render_viewport(&self, vp: u32, w: usize, hh: usize, rgb: &mut [u8]) {
-        let Some(cam) = self.objs[&vp].f.get("camera").map(|c| c[0] as u32) else { return };
-        let Some((cp, cr)) = self.camera_pose(cam) else { return };
-        let dim = { let d = self.pf(vp, "viewport.dimensions"); if d.len() == 4 { d } else { vec![0.0, 0.0, 1.0, 1.0] } };
-        let (x0, y0) = ((dim[0].clamp(0.0, 1.0) * w as f64) as usize, (dim[1].clamp(0.0, 1.0) * hh as f64) as usize);
-        let vw = ((dim[2].clamp(0.0, 1.0) * w as f64) as usize).min(w - x0).max(1);
-        let vh = ((dim[3].clamp(0.0, 1.0) * hh as f64) as usize).min(hh - y0).max(1);
-        let bg = self.pf(vp, "viewport.backgroundcolour");
-        let bgc = [0, 1, 2].map(|i| (bg.get(i).copied().unwrap_or(0.0).clamp(0.0, 1.0) * 255.0) as u8);
-        for y in y0..y0 + vh {
-            for x in x0..x0 + vw {
-                rgb[(y * w + x) * 3..(y * w + x) * 3 + 3].copy_from_slice(&bgc);
-            }
-        }
-        let scene = self.objs[&cam].scene;
-        let fov = self.pf(cam, "camera.fov")[0];
-        let near = self.pf(cam, "camera.nearclipdistance")[0].max(1e-4);
-        let ortho = self.pf(cam, "camera.projectiontype")[0] == 0.0;
-        let aspect = vw as f64 / vh as f64;
-        let th = (fov / 2.0).tan();
-        let ambient = self.objs.get(&scene).and_then(|s| s.f.get("scene.ambientlight")).cloned().unwrap_or_else(|| vec![0.0; 3]);
-        // направления света (в мире) и цвета
-        let mut lights: Vec<(V3, V3, bool, V3)> = Vec::new();
-        for (id, o) in &self.objs {
-            if o.kind == Kind::Light && o.scene == scene && o.parent != 0 {
-                let (p, r, _) = self.derived(o.parent);
-                let ty = self.pf(*id, "light.type").first().copied().unwrap_or(0.0);
-                let c = self.pf(*id, "light.diffusecolour");
-                let pw = self.pf(*id, "light.powerscale")[0];
-                let col = [c[0] * pw, c[1] * pw, c[2] * pw];
-                lights.push((p, unit(qrot(r, [0.0, 0.0, -1.0])), ty == 1.0, col));
-            }
-        }
-        let mut depth = vec![f64::INFINITY; vw * vh];
-        let inv = qconj(cr);
-        for (id, o) in &self.objs {
-            if o.scene != scene || !matches!(o.kind, Kind::Entity | Kind::ManualObject) || o.parent == 0 {
-                continue;
-            }
-            if self.pf(*id, "movable.visible")[0] == 0.0 {
-                continue;
-            }
-            // цвет материала
-            let mat = o.sub_mat.first().cloned().or_else(|| o.manual.as_ref().and_then(|m| m.sections.first().map(|s| s.material.clone()))).unwrap_or_default();
-            let (diff, lit) = self.material_look(&mat);
-            for t in self.world_tris(*id) {
-                let n = unit(cross(sub(t[1], t[0]), sub(t[2], t[0])));
-                let ctr = [(t[0][0] + t[1][0] + t[2][0]) / 3.0, (t[0][1] + t[1][1] + t[2][1]) / 3.0, (t[0][2] + t[1][2] + t[2][2]) / 3.0];
-                let mut shade = [ambient.first().copied().unwrap_or(0.0), ambient.get(1).copied().unwrap_or(0.0), ambient.get(2).copied().unwrap_or(0.0)];
-                for (lp, ld, directional, lc) in &lights {
-                    let l = if *directional { [-ld[0], -ld[1], -ld[2]] } else { unit(sub(*lp, ctr)) };
-                    let d = dot(n, l).abs();
-                    for k in 0..3 {
-                        shade[k] += d * lc[k];
-                    }
-                }
-                let col = [0, 1, 2].map(|k| {
-                    let s = if lit { shade[k].clamp(0.0, 1.0) } else { 1.0 };
-                    (diff[k] * s * 255.0).clamp(0.0, 255.0) as u8
-                });
-                let cs: Vec<V3> = t.iter().map(|v| qrot(inv, sub(*v, cp))).collect();
-                for poly in clip_near(&cs, near) {
-                    let pts: Vec<[f64; 3]> = poly
-                        .iter()
-                        .map(|v| {
-                            let z = -v[2];
-                            if ortho {
-                                let hh_ = th * 100.0;
-                                [(v[0] / (hh_ * aspect) * 0.5 + 0.5) * vw as f64, (0.5 - v[1] / hh_ * 0.5) * vh as f64, z]
-                            } else {
-                                [(v[0] / (z * th * aspect) * 0.5 + 0.5) * vw as f64, (0.5 - v[1] / (z * th) * 0.5) * vh as f64, z]
-                            }
-                        })
-                        .collect();
-                    for k in 1..pts.len().saturating_sub(1) {
-                        raster(&[pts[0], pts[k], pts[k + 1]], &mut depth, vw, vh, |x, y| {
-                            let i = ((y0 + y) * w + x0 + x) * 3;
-                            rgb[i..i + 3].copy_from_slice(&col);
-                        });
-                    }
-                }
-            }
-        }
-    }
-
-    fn material_look(&self, name: &str) -> ([f64; 3], bool) {
-        let Some(&m) = self.materials.get(&name.to_ascii_lowercase()) else { return ([0.8, 0.8, 0.8], true) };
-        let Some(p) = self.objs[&m].children.first().and_then(|t| self.objs[t].children.first()) else { return ([0.8, 0.8, 0.8], true) };
-        let d = self.pf(*p, "pass.diffuse");
-        let l = self.pf(*p, "pass.lightingenabled")[0] != 0.0;
-        ([d[0].clamp(0.0, 1.0), d[1].clamp(0.0, 1.0), d[2].clamp(0.0, 1.0)], l)
-    }
 }
 
 fn is_creator(name: &str) -> bool {
@@ -2222,53 +2157,6 @@ fn ray_tri(o: V3, d: V3, t: [V3; 3]) -> Option<f64> {
     }
     let dist = dot(e2, q) * inv;
     (dist >= 0.0 && dist.is_finite()).then_some(dist)
-}
-
-fn clip_near(tri: &[V3], near: f64) -> Vec<Vec<V3>> {
-    // камера смотрит вдоль -Z: видимо z <= -near
-    let inside = |v: &V3| v[2] <= -near;
-    let mut out = Vec::new();
-    for i in 0..tri.len() {
-        let (a, b) = (tri[i], tri[(i + 1) % tri.len()]);
-        if inside(&a) {
-            out.push(a);
-        }
-        if inside(&a) != inside(&b) {
-            let t = (-near - a[2]) / (b[2] - a[2]);
-            out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, -near]);
-        }
-    }
-    if out.len() >= 3 { vec![out] } else { Vec::new() }
-}
-
-fn raster(p: &[[f64; 3]; 3], depth: &mut [f64], w: usize, hh: usize, mut put: impl FnMut(usize, usize)) {
-    let minx = p.iter().map(|v| v[0]).fold(f64::INFINITY, f64::min).floor().max(0.0);
-    let maxx = p.iter().map(|v| v[0]).fold(f64::NEG_INFINITY, f64::max).ceil().min(w as f64 - 1.0);
-    let miny = p.iter().map(|v| v[1]).fold(f64::INFINITY, f64::min).floor().max(0.0);
-    let maxy = p.iter().map(|v| v[1]).fold(f64::NEG_INFINITY, f64::max).ceil().min(hh as f64 - 1.0);
-    if !(minx.is_finite() && maxx.is_finite() && miny.is_finite() && maxy.is_finite()) || minx > maxx || miny > maxy {
-        return;
-    }
-    let area = (p[1][0] - p[0][0]) * (p[2][1] - p[0][1]) - (p[2][0] - p[0][0]) * (p[1][1] - p[0][1]);
-    if area.abs() < 1e-9 {
-        return;
-    }
-    for y in miny as usize..=maxy as usize {
-        for x in minx as usize..=maxx as usize {
-            let (px, py) = (x as f64 + 0.5, y as f64 + 0.5);
-            let w0 = ((p[1][0] - px) * (p[2][1] - py) - (p[2][0] - px) * (p[1][1] - py)) / area;
-            let w1 = ((p[2][0] - px) * (p[0][1] - py) - (p[0][0] - px) * (p[2][1] - py)) / area;
-            let w2 = 1.0 - w0 - w1;
-            if w0 < 0.0 || w1 < 0.0 || w2 < 0.0 {
-                continue;
-            }
-            let z = w0 * p[0][2] + w1 * p[1][2] + w2 * p[2][2];
-            if z < depth[y * w + x] {
-                depth[y * w + x] = z;
-                put(x, y);
-            }
-        }
-    }
 }
 
 fn walk_find(dir: &std::path::Path, want: &str, depth: usize, budget: &mut usize) -> Option<PathBuf> {
@@ -2426,6 +2314,36 @@ impl<'a> Rd<'a> {
     }
 }
 
+#[derive(Default)]
+struct Geom {
+    pos: Vec<[f32; 3]>,
+    nrm: Vec<[f32; 3]>,
+    uv: Vec<[f32; 2]>,
+}
+
+fn read_bone_assignments(r: &mut Rd, end: usize, out: &mut Vec<(usize, u16, f32)>) -> Option<()> {
+    while r.p + 10 <= end && out.len() < MAX_VERTS * 4 {
+        let v = r.u32()? as usize;
+        let b = r.u16()?;
+        let w = r.f32()?;
+        out.push((v, b, w));
+    }
+    Some(())
+}
+
+fn spread_bones(n: usize, asg: &[(usize, u16, f32)]) -> Vec<Vec<(u16, f32)>> {
+    if asg.is_empty() {
+        return Vec::new();
+    }
+    let mut v = vec![Vec::new(); n];
+    for &(i, b, w) in asg {
+        if i < n && w.is_finite() && w > 0.0 && v[i].len() < 8 {
+            v[i].push((b, w));
+        }
+    }
+    v
+}
+
 pub fn parse_mesh(data: &[u8]) -> Option<Mesh> {
     let mut r = Rd { d: data, p: 0 };
     if r.u16()? != 0x1000 {
@@ -2436,13 +2354,14 @@ pub fn parse_mesh(data: &[u8]) -> Option<Mesh> {
         return None;
     }
     let mut mesh = Mesh { min: [f32::MAX; 3], max: [f32::MIN; 3], ..Default::default() };
-    let mut shared: Vec<[f32; 3]> = Vec::new();
+    let mut shared = Geom::default();
+    let mut shared_asg: Vec<(usize, u16, f32)> = Vec::new();
     let (id, mend) = r.chunk()?;
     if id != 0x3000 {
         return None;
     }
     r.u8()?;
-    let mut subs: Vec<(SubMesh, bool)> = Vec::new();
+    let mut subs: Vec<(SubMesh, bool, Vec<(usize, u16, f32)>)> = Vec::new();
     while r.p + 6 <= mend {
         let (id, end) = r.chunk()?;
         match id {
@@ -2458,18 +2377,26 @@ pub fn parse_mesh(data: &[u8]) -> Option<Mesh> {
                 for _ in 0..ic {
                     sm.idx.push(if wide { r.u32()? } else { r.u16()? as u32 });
                 }
+                let mut asg = Vec::new();
                 while r.p + 6 <= end {
                     let (sid, send) = r.chunk()?;
                     match sid {
-                        0x5000 if !use_shared => sm.verts = parse_geometry(&mut r, send)?,
+                        0x5000 if !use_shared => {
+                            let g = parse_geometry(&mut r, send)?;
+                            sm.verts = g.pos;
+                            sm.nrm = g.nrm;
+                            sm.uv = g.uv;
+                        }
                         0x4010 => sm.op = r.u16()?,
+                        0x4100 => read_bone_assignments(&mut r, send, &mut asg)?,
                         _ => {}
                     }
                     r.p = send;
                 }
-                subs.push((sm, use_shared));
+                subs.push((sm, use_shared, asg));
             }
             0x6000 => mesh.skeleton = Some(r.line()?),
+            0x7000 => read_bone_assignments(&mut r, end, &mut shared_asg)?,
             0x9000 => {
                 for k in 0..3 {
                     mesh.min[k] = r.f32()?;
@@ -2482,9 +2409,14 @@ pub fn parse_mesh(data: &[u8]) -> Option<Mesh> {
         }
         r.p = end;
     }
-    for (mut sm, use_shared) in subs {
+    for (mut sm, use_shared, asg) in subs {
         if use_shared {
-            sm.verts = shared.clone();
+            sm.verts = shared.pos.clone();
+            sm.nrm = shared.nrm.clone();
+            sm.uv = shared.uv.clone();
+            sm.bones = spread_bones(sm.verts.len(), &shared_asg);
+        } else {
+            sm.bones = spread_bones(sm.verts.len(), &asg);
         }
         if sm.idx.iter().any(|&i| i as usize >= sm.verts.len()) {
             return None;
@@ -2504,12 +2436,13 @@ pub fn parse_mesh(data: &[u8]) -> Option<Mesh> {
     Some(mesh)
 }
 
-fn parse_geometry(r: &mut Rd, end: usize) -> Option<Vec<[f32; 3]>> {
+fn parse_geometry(r: &mut Rd, end: usize) -> Option<Geom> {
     let vc = r.u32()? as usize;
     if vc > MAX_VERTS {
         return None;
     }
-    let mut pos_elem: Option<(u16, u16)> = None;
+    // (источник, смещение) для положения, нормали, первой текстурной координаты
+    let (mut pos_e, mut nrm_e, mut uv_e): (Option<(u16, u16)>, Option<(u16, u16)>, Option<(u16, u16)>) = (None, None, None);
     let mut bufs: HashMap<u16, (usize, usize)> = HashMap::new();
     let mut sizes: HashMap<u16, usize> = HashMap::new();
     while r.p + 6 <= end {
@@ -2519,9 +2452,12 @@ fn parse_geometry(r: &mut Rd, end: usize) -> Option<Vec<[f32; 3]>> {
                 while r.p + 6 <= cend {
                     let (eid, eend) = r.chunk()?;
                     if eid == 0x5110 {
-                        let (src, ty, sem, off) = (r.u16()?, r.u16()?, r.u16()?, r.u16()?);
-                        if sem == 1 && ty == 2 && pos_elem.is_none() {
-                            pos_elem = Some((src, off));
+                        let (src, ty, sem, off, idx) = (r.u16()?, r.u16()?, r.u16()?, r.u16()?, r.u16()?);
+                        match (sem, ty) {
+                            (1, 2) if pos_e.is_none() => pos_e = Some((src, off)),
+                            (4, 2) if nrm_e.is_none() => nrm_e = Some((src, off)),
+                            (7, 1) if uv_e.is_none() && idx == 0 => uv_e = Some((src, off)),
+                            _ => {}
                         }
                     }
                     r.p = eend;
@@ -2543,42 +2479,108 @@ fn parse_geometry(r: &mut Rd, end: usize) -> Option<Vec<[f32; 3]>> {
         }
         r.p = cend;
     }
-    let (src, off) = pos_elem?;
-    let (start, bend) = *bufs.get(&src)?;
-    let vsize = *sizes.get(&src)?;
-    if vsize < off as usize + 12 || start + vc.checked_mul(vsize)? > bend {
-        return None;
-    }
-    let mut out = Vec::with_capacity(vc);
-    for i in 0..vc {
-        let mut rr = Rd { d: r.d, p: start + i * vsize + off as usize };
-        out.push([rr.f32()?, rr.f32()?, rr.f32()?]);
-    }
-    Some(out)
+    let read = |e: (u16, u16), n: usize| -> Option<Vec<Vec<f32>>> {
+        let (start, bend) = *bufs.get(&e.0)?;
+        let vsize = *sizes.get(&e.0)?;
+        if vsize < e.1 as usize + n * 4 || start.checked_add(vc.checked_mul(vsize)?)? > bend {
+            return None;
+        }
+        let mut out = Vec::with_capacity(vc);
+        for i in 0..vc {
+            let mut rr = Rd { d: r.d, p: start + i * vsize + e.1 as usize };
+            let mut v = Vec::with_capacity(n);
+            for _ in 0..n {
+                v.push(rr.f32()?);
+            }
+            out.push(v);
+        }
+        Some(out)
+    };
+    let pos = read(pos_e?, 3)?.into_iter().map(|v| [v[0], v[1], v[2]]).collect();
+    let nrm = nrm_e.and_then(|e| read(e, 3)).map(|a| a.into_iter().map(|v| [v[0], v[1], v[2]]).collect()).unwrap_or_default();
+    let uv = uv_e.and_then(|e| read(e, 2)).map(|a| a.into_iter().map(|v| [v[0], v[1]]).collect()).unwrap_or_default();
+    Some(Geom { pos, nrm, uv })
 }
 
-fn parse_skeleton(data: &[u8]) -> Option<Skeleton> {
+pub fn parse_skeleton(data: &[u8]) -> Option<Skeleton> {
     let mut r = Rd { d: data, p: 0 };
     if r.u16()? != 0x1000 {
         return None;
     }
     r.line()?;
     let mut sk = Skeleton::default();
+    let mut parents: Vec<(u16, u16)> = Vec::new();
     while r.p + 6 <= data.len() {
         let (id, end) = r.chunk()?;
         match id {
-            0x2000 if sk.bones.len() < 4096 => sk.bones.push(r.line()?),
+            0x2000 if sk.bones.len() < 4096 => {
+                let name = r.line()?;
+                let handle = r.u16()?;
+                let pos = [r.f32()? as f64, r.f32()? as f64, r.f32()? as f64];
+                let (qx, qy, qz, qw) = (r.f32()? as f64, r.f32()? as f64, r.f32()? as f64, r.f32()? as f64);
+                sk.bones.push(BoneDef { name, handle, parent: None, pos, rot: qnorm([qw, qx, qy, qz]) });
+            }
+            0x3000 if parents.len() < 4096 => parents.push((r.u16()?, r.u16()?)),
             0x4000 if sk.anims.len() < 4096 => {
-                let n = r.line()?;
+                let name = r.line()?;
                 let l = r.f32()? as f64;
-                sk.anims.push((n, if l.is_finite() && l >= 0.0 { l } else { 0.0 }));
+                let mut an = Anim { name, length: if l.is_finite() && l >= 0.0 { l } else { 0.0 }, tracks: Vec::new() };
+                while r.p + 6 <= end {
+                    let (tid, tend) = r.chunk()?;
+                    if tid == 0x4100 && an.tracks.len() < 4096 {
+                        let bh = r.u16()?;
+                        let mut keys = Vec::new();
+                        while r.p + 6 <= tend && keys.len() < 100_000 {
+                            let (kid, kend) = r.chunk()?;
+                            if kid == 0x4110 {
+                                let t = r.f32()? as f64;
+                                let (qx, qy, qz, qw) = (r.f32()? as f64, r.f32()? as f64, r.f32()? as f64, r.f32()? as f64);
+                                let pos = [r.f32()? as f64, r.f32()? as f64, r.f32()? as f64];
+                                if t.is_finite() && pos.iter().all(|v| v.is_finite()) {
+                                    keys.push(Key { t, rot: qnorm([qw, qx, qy, qz]), pos });
+                                }
+                            }
+                            r.p = kend;
+                        }
+                        if let Some(bi) = sk.bones.iter().position(|b| b.handle == bh) {
+                            keys.sort_by(|a, b| a.t.partial_cmp(&b.t).unwrap_or(std::cmp::Ordering::Equal));
+                            an.tracks.push((bi, keys));
+                        }
+                    }
+                    r.p = tend;
+                }
+                sk.anims.push(an);
             }
             _ => {}
         }
         r.p = end;
     }
+    for (c, p) in parents {
+        let pi = sk.bones.iter().position(|b| b.handle == p);
+        if let Some(b) = sk.bones.iter_mut().find(|b| b.handle == c) {
+            b.parent = pi;
+        }
+    }
+    // защита от циклов: родитель должен идти до потомка по цепочке не длиннее числа костей
+    for i in 0..sk.bones.len() {
+        let mut cur = Some(i);
+        let mut n = 0;
+        while let Some(c) = cur {
+            n += 1;
+            if n > sk.bones.len() + 1 {
+                sk.bones[i].parent = None;
+                break;
+            }
+            cur = sk.bones[c].parent;
+        }
+    }
     Some(sk)
 }
+
+mod image;
+mod render;
+mod scene;
+pub use render::WINDOW_NAME;
 
 #[cfg(test)]
 mod tests;

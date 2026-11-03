@@ -217,3 +217,218 @@ fn mesh_parser_fuzz() {
         let _ = parse_mesh(&d[..d.len() / 3]);
     }
 }
+
+fn chunk(id: u16, body: &[u8]) -> Vec<u8> {
+    let mut v = id.to_le_bytes().to_vec();
+    v.extend_from_slice(&((body.len() + 6) as u32).to_le_bytes());
+    v.extend_from_slice(body);
+    v
+}
+fn f32s(a: &[f32]) -> Vec<u8> {
+    a.iter().flat_map(|x| x.to_le_bytes()).collect()
+}
+
+fn skinned_files(dir: &std::path::Path) {
+    // сетка: один треугольник, все вершины привязаны к кости 1
+    let mut geom = 3u32.to_le_bytes().to_vec();
+    let mut elem = Vec::new();
+    for v in [0u16, 2, 1, 0, 0] {
+        elem.extend_from_slice(&v.to_le_bytes());
+    }
+    geom.extend(chunk(0x5100, &chunk(0x5110, &elem)));
+    let mut buf = 0u16.to_le_bytes().to_vec();
+    buf.extend_from_slice(&12u16.to_le_bytes());
+    buf.extend(chunk(0x5210, &f32s(&[0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0])));
+    geom.extend(chunk(0x5200, &buf));
+    let mut sub = b"mat\n".to_vec();
+    sub.push(0);
+    sub.extend_from_slice(&3u32.to_le_bytes());
+    sub.push(0);
+    for i in [0u16, 1, 2] {
+        sub.extend_from_slice(&i.to_le_bytes());
+    }
+    sub.extend(chunk(0x5000, &geom));
+    let mut asg = Vec::new();
+    for v in 0..3u32 {
+        asg.extend_from_slice(&v.to_le_bytes());
+        asg.extend_from_slice(&1u16.to_le_bytes());
+        asg.extend_from_slice(&1f32.to_le_bytes());
+    }
+    sub.extend(chunk(0x4100, &asg));
+    let mut mesh_body = vec![1u8];
+    mesh_body.extend(chunk(0x4000, &sub));
+    mesh_body.extend(chunk(0x6000, b"anim.skeleton\n"));
+    let mut mesh = vec![0x00, 0x10];
+    mesh.extend_from_slice(b"[MeshSerializer_v1.40]\n");
+    mesh.extend(chunk(0x3000, &mesh_body));
+    std::fs::write(dir.join("tri.mesh"), mesh).unwrap();
+    // скелет: корень и кость 1; анимация сдвигает кость 1 на +2 по X
+    let bone = |name: &str, h: u16| {
+        let mut b = format!("{name}\n").into_bytes();
+        b.extend_from_slice(&h.to_le_bytes());
+        b.extend(f32s(&[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]));
+        chunk(0x2000, &b)
+    };
+    let mut sk = vec![0x00, 0x10];
+    sk.extend_from_slice(b"[Serializer_v1.10]\n");
+    sk.extend(bone("root", 0));
+    sk.extend(bone("arm", 1));
+    let mut par = 1u16.to_le_bytes().to_vec();
+    par.extend_from_slice(&0u16.to_le_bytes());
+    sk.extend(chunk(0x3000, &par));
+    let key = |t: f32, x: f32| {
+        let mut k = f32s(&[t, 0.0, 0.0, 0.0, 1.0, x, 0.0, 0.0]);
+        k.truncate(32);
+        chunk(0x4110, &k)
+    };
+    let mut track = 1u16.to_le_bytes().to_vec();
+    track.extend(key(0.0, 0.0));
+    track.extend(key(1.0, 2.0));
+    let mut anim = b"move\n".to_vec();
+    anim.extend(f32s(&[1.0]));
+    anim.extend(chunk(0x4100, &track));
+    sk.extend(chunk(0x4000, &anim));
+    std::fs::write(dir.join("anim.skeleton"), sk).unwrap();
+}
+
+#[test]
+fn skeletal_animation_skins_vertices() {
+    let dir = std::env::temp_dir().join(format!("stratum-ogre-skin-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    skinned_files(&dir);
+    let mut fx = Effects::default();
+    fx.gfx.project_dir = dir.clone();
+    let sc = boot(&mut fx);
+    let e = c(&mut fx, "Entity_Create", &[hv(&sc), st("e"), st("tri.mesh")]);
+    assert!(e.as_float() >= 1.0, "{:?}", fx.log);
+    let n = c(&mut fx, "SceneNode_Create", &[hv(&sc), st("n")]);
+    c(&mut fx, "SceneNode_AttachObject", &[hv(&n), hv(&e)]);
+    assert_eq!(c(&mut fx, "Entity_GetAnimationState", &[hv(&e), st("nope")]).as_float(), 0.0);
+    let a = c(&mut fx, "Entity_GetAnimationState", &[hv(&e), st("move")]);
+    assert!(a.as_float() >= 1.0);
+    assert_eq!(c(&mut fx, "AnimationState_GetLength", &[hv(&a)]).as_float(), 1.0);
+    assert!(c(&mut fx, "Entity_GetBone", &[hv(&e), st("arm")]).as_float() >= 1.0);
+    let x0 = fx.ogre.world_tris(e.as_float() as u32)[0][1][0];
+    assert!((x0 - 1.0).abs() < 1e-6);
+    c(&mut fx, "AnimationState_SetEnabled", &[hv(&a), f(1.0)]);
+    c(&mut fx, "AnimationState_AddTime", &[hv(&a), f(0.5)]);
+    let x1 = fx.ogre.world_tris(e.as_float() as u32)[0][1][0];
+    assert!((x1 - 2.0).abs() < 1e-5, "{x1}");
+    // цикл: 1.25 -> 0.25
+    c(&mut fx, "AnimationState_AddTime", &[hv(&a), f(0.75)]);
+    assert!((c(&mut fx, "AnimationState_GetTimePosition", &[hv(&a)]).as_float() - 0.25).abs() < 1e-9);
+    c(&mut fx, "AnimationState_SetLoop", &[hv(&a), f(0.0)]);
+    c(&mut fx, "AnimationState_AddTime", &[hv(&a), f(5.0)]);
+    assert_eq!(c(&mut fx, "AnimationState_GetTimePosition", &[hv(&a)]).as_float(), 1.0);
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+fn fixture_dir() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../fixtures/PROJECTS/samples/Ogre_3D")
+}
+
+#[test]
+fn scene_load_dotscene() {
+    let dir = fixture_dir().join("Project2");
+    if !dir.exists() {
+        return;
+    }
+    let mut fx = Effects::default();
+    fx.gfx.project_dir = dir;
+    let sc = boot(&mut fx);
+    c(&mut fx, "Root_AddResourceLocation", &[st("TestScene"), st("FileSystem"), st("General"), f(1.0)]);
+    c(&mut fx, "Root_InitialiseAllResourceGroups", &[]);
+    c(&mut fx, "Scene_Load", &[hv(&sc), st("TestScene/Lesson2.scene")]);
+    assert_eq!(fx.ogre.errors, 0, "{:?}", fx.log);
+    let t = c(&mut fx, "Scene_GetEntity", &[hv(&sc), st("Teapot01")]);
+    assert!(t.as_float() >= 1.0);
+    assert!(c(&mut fx, "Entity_GetVertexCount", &[hv(&t), f(0.0)]).as_float() > 100.0);
+    assert!(c(&mut fx, "Scene_GetLight", &[hv(&sc), st("Omni01")]).as_float() >= 1.0);
+    assert!(c(&mut fx, "Scene_GetEntity", &[hv(&sc), st("Plane01")]).as_float() >= 1.0);
+    assert!(c(&mut fx, "Material_Get", &[st("01-Default")]).as_float() >= 1.0);
+}
+
+#[test]
+fn texture_decoders_on_fixtures() {
+    let root = fixture_dir();
+    for (rel, min) in [("CompositorDemo/Data/RustyBarrel.png", 8), ("ManualMaterial/Data/MRAMOR.jpg", 8), ("CompositorDemo/Data/WaterNormal1.tga", 8)] {
+        let p = root.join(rel);
+        let Ok(d) = std::fs::read(&p) else { continue };
+        let t = image::decode(rel, &d).unwrap_or_else(|| panic!("{rel}"));
+        assert!(t.w >= min && t.h >= min && t.rgba.len() == t.w * t.h * 4, "{rel}");
+        // не сплошной цвет
+        assert!(t.rgba.chunks_exact(4).any(|p| p[..3] != t.rgba[..3]), "{rel} is flat");
+    }
+    // мусор не падает
+    for n in ["a.png", "a.jpg", "a.tga", "a.bmp"] {
+        assert!(image::decode(n, &[0x89, b'P', b'N', b'G', 0, 0, 0, 0, 0]).is_none());
+        assert!(image::decode(n, &[0xFF, 0xD8, 0xFF, 0xDA, 0, 2]).is_none());
+        assert!(image::decode(n, &[]).is_none());
+    }
+}
+
+#[test]
+fn texture_fuzz_does_not_panic() {
+    let root = fixture_dir();
+    let mut x = 99u64;
+    for rel in ["CompositorDemo/Data/RustyBarrel.png", "ManualMaterial/Data/MRAMOR.jpg", "CompositorDemo/Data/WaterNormal1.tga"] {
+        let Ok(base) = std::fs::read(root.join(rel)) else { continue };
+        for _ in 0..40 {
+            let mut d = base.clone();
+            for _ in 0..6 {
+                x = x.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                let i = (x >> 33) as usize % d.len();
+                d[i] = (x >> 20) as u8;
+            }
+            let _ = image::decode(rel, &d);
+            let _ = image::decode(rel, &d[..d.len() / 2]);
+        }
+    }
+}
+
+#[test]
+fn fog_and_texture_affect_pixels() {
+    let mut fx = Effects::default();
+    let sc = boot(&mut fx);
+    let mo = c(&mut fx, "ManualObject_Create", &[hv(&sc), st("q")]);
+    c(&mut fx, "ManualObject_Begin", &[hv(&mo), st(""), f(4.0)]);
+    for p in [[-5.0, -5.0, 0.0], [5.0, -5.0, 0.0], [5.0, 5.0, 0.0], [-5.0, 5.0, 0.0]] {
+        c(&mut fx, "ManualObject_Position", &[hv(&mo), f(p[0]), f(p[1]), f(p[2])]);
+    }
+    for i in [0.0, 1.0, 2.0, 0.0, 2.0, 3.0] {
+        c(&mut fx, "ManualObject_Index", &[hv(&mo), f(i)]);
+    }
+    c(&mut fx, "ManualObject_End", &[hv(&mo)]);
+    let n = c(&mut fx, "SceneNode_Create", &[hv(&sc), st("n")]);
+    c(&mut fx, "SceneNode_AttachObject", &[hv(&n), hv(&mo)]);
+    let cam = c(&mut fx, "Camera_Create", &[hv(&sc), st("c")]);
+    let cn = c(&mut fx, "SceneNode_Create", &[hv(&sc), st("cn")]);
+    c(&mut fx, "Node_SetPosition", &[hv(&cn), f(0.0), f(0.0), f(20.0)]);
+    c(&mut fx, "SceneNode_AttachObject", &[hv(&cn), hv(&cam)]);
+    c(&mut fx, "Camera_SetNearClipDistance", &[hv(&cam), f(1.0)]);
+    let win = c(&mut fx, "RenderWindow_GetPrimary", &[]);
+    c(&mut fx, "Viewport_Create", &[hv(&win), hv(&cam), f(0.0)]);
+    c(&mut fx, "Scene_SetAmbientLight", &[hv(&sc), f(1.0), f(1.0), f(1.0)]);
+    let mid = |fr: &Frame| {
+        let i = (fr.height / 2 * fr.width + fr.width / 2) * 3;
+        [fr.rgb[i], fr.rgb[i + 1], fr.rgb[i + 2]]
+    };
+    let plain = mid(&fx.ogre.render(None).unwrap());
+    assert!(plain[0] > 150, "{plain:?}");
+    // сплошной туман: цвет тумана
+    c(&mut fx, "Scene_SetFog", &[hv(&sc), f(3.0), f(1.0), f(0.0), f(0.0), f(0.0), f(1.0), f(2.0)]);
+    let fogged = mid(&fx.ogre.render(None).unwrap());
+    assert_eq!(fogged, [255, 0, 0]);
+    // точечный свет без окружения
+    c(&mut fx, "Scene_SetFog", &[hv(&sc), f(0.0), f(0.0), f(0.0), f(0.0), f(0.0), f(0.0), f(0.0)]);
+    c(&mut fx, "Scene_SetAmbientLight", &[hv(&sc), f(0.0), f(0.0), f(0.0)]);
+    let dark = mid(&fx.ogre.render(None).unwrap());
+    assert_eq!(dark, [0, 0, 0]);
+    let lt = c(&mut fx, "Light_Create", &[hv(&sc), st("l")]);
+    let ln = c(&mut fx, "SceneNode_Create", &[hv(&sc), st("ln")]);
+    c(&mut fx, "Node_SetPosition", &[hv(&ln), f(0.0), f(0.0), f(5.0)]);
+    c(&mut fx, "SceneNode_AttachObject", &[hv(&ln), hv(&lt)]);
+    c(&mut fx, "Light_SetAttenuation", &[hv(&lt), f(100.0), f(1.0), f(0.0), f(0.0)]);
+    let lit = mid(&fx.ogre.render(None).unwrap());
+    assert!(lit[0] > 100, "{lit:?}");
+}

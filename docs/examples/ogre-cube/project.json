@@ -1,0 +1,13 @@
+{
+  "classes": [
+    {
+      "file": "Main",
+      "name": "Main"
+    }
+  ],
+  "format": "stratum-modern/1",
+  "libraries": [],
+  "properties": [],
+  "root": "Main",
+  "variables": []
+}

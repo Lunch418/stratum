@@ -1,0 +1,85 @@
+{
+  "children": [],
+  "description": "",
+  "links": [],
+  "name": "Main",
+  "vars": [
+    {
+      "default": "",
+      "description": "",
+      "flags": 0,
+      "name": "init",
+      "type": "FLOAT"
+    },
+    {
+      "default": "",
+      "description": "",
+      "flags": 0,
+      "name": "ang",
+      "type": "FLOAT"
+    },
+    {
+      "default": "",
+      "description": "",
+      "flags": 0,
+      "name": "sc",
+      "type": "HANDLE"
+    },
+    {
+      "default": "",
+      "description": "",
+      "flags": 0,
+      "name": "mo",
+      "type": "HANDLE"
+    },
+    {
+      "default": "",
+      "description": "",
+      "flags": 0,
+      "name": "n",
+      "type": "HANDLE"
+    },
+    {
+      "default": "",
+      "description": "",
+      "flags": 0,
+      "name": "cam",
+      "type": "HANDLE"
+    },
+    {
+      "default": "",
+      "description": "",
+      "flags": 0,
+      "name": "cn",
+      "type": "HANDLE"
+    },
+    {
+      "default": "",
+      "description": "",
+      "flags": 0,
+      "name": "lt",
+      "type": "HANDLE"
+    },
+    {
+      "default": "",
+      "description": "",
+      "flags": 0,
+      "name": "ln",
+      "type": "HANDLE"
+    },
+    {
+      "default": "",
+      "description": "",
+      "flags": 0,
+      "name": "win",
+      "type": "HANDLE"
+    },
+    {
+      "default": "",
+      "description": "",
+      "flags": 0,
+      "name": "vp",
+      "type": "HANDLE"
+    }
+  ]
+}

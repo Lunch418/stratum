@@ -610,6 +610,10 @@ fn apply_event(s: &mut Shared, ev: Event) {
             }
         }
         Event::Mouse { window, msg, x, y, keys } => {
+            if window == crate::runtime::ogre::WINDOW_NAME {
+                s.sim.effects.ogre.mouse_event(msg, x, y, keys);
+                return;
+            }
             if let Some(space) = s.sim.effects.gfx.window_space(&window) {
                 // координаты страницы → координаты пространства
                 let (ox, oy, k) = s
@@ -689,6 +693,7 @@ fn apply_event(s: &mut Shared, ev: Event) {
             }
         }
         Event::Key { msg, vk } => {
+            s.sim.effects.ogre.key_event(msg, vk);
             let spaces: Vec<_> = s.sim.effects.gfx.spaces.keys().copied().collect();
             for space in spaces {
                 if let Err(e) = s.sim.key(space, msg, vk) {
@@ -965,6 +970,8 @@ fn frame_json(shared: &Arc<Mutex<Shared>>) -> String {
     let mut s = shared.lock().unwrap();
     let pending_sounds = std::mem::take(&mut s.sim.effects.sounds);
     s.sim.effects.sounds = pending_sounds.clone();
+    // окно рендеринга Ogre: картинка обновляется, когда модель отрисовала кадр
+    let ogre_frame = s.sim.effects.ogre.frame_svg();
     let gfx = &s.sim.effects.gfx;
     let mut windows = Vec::new();
     for (i, name) in gfx.window_order.iter().enumerate() {
@@ -998,6 +1005,14 @@ fn frame_json(shared: &Arc<Mutex<Shared>>) -> String {
             json_string(&sp.window_style),
             json_string(&svg::render_in(sp, Some(gfx))),
             controls.join(",")
+        ));
+    }
+    if let Some((w, h, svg)) = ogre_frame {
+        windows.push(format!(
+            "{{\"id\":{},\"name\":{},\"w\":{w},\"h\":{h},\"size\":\"default\",\"style\":\"default\",\"svg\":{},\"controls\":[]}}",
+            gfx.window_order.len(),
+            json_string(crate::runtime::ogre::WINDOW_NAME),
+            json_string(&svg)
         ));
     }
     let hyper: Vec<String> = std::mem::take(&mut s.hyper_events)
