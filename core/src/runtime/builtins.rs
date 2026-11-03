@@ -81,6 +81,8 @@ pub struct Effects {
     pub dbs: super::db::Dbs,
     /// Аудио-файлы модели (`Audio*`).
     pub audio: super::audio::Audios,
+    /// Состояние Ogre 3D (сцены, камеры, материалы, окна).
+    pub ogre: super::ogre::Ogre,
 }
 
 impl Effects {

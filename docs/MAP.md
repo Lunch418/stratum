@@ -36,6 +36,7 @@
 - audio.rs - состояние Audio* по дескрипторам: Audios, Sound, AudioCmd, wav_info
 - db.rs - функции Db* языка поверх dbf.rs (MEMO, индексы, сортировка, Browse): Dbs, call
 - sql.rs - SQL-подмножество для DbSQL: run, Done
+- ogre.rs (+ogre_sigs.txt, ogre/tests.rs) - Ogre 3D: состояние сцены по дескрипторам, .mesh/.skeleton/.material, лучи, программный render: call, Ogre, parse_mesh
 - data.rs - матрицы и динамические массивы: Matrix, Matrices, multiply, transpose, determinant
 - constants.rs - константы (PI, WM_*, стили окон): lookup (генерируется tools/gen_constants.py)
 - clock.rs - часы: local_now, tick_count, hundredths

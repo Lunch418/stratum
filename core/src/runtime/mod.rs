@@ -7,6 +7,7 @@ pub mod constants;
 pub mod data;
 pub mod db;
 pub mod extra;
+pub mod ogre;
 pub mod sql;
 pub mod value;
 

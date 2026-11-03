@@ -202,7 +202,7 @@ export function buildMenus(ctx: MenuContext): Menu[] {
       { label: 'Параметры среды...', run: () => ctx.open('envOptions') },
       { label: 'Параметры проекта...', run: () => ctx.open('projectOptions'), disabled: noProject },
       { sep: true },
-      { label: 'Дополнительные модули...', disabled: true, why: 'DBF, видео и звук встроены; Ogre3D и запись AVI не поддерживаются' },
+      { label: 'Дополнительные модули...', disabled: true, why: 'DBF, видео, звук и состояние Ogre3D встроены; запись AVI не поддерживается' },
       { label: 'Database Explorer...', run: () => ctx.open('dbf') },
     ] },
     { title: 'Окна', items: [

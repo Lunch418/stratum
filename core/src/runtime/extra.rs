@@ -612,6 +612,7 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
             num(0.0)
         }
         // Ogre3D — отдельный движок; в ядре не поддерживается, считаем вызовы
+        n if super::ogre::is_ogre(n) => return super::ogre::call(n, args, fx),
         n if is_ogre(n) => {
             *fx.missing.entry(name.to_string()).or_insert(0) += 1;
             Value::Handle(0.0)
