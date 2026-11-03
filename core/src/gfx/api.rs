@@ -890,7 +890,8 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
 
         // ── прозрачность и растр по пикселям ─────────────────────────────
         "setobjectalpha2d" => {
-            let a = f(args, 2).clamp(0.0, 255.0) as u8;
+            // уровень 0.0 ... 1.0 (справка, сверено в Wine: PNG, getobjectalpha2d * 100 = 100)
+            let a = (f(args, 2).clamp(0.0, 1.0) * 255.0).round() as u8;
             ok(object_mut(gfx, args).map(|o| o.alpha = a).is_some())
         }
         "getobjectsize2dx" | "getactualwidth2d" => num(object(gfx, args).map(|o| o.w).unwrap_or(0.0)),
@@ -926,7 +927,7 @@ pub fn call(name: &str, args: &[Value], gfx: &mut Gfx) -> Option<Value> {
         "getprojectprop" => Value::Str(String::new()),
         "setprojectprop" => ok(true),
         "removetexture" => ok(true),
-        "getobjectalpha2d" => num(object(gfx, args).map(|o| o.alpha as f64).unwrap_or(255.0)),
+        "getobjectalpha2d" => num(object(gfx, args).map(|o| o.alpha as f64 / 255.0).unwrap_or(1.0)),
         "getdibpixel2d" | "getddibpixel2d" => {
             let (x, y) = (f(args, 2) as i64, f(args, 3) as i64);
             let v = gfx.space_mut(h(args, 0)).and_then(|sp| sp.dibs.get_mut(&h(args, 1))).and_then(|d| d.pixel(x, y));
