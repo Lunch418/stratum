@@ -1,0 +1,7 @@
+# MDim: порядок выходных параметров (MinI, MinJ, MaxI, MaxJ), не как в справке
+> m := MCreate(0, 1, 5, 10, 20, 1)
+> r := MDim(~m, ~a, ~b, ~c, ~d)
+a | ~a
+b | ~b
+c | ~c
+d | ~d

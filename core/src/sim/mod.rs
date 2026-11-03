@@ -1286,6 +1286,14 @@ impl Vars for Frame<'_> {
             }
             // дескриптор экземпляра на схеме родителя
             "gethobject" => Value::Handle(self.sim.instances[self.instance].handle as f64),
+            // GetSchemeObject("..") (старое имя) даёт номер объекта схемы -
+            // handle самого экземпляра на схеме его родителя (PINBALL_)
+            "getschemeobject" | "gethobjectbyname" if arg(0).trim_start_matches('\\').starts_with("..") => {
+                match self.sim.resolve_path(self.instance, &arg(0)) {
+                    Some(i) => Value::Handle(self.sim.instances[i].handle as f64),
+                    None => Value::Handle(0.0),
+                }
+            }
             "gethobjectbyname" => match self.sim.find(&arg(0)) {
                 Some(i) => Value::Handle(i as f64),
                 None => Value::Handle(0.0),

@@ -386,7 +386,8 @@ pub fn call(name: &str, args: &[Value], fx: &mut Effects) -> Option<Value> {
         }
         "mdim" => match fx.matrices.get(data::idx(f(args, 0))) {
             Some(m) => {
-                for (i, v) in [m.min_i, m.max_i, m.min_j, m.max_j].into_iter().enumerate() {
+                // порядок оригинала (Wine, tools/verify/mdim.txt): MinI, MinJ, MaxI, MaxJ
+                for (i, v) in [m.min_i, m.min_j, m.max_i, m.max_j].into_iter().enumerate() {
                     fx.outputs.push((i + 1, num(v as f64)));
                 }
                 boolean(true)
