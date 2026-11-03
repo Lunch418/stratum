@@ -53,6 +53,33 @@ struct Surf<'a> {
     vw: usize,
     vh: usize,
     depth: Vec<f32>,
+    shadow: Option<Shadow>,
+}
+
+/// Карта теней: глубина вдоль луча источника (ортогональная проекция).
+struct Shadow {
+    n: usize,
+    r: f64,
+    map: Vec<f32>,
+    rl: V3,
+    ul: V3,
+    dl: V3,
+    off: V3,
+    bias: f64,
+}
+
+impl Shadow {
+    /// Точка в системе камеры в тени?
+    fn test(&self, pc: V3) -> bool {
+        let lx = self.off[0] + dot(self.rl, pc);
+        let ly = self.off[1] + dot(self.ul, pc);
+        let lz = self.off[2] + dot(self.dl, pc);
+        let (u, v) = ((lx / self.r * 0.5 + 0.5) * self.n as f64, (ly / self.r * 0.5 + 0.5) * self.n as f64);
+        if !(u >= 0.0 && v >= 0.0 && u < self.n as f64 && v < self.n as f64) {
+            return false;
+        }
+        (self.map[v as usize * self.n + u as usize] as f64) + self.bias < lz
+    }
 }
 
 struct Cam {
@@ -159,7 +186,9 @@ impl Ogre {
                 continue;
             }
             let tex = self.read_file(fx, &n).and_then(|d| image::decode(&n, &d));
-            if tex.is_none() {
+            // RT, rt0...: псевдоним цели композитора, файла нет
+            let alias = key.strip_prefix("rt").is_some_and(|r| r.chars().all(|c| c.is_ascii_digit()));
+            if tex.is_none() && !alias {
                 self.pending_log.push(format!("Ogre: текстура '{n}' не прочитана (BMP, TGA, PNG, базовый JPEG)"));
             }
             self.textures.insert(key, tex.map(Arc::new));
@@ -518,12 +547,13 @@ impl Ogre {
         let ambient = self.objs.get(&scene).and_then(|s| s.f.get("scene.ambientlight")).cloned().unwrap_or_else(|| vec![0.5; 3]);
         let lights = self.lights(scene);
         let inv = qconj(cr);
-        let mut surf = Surf { rgb, full_w: w, x0, y0, vw, vh, depth: vec![f32::INFINITY; vw * vh] };
+        let mut surf = Surf { rgb, full_w: w, x0, y0, vw, vh, depth: vec![f32::INFINITY; vw * vh], shadow: None };
 
         struct Item {
             dist: f64,
             geo: Geo,
             mat: MatLook,
+            cast: bool,
         }
         let mut items: Vec<Item> = Vec::new();
         for (id, o) in &self.objs {
@@ -533,13 +563,19 @@ impl Ogre {
             for g in self.object_geos(*id) {
                 let mat = self.material_look(&g.material);
                 let c = g.pos.first().copied().unwrap_or([0.0; 3]);
-                items.push(Item { dist: len(sub(c, cp)), geo: g, mat });
+                let cast = self.objs[id].f.get("movable.castshadows").is_none_or(|v| v[0] != 0.0) && mat.blend == (0, 1);
+                items.push(Item { dist: len(sub(c, cp)), geo: g, mat, cast });
             }
         }
         items.sort_by(|a, b| {
             let (ta, tb) = (a.mat.blend != (0, 1), b.mat.blend != (0, 1));
             ta.cmp(&tb).then(if ta { b.dist.partial_cmp(&a.dist).unwrap_or(std::cmp::Ordering::Equal) } else { std::cmp::Ordering::Equal })
         });
+        let shadow_on = self.objs.get(&scene).and_then(|s| s.f.get("scene.shadowtechnique")).is_some_and(|v| v[0] != 0.0);
+        if shadow_on {
+            let casters: Vec<(&Geo, bool)> = items.iter().filter(|i| i.cast).map(|i| (&i.geo, true)).collect();
+            surf.shadow = self.build_shadow(&lights, &items.iter().map(|i| &i.geo).collect::<Vec<_>>(), &casters, cp, inv);
+        }
         let amb = [ambient.first().copied().unwrap_or(0.5), ambient.get(1).copied().unwrap_or(0.5), ambient.get(2).copied().unwrap_or(0.5)];
         for it in &items {
             let g = &it.geo;
@@ -666,9 +702,162 @@ impl Ogre {
             let col = if col.len() == 4 { col } else { vec![1.0; 4] };
             put_text(&mut surf, &cap, x, y, px, [col[0], col[1], col[2]], col[3]);
         }
+        self.apply_compositors(vp, &mut surf);
         // наложения (Overlay)
         if self.pf(vp, "viewport.overlaysenabled")[0] != 0.0 {
             self.draw_overlays(&mut surf);
+        }
+    }
+
+    /// Карта теней от первого источника света: все видимые непрозрачные объекты
+    /// с CastShadows отбрасывают тень на всё освещаемое (детерминированно).
+    fn build_shadow(&self, lights: &[Light], all: &[&Geo], casters: &[(&Geo, bool)], cp: V3, inv: Q) -> Option<Shadow> {
+        let l = lights.iter().find(|l| l.kind == 1).or_else(|| lights.first())?;
+        let (mut lo, mut hi) = ([f64::MAX; 3], [f64::MIN; 3]);
+        for g in all {
+            for p in &g.pos {
+                for k in 0..3 {
+                    lo[k] = lo[k].min(p[k]);
+                    hi[k] = hi[k].max(p[k]);
+                }
+            }
+        }
+        if lo[0] > hi[0] || !lo.iter().chain(hi.iter()).all(|v| v.is_finite()) {
+            return None;
+        }
+        let c = [(lo[0] + hi[0]) / 2.0, (lo[1] + hi[1]) / 2.0, (lo[2] + hi[2]) / 2.0];
+        let r = (len(sub(hi, lo)) / 2.0).max(1e-6);
+        let d = if l.kind == 1 { l.dir } else { unit(sub(c, l.pos)) };
+        if len(d) < 0.5 {
+            return None;
+        }
+        let helper = if d[1].abs() < 0.9 { [0.0, 1.0, 0.0] } else { [1.0, 0.0, 0.0] };
+        let right = unit(cross(d, helper));
+        let up = cross(right, d);
+        let n = 512usize;
+        let mut map = vec![f32::INFINITY; n * n];
+        let tolight = |p: V3| {
+            let q = sub(p, c);
+            [(dot(q, right) / r * 0.5 + 0.5) * n as f64, (dot(q, up) / r * 0.5 + 0.5) * n as f64, dot(q, d)]
+        };
+        for (g, _) in casters {
+            for t in &g.tris {
+                let ids = [t[0] as usize, t[1] as usize, t[2] as usize];
+                if ids.iter().any(|&i| i >= g.pos.len()) {
+                    continue;
+                }
+                let p = ids.map(|i| tolight(g.pos[i]));
+                let area = (p[1][0] - p[0][0]) * (p[2][1] - p[0][1]) - (p[2][0] - p[0][0]) * (p[1][1] - p[0][1]);
+                if area.abs() < 1e-12 || !area.is_finite() {
+                    continue;
+                }
+                let minx = p.iter().map(|v| v[0]).fold(f64::INFINITY, f64::min).floor().max(0.0) as usize;
+                let maxx = p.iter().map(|v| v[0]).fold(f64::NEG_INFINITY, f64::max).ceil().min(n as f64 - 1.0).max(0.0) as usize;
+                let miny = p.iter().map(|v| v[1]).fold(f64::INFINITY, f64::min).floor().max(0.0) as usize;
+                let maxy = p.iter().map(|v| v[1]).fold(f64::NEG_INFINITY, f64::max).ceil().min(n as f64 - 1.0).max(0.0) as usize;
+                for y in miny..=maxy {
+                    for x in minx..=maxx {
+                        let (px, py) = (x as f64 + 0.5, y as f64 + 0.5);
+                        let w0 = ((p[1][0] - px) * (p[2][1] - py) - (p[2][0] - px) * (p[1][1] - py)) / area;
+                        let w1 = ((p[2][0] - px) * (p[0][1] - py) - (p[0][0] - px) * (p[2][1] - py)) / area;
+                        let w2 = 1.0 - w0 - w1;
+                        if w0 < -1e-9 || w1 < -1e-9 || w2 < -1e-9 {
+                            continue;
+                        }
+                        let z = (w0 * p[0][2] + w1 * p[1][2] + w2 * p[2][2]) as f32;
+                        let cell = &mut map[y * n + x];
+                        if z < *cell {
+                            *cell = z;
+                        }
+                    }
+                }
+            }
+        }
+        // мировая точка = cp + qrot(cr, pc): переносим базис в систему камеры
+        let rl = qrot(inv, right);
+        let ul = qrot(inv, up);
+        let dl = qrot(inv, d);
+        let q = sub(cp, c);
+        Some(Shadow { n, r, map, rl, ul, dl, off: [dot(q, right), dot(q, up), dot(q, d)], bias: r * 0.02 })
+    }
+
+    /// Композиторы окна просмотра: цели, проходы clear / render_scene / render_quad.
+    /// Шейдерные программы не выполняются (см. docs/ogre.md).
+    fn apply_compositors(&self, vp: u32, s: &mut Surf) {
+        let comps: Vec<u32> = self.objs[&vp]
+            .children
+            .iter()
+            .copied()
+            .filter(|c| self.objs.get(c).is_some_and(|o| o.kind == Kind::Compositor) && self.objs[c].f.get("compositor.enabled").is_some_and(|v| v[0] != 0.0))
+            .collect();
+        if comps.is_empty() {
+            return;
+        }
+        let (vw, vh) = (s.vw, s.vh);
+        let mut scene = vec![0u8; vw * vh * 3];
+        for y in 0..vh {
+            let o = ((s.y0 + y) * s.full_w + s.x0) * 3;
+            scene[y * vw * 3..(y + 1) * vw * 3].copy_from_slice(&s.rgb[o..o + vw * 3]);
+        }
+        let mut prev = scene.clone();
+        for c in comps {
+            let Some(def) = self.cdefs.get(&self.objs[&c].name.to_ascii_lowercase()) else { continue };
+            let mut bufs: std::collections::BTreeMap<String, Vec<u8>> = std::collections::BTreeMap::new();
+            for t in def.targets.iter().chain(std::iter::once(&def.output)) {
+                let mut b = if t.previous { prev.clone() } else { vec![0u8; vw * vh * 3] };
+                for p in &t.passes {
+                    match p.kind.as_str() {
+                        "clear" => {
+                            let col = p.clear.map(|v| (v.clamp(0.0, 1.0) * 255.0) as u8);
+                            for px in b.chunks_exact_mut(3) {
+                                px.copy_from_slice(&col);
+                            }
+                        }
+                        "render_scene" => b.copy_from_slice(&scene),
+                        "render_quad" => {
+                            let src = p.inputs.first().and_then(|(_, n)| bufs.get(n)).unwrap_or(&prev);
+                            self.compose_quad(&p.material, src, &mut b, vw, vh);
+                        }
+                        _ => {}
+                    }
+                }
+                if t.name.is_empty() {
+                    prev = b;
+                } else {
+                    bufs.insert(t.name.clone(), b);
+                }
+            }
+        }
+        for y in 0..vh {
+            let o = ((s.y0 + y) * s.full_w + s.x0) * 3;
+            s.rgb[o..o + vw * 3].copy_from_slice(&prev[y * vw * 3..(y + 1) * vw * 3]);
+        }
+    }
+
+    fn compose_quad(&self, material: &str, src: &[u8], dst: &mut [u8], vw: usize, vh: usize) {
+        let m = self.material_look(material);
+        let lname = material.to_ascii_lowercase();
+        let shader = self.shader_mats.contains(&lname);
+        if let (false, Some(tx)) = (shader, &m.tex) {
+            for y in 0..vh {
+                for x in 0..vw {
+                    let tc = texel(tx, (x as f64 + 0.5) / vw as f64, (y as f64 + 0.5) / vh as f64);
+                    for k in 0..3 {
+                        dst[(y * vw + x) * 3 + k] = (tc[k] * 255.0) as u8;
+                    }
+                }
+            }
+            return;
+        }
+        // известный эффект без шейдера: чёрно-белое изображение
+        let grey = lname.contains("blackandwhite") || lname.contains("grayscale") || lname.contains("greyscale");
+        for (o, i) in dst.chunks_exact_mut(3).zip(src.chunks_exact(3)) {
+            if grey {
+                let y = (0.299 * i[0] as f64 + 0.587 * i[1] as f64 + 0.114 * i[2] as f64) as u8;
+                o.copy_from_slice(&[y, y, y]);
+            } else {
+                o.copy_from_slice(i);
+            }
         }
     }
 
@@ -963,6 +1152,16 @@ fn draw_tri(s: &mut Surf, c: &Cam, t: [Pv; 3], m: &MatLook) {
             let (a0, a1, a2) = (w0 * iz[0] * z, w1 * iz[1] * z, w2 * iz[2] * z);
             let mut col = [0, 1, 2].map(|k| t[0].col[k] * a0 + t[1].col[k] * a1 + t[2].col[k] * a2);
             let mut alpha = m.diff[3];
+            if m.lit {
+                if let Some(sh) = &s.shadow {
+                    let pc = [0, 1, 2].map(|k| t[0].p[k] * a0 + t[1].p[k] * a1 + t[2].p[k] * a2);
+                    if sh.test(pc) {
+                        for k in 0..3 {
+                            col[k] *= 0.3;
+                        }
+                    }
+                }
+            }
             if let Some(tx) = &m.tex {
                 let u = t[0].uv[0] * a0 + t[1].uv[0] * a1 + t[2].uv[0] * a2;
                 let v = t[0].uv[1] * a0 + t[1].uv[1] * a1 + t[2].uv[1] * a2;

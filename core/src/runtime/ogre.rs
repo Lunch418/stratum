@@ -214,6 +214,8 @@ pub struct Ogre {
     meshes: BTreeMap<String, Arc<Mesh>>,
     skeletons: BTreeMap<String, Arc<Skeleton>>,
     compositors: BTreeSet<String>,
+    cdefs: BTreeMap<String, Arc<fx::CompDef>>,
+    shader_mats: BTreeSet<String>,
     hits: Vec<(f64, u32)>,
     /// Сколько вызовов отклонено (неверный дескриптор, предел, NaN).
     pub errors: u32,
@@ -884,6 +886,7 @@ impl Ogre {
                         self.compositors.insert(w[1].to_ascii_lowercase());
                     }
                 }
+                fx::parse_compositors(&toks, &mut self.cdefs);
             }
             "overlay" => self.parse_overlays(text),
             _ => self.parse_particles(text),
@@ -994,6 +997,16 @@ impl Ogre {
                     pass = self.add_child(tech, Kind::Pass, args.first().copied().unwrap_or(""));
                     tu = 0;
                     stack.push("pass");
+                }
+                "vertex_program_ref" | "fragment_program_ref" | "geometry_program_ref" | "shadow_caster_vertex_program_ref" | "shadow_receiver_fragment_program_ref" | "shadow_receiver_vertex_program_ref" => {
+                    let nm = self.objs[&mat].name.to_ascii_lowercase();
+                    if self.shader_mats.len() < 4096 && self.shader_mats.insert(nm) {
+                        let m = format!("Ogre: материал '{}' использует шейдерную программу ({}), она не выполняется", self.objs[&mat].name, args.first().copied().unwrap_or("?"));
+                        if self.pending_log.len() < 64 {
+                            self.pending_log.push(m);
+                        }
+                    }
+                    stack.push("program");
                 }
                 "texture_unit" if pass != 0 => {
                     tu = self.add_child(pass, Kind::TextureUnit, args.first().copied().unwrap_or(""));

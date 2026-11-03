@@ -270,6 +270,34 @@ fn inflate_at(d: &[u8], start: usize, cap: usize) -> Option<Vec<u8>> {
     }
 }
 
+/// Обратные фильтры строк PNG: `raw` - строки с байтом фильтра, результат в `img`.
+fn png_unfilter(raw: &[u8], stride: usize, h: usize, bpp: usize, img: &mut [u8]) -> Option<()> {
+    for y in 0..h {
+        let f = raw[y * (stride + 1)];
+        let line = &raw[y * (stride + 1) + 1..(y + 1) * (stride + 1)];
+        for x in 0..stride {
+            let a = if x >= bpp { img[y * stride + x - bpp] as i32 } else { 0 };
+            let b = if y > 0 { img[(y - 1) * stride + x] as i32 } else { 0 };
+            let c = if x >= bpp && y > 0 { img[(y - 1) * stride + x - bpp] as i32 } else { 0 };
+            let pr = match f {
+                0 => 0,
+                1 => a,
+                2 => b,
+                3 => (a + b) / 2,
+                4 => {
+                    let pa = (b - c).abs();
+                    let pb = (a - c).abs();
+                    let pc = (a + b - 2 * c).abs();
+                    if pa <= pb && pa <= pc { a } else if pb <= pc { b } else { c }
+                }
+                _ => return None,
+            };
+            img[y * stride + x] = (line[x] as i32 + pr) as u8;
+        }
+    }
+    Some(())
+}
+
 fn png(d: &[u8]) -> Option<Tex> {
     let mut p = 8;
     let (mut w, mut h, mut depth, mut ct, mut interlace) = (0usize, 0usize, 0u8, 0u8, 0u8);
@@ -301,7 +329,7 @@ fn png(d: &[u8]) -> Option<Tex> {
         }
         p += 12 + len;
     }
-    if !checked(w, h) || interlace != 0 || !matches!(depth, 1 | 2 | 4 | 8 | 16) {
+    if !checked(w, h) || interlace > 1 || !matches!(depth, 1 | 2 | 4 | 8 | 16) {
         return None;
     }
     let chans = match ct {
@@ -317,32 +345,51 @@ fn png(d: &[u8]) -> Option<Tex> {
     let bits = chans * depth as usize;
     let stride = (w * bits).div_ceil(8);
     let bpp = bits.div_ceil(8).max(1);
-    let raw = inflate(&idat, (stride + 1) * h)?;
-    if raw.len() < (stride + 1) * h {
-        return None;
-    }
     let mut img = vec![0u8; stride * h];
-    for y in 0..h {
-        let f = raw[y * (stride + 1)];
-        let line = &raw[y * (stride + 1) + 1..(y + 1) * (stride + 1)];
-        for x in 0..stride {
-            let a = if x >= bpp { img[y * stride + x - bpp] as i32 } else { 0 };
-            let b = if y > 0 { img[(y - 1) * stride + x] as i32 } else { 0 };
-            let c = if x >= bpp && y > 0 { img[(y - 1) * stride + x - bpp] as i32 } else { 0 };
-            let pr = match f {
-                0 => 0,
-                1 => a,
-                2 => b,
-                3 => (a + b) / 2,
-                4 => {
-                    let pa = (b - c).abs();
-                    let pb = (a - c).abs();
-                    let pc = (a + b - 2 * c).abs();
-                    if pa <= pb && pa <= pc { a } else if pb <= pc { b } else { c }
+    if interlace == 0 {
+        let raw = inflate(&idat, (stride + 1) * h)?;
+        if raw.len() < (stride + 1) * h {
+            return None;
+        }
+        png_unfilter(&raw, stride, h, bpp, &mut img)?;
+    } else {
+        // Adam7: (x0, y0, шаг x, шаг y) семи проходов
+        const PASSES: [(usize, usize, usize, usize); 7] = [(0, 0, 8, 8), (4, 0, 8, 8), (0, 4, 4, 8), (2, 0, 4, 4), (0, 2, 2, 4), (1, 0, 2, 2), (0, 1, 1, 2)];
+        let dims = |&(xs, ys, dx, dy): &(usize, usize, usize, usize)| -> Option<(usize, usize, usize)> {
+            if xs >= w || ys >= h {
+                return None;
+            }
+            let (pw, ph) = ((w - xs).div_ceil(dx), (h - ys).div_ceil(dy));
+            Some((pw, ph, (pw * bits).div_ceil(8)))
+        };
+        let total: usize = PASSES.iter().filter_map(dims).map(|(_, ph, ps)| (ps + 1) * ph).sum();
+        let raw = inflate(&idat, total)?;
+        if raw.len() < total {
+            return None;
+        }
+        let mut off = 0;
+        for pass in PASSES.iter() {
+            let Some((pw, ph, ps)) = dims(pass) else { continue };
+            let (xs, ys, dx, dy) = *pass;
+            let mut pimg = vec![0u8; ps * ph];
+            png_unfilter(&raw[off..off + (ps + 1) * ph], ps, ph, bpp, &mut pimg)?;
+            off += (ps + 1) * ph;
+            for py in 0..ph {
+                for px in 0..pw {
+                    let (x, y) = (xs + px * dx, ys + py * dy);
+                    if bits % 8 == 0 {
+                        let n = bits / 8;
+                        img[y * stride + x * n..y * stride + x * n + n].copy_from_slice(&pimg[py * ps + px * n..py * ps + px * n + n]);
+                    } else {
+                        for k in 0..bits {
+                            let si = px * bits + k;
+                            let bit = (pimg[py * ps + si / 8] >> (7 - si % 8)) & 1;
+                            let di = x * bits + k;
+                            img[y * stride + di / 8] |= bit << (7 - di % 8);
+                        }
+                    }
                 }
-                _ => return None,
-            };
-            img[y * stride + x] = (line[x] as i32 + pr) as u8;
+            }
         }
     }
     let mut rgba = vec![255u8; w * h * 4];
@@ -598,7 +645,8 @@ fn jpeg(d: &[u8]) -> Option<Tex> {
                     comps.push(Comp { id: b[0], h: ch, v: cv, tq: b[2] as usize, td: 0, ta: 0, plane: Vec::new(), pw: 0 });
                 }
             }
-            0xC2 | 0xC3 | 0xC5..=0xC7 | 0xC9..=0xCF => return None,
+            0xC2 => return jpeg_prog(d),
+            0xC3 | 0xC5..=0xC7 | 0xC9..=0xCF => return None,
             0xC4 => {
                 let mut s = seg;
                 while s.len() >= 17 {
@@ -701,6 +749,10 @@ fn jpeg_scan(d: &[u8], p: usize, w: usize, h: usize, hmax: usize, vmax: usize, r
             }
         }
     }
+    Some(jpeg_to_tex(w, h, hmax, vmax, &comps))
+}
+
+fn jpeg_to_tex(w: usize, h: usize, hmax: usize, vmax: usize, comps: &[Comp]) -> Tex {
     let mut rgba = vec![255u8; w * h * 4];
     for y in 0..h {
         for x in 0..w {
@@ -717,5 +769,314 @@ fn jpeg_scan(d: &[u8], p: usize, w: usize, h: usize, hmax: usize, vmax: usize, r
             }
         }
     }
-    Some(Tex { w, h, rgba })
+    Tex { w, h, rgba }
+}
+
+// ---- JPEG прогрессивный (SOF2) ---------------------------------------------------
+
+struct PComp {
+    id: u8,
+    h: usize,
+    v: usize,
+    tq: usize,
+    bw: usize,
+    bh: usize,
+    /// коэффициенты блоков в естественном порядке (после обратного зигзага)
+    coef: Vec<i16>,
+}
+
+fn jpeg_prog(d: &[u8]) -> Option<Tex> {
+    let mut p = 2;
+    let mut qt = [[0u16; 64]; 4];
+    let mut dc: [Option<JHuff>; 4] = [None, None, None, None];
+    let mut ac: [Option<JHuff>; 4] = [None, None, None, None];
+    let mut comps: Vec<PComp> = Vec::new();
+    let (mut w, mut h) = (0usize, 0usize);
+    let (mut hmax, mut vmax) = (1usize, 1usize);
+    let mut restart = 0usize;
+    let mut scans = 0;
+    loop {
+        while *d.get(p)? != 0xFF {
+            p += 1;
+        }
+        while *d.get(p)? == 0xFF {
+            p += 1;
+        }
+        let m = *d.get(p)?;
+        p += 1;
+        if m == 0xD9 {
+            break;
+        }
+        if (0xD0..=0xD8).contains(&m) || m == 0x01 {
+            continue;
+        }
+        let len = u16::from_be_bytes([*d.get(p)?, *d.get(p + 1)?]) as usize;
+        if len < 2 {
+            return None;
+        }
+        let seg = d.get(p + 2..p + len)?;
+        match m {
+            0xDB => {
+                let mut s = seg;
+                while !s.is_empty() {
+                    let (pq, tq) = (s[0] >> 4, (s[0] & 15) as usize);
+                    if tq > 3 {
+                        return None;
+                    }
+                    s = &s[1..];
+                    for i in 0..64 {
+                        qt[tq][ZIGZAG[i]] = if pq == 0 { *s.get(i)? as u16 } else { u16::from_be_bytes([*s.get(i * 2)?, *s.get(i * 2 + 1)?]) };
+                    }
+                    s = s.get(if pq == 0 { 64 } else { 128 }..)?;
+                }
+            }
+            0xC2 => {
+                if !comps.is_empty() || *seg.first()? != 8 || seg.len() < 6 {
+                    return None;
+                }
+                h = u16::from_be_bytes([seg[1], seg[2]]) as usize;
+                w = u16::from_be_bytes([seg[3], seg[4]]) as usize;
+                let n = seg[5] as usize;
+                // прогрессивному нужны все коэффициенты в памяти: предел вдвое ниже
+                if !checked(w, h) || w * h > 8 << 20 || !(n == 1 || n == 3) || seg.len() < 6 + n * 3 {
+                    return None;
+                }
+                let mut raw = Vec::new();
+                for i in 0..n {
+                    let b = &seg[6 + i * 3..9 + i * 3];
+                    let (ch, cv) = ((b[1] >> 4) as usize, (b[1] & 15) as usize);
+                    if !(1..=4).contains(&ch) || !(1..=4).contains(&cv) || b[2] > 3 {
+                        return None;
+                    }
+                    hmax = hmax.max(ch);
+                    vmax = vmax.max(cv);
+                    raw.push((b[0], ch, cv, b[2] as usize));
+                }
+                let (mcx, mcy) = (w.div_ceil(8 * hmax), h.div_ceil(8 * vmax));
+                for (id, ch, cv, tq) in raw {
+                    let (bw, bh) = (mcx * ch, mcy * cv);
+                    comps.push(PComp { id, h: ch, v: cv, tq, bw, bh, coef: vec![0i16; bw * bh * 64] });
+                }
+            }
+            0xC0 | 0xC1 | 0xC3 | 0xC5..=0xC7 | 0xC9..=0xCF => return None,
+            0xC4 => {
+                let mut s = seg;
+                while s.len() >= 17 {
+                    let (tc, th) = (s[0] >> 4, (s[0] & 15) as usize);
+                    let mut counts = [0u8; 16];
+                    counts.copy_from_slice(&s[1..17]);
+                    let total: usize = counts.iter().map(|&c| c as usize).sum();
+                    let vals = s.get(17..17 + total)?.to_vec();
+                    if th > 3 {
+                        return None;
+                    }
+                    let t = JHuff::new(&counts, vals);
+                    if tc == 0 { dc[th] = Some(t) } else { ac[th] = Some(t) }
+                    s = &s[17 + total..];
+                }
+            }
+            0xDD => restart = u16::from_be_bytes([*seg.first()?, *seg.get(1)?]) as usize,
+            0xDA => {
+                scans += 1;
+                if scans > 256 || comps.is_empty() {
+                    return None;
+                }
+                let n = *seg.first()? as usize;
+                if n == 0 || n > comps.len() || seg.len() < 4 + n * 2 {
+                    return None;
+                }
+                let mut sel = Vec::new();
+                for i in 0..n {
+                    let (cid, t) = (seg[1 + i * 2], seg[2 + i * 2]);
+                    let ci = comps.iter().position(|c| c.id == cid)?;
+                    sel.push((ci, (t >> 4) as usize & 3, (t & 15) as usize & 3));
+                }
+                let (ss, se, a) = (seg[1 + n * 2] as usize, seg[2 + n * 2] as usize, seg[3 + n * 2]);
+                let (ah, al) = ((a >> 4) as u32, (a & 15) as u32);
+                if ss > se || se > 63 || al > 13 || (ss == 0 && se != 0) || (ss > 0 && n != 1) {
+                    return None;
+                }
+                p += len;
+                p = prog_scan(d, p, &mut comps, (w, h, hmax, vmax), restart, &sel, (ss, se, ah, al), &dc, &ac)?;
+                continue;
+            }
+            _ => {}
+        }
+        p += len;
+    }
+    if comps.is_empty() {
+        return None;
+    }
+    let mut planes = Vec::new();
+    for c in &comps {
+        let pw = c.bw * 8;
+        let mut plane = vec![0u8; pw * c.bh * 8];
+        for by in 0..c.bh {
+            for bx in 0..c.bw {
+                let off = (by * c.bw + bx) * 64;
+                let mut blk = [0i32; 64];
+                for i in 0..64 {
+                    blk[i] = c.coef[off + i] as i32 * qt[c.tq][i] as i32;
+                }
+                let mut out = [0u8; 64];
+                idct(&blk, &mut out);
+                for yy in 0..8 {
+                    let row = (by * 8 + yy) * pw + bx * 8;
+                    plane[row..row + 8].copy_from_slice(&out[yy * 8..yy * 8 + 8]);
+                }
+            }
+        }
+        planes.push(Comp { id: c.id, h: c.h, v: c.v, tq: c.tq, td: 0, ta: 0, plane, pw });
+    }
+    Some(jpeg_to_tex(w, h, hmax, vmax, &planes))
+}
+
+/// Один проход прогрессивного JPEG. Возвращает позицию следующего маркера.
+#[allow(clippy::too_many_arguments)]
+fn prog_scan(d: &[u8], p: usize, comps: &mut [PComp], dims: (usize, usize, usize, usize), restart: usize, sel: &[(usize, usize, usize)], spec: (usize, usize, u32, u32), dc: &[Option<JHuff>; 4], ac: &[Option<JHuff>; 4]) -> Option<usize> {
+    let (w, h, hmax, vmax) = dims;
+    let (ss, se, ah, al) = spec;
+    let mut b = JBits { d, p, buf: 0, n: 0 };
+    let mut pred = vec![0i32; sel.len()];
+    let mut eobrun = 0u32;
+    let inter = sel.len() > 1;
+    let (ux_n, uy_n) = if inter {
+        (w.div_ceil(8 * hmax), h.div_ceil(8 * vmax))
+    } else {
+        let c = &comps[sel[0].0];
+        ((w * c.h).div_ceil(hmax).div_ceil(8), (h * c.v).div_ceil(vmax).div_ceil(8))
+    };
+    let mut count = 0usize;
+    let (p1, m1) = (1i32 << al, -1i32 << al);
+    for uy in 0..uy_n {
+        for ux in 0..ux_n {
+            if restart > 0 && count > 0 && count % restart == 0 {
+                b.align();
+                while *b.d.get(b.p)? != 0xFF {
+                    b.p += 1;
+                }
+                b.p += 2;
+                pred.iter_mut().for_each(|v| *v = 0);
+                eobrun = 0;
+            }
+            count += 1;
+            for (si, &(ci, td, ta)) in sel.iter().enumerate() {
+                let (ch, cv) = if inter { (comps[ci].h, comps[ci].v) } else { (1, 1) };
+                for by in 0..cv {
+                    for bx in 0..ch {
+                        let (gx, gy) = if inter { (ux * ch + bx, uy * cv + by) } else { (ux, uy) };
+                        let c = &mut comps[ci];
+                        if gx >= c.bw || gy >= c.bh {
+                            return None;
+                        }
+                        let off = (gy * c.bw + gx) * 64;
+                        let blk = c.coef.get_mut(off..off + 64)?;
+                        if ss == 0 {
+                            if ah == 0 {
+                                let t = b.huff(dc[td].as_ref()?)? as u32;
+                                if t > 15 {
+                                    return None;
+                                }
+                                pred[si] += extend(b.bits(t)?, t);
+                                blk[0] = (pred[si] << al) as i16;
+                            } else if b.bit()? == 1 {
+                                blk[0] |= p1 as i16;
+                            }
+                        } else if ah == 0 {
+                            if eobrun > 0 {
+                                eobrun -= 1;
+                                continue;
+                            }
+                            let act = ac[ta].as_ref()?;
+                            let mut k = ss;
+                            while k <= se {
+                                let rs = b.huff(act)?;
+                                let (r, s) = ((rs >> 4) as usize, (rs & 15) as u32);
+                                if s == 0 {
+                                    if r < 15 {
+                                        eobrun = (1u32 << r) - 1;
+                                        if r > 0 {
+                                            eobrun += b.bits(r as u32)? as u32;
+                                        }
+                                        break;
+                                    }
+                                    k += 16;
+                                    continue;
+                                }
+                                k += r;
+                                if k > 63 {
+                                    return None;
+                                }
+                                blk[ZIGZAG[k]] = (extend(b.bits(s)?, s) << al) as i16;
+                                k += 1;
+                            }
+                        } else {
+                            let act = ac[ta].as_ref()?;
+                            let mut k = ss;
+                            if eobrun == 0 {
+                                while k <= se {
+                                    let rs = b.huff(act)?;
+                                    let (mut r, s) = ((rs >> 4) as i32, (rs & 15) as u32);
+                                    let mut val = 0i32;
+                                    if s == 0 {
+                                        if r < 15 {
+                                            eobrun = 1u32 << r;
+                                            if r > 0 {
+                                                eobrun += b.bits(r as u32)? as u32;
+                                            }
+                                            break;
+                                        }
+                                    } else if s == 1 {
+                                        val = if b.bit()? == 1 { p1 } else { m1 };
+                                    } else {
+                                        return None;
+                                    }
+                                    while k <= se {
+                                        let z = ZIGZAG[k];
+                                        let cur = blk[z] as i32;
+                                        if cur != 0 {
+                                            if b.bit()? == 1 && cur & p1 == 0 {
+                                                blk[z] = (cur + if cur >= 0 { p1 } else { m1 }) as i16;
+                                            }
+                                        } else {
+                                            r -= 1;
+                                            if r < 0 {
+                                                break;
+                                            }
+                                        }
+                                        k += 1;
+                                    }
+                                    if s != 0 && k <= 63 {
+                                        blk[ZIGZAG[k]] = val as i16;
+                                    }
+                                    k += 1;
+                                }
+                            }
+                            if eobrun > 0 {
+                                while k <= se {
+                                    let z = ZIGZAG[k];
+                                    let cur = blk[z] as i32;
+                                    if cur != 0 && b.bit()? == 1 && cur & p1 == 0 {
+                                        blk[z] = (cur + if cur >= 0 { p1 } else { m1 }) as i16;
+                                    }
+                                    k += 1;
+                                }
+                                eobrun -= 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    let mut q = b.p.saturating_sub(1);
+    loop {
+        if q + 1 >= d.len() {
+            return Some(d.len());
+        }
+        if d[q] == 0xFF && d[q + 1] != 0 && !(0xD0..=0xD7).contains(&d[q + 1]) && d[q + 1] != 0xFF {
+            return Some(q);
+        }
+        q += 1;
+    }
 }

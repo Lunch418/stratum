@@ -442,8 +442,12 @@ pub fn draw_text(text: &str, x: f64, y: f64, px: f64, mut put: impl FnMut(i64, i
     for ch in text.chars().take(512) {
         let c = ch as u32;
         let idx = if (32..127).contains(&c) { (c - 32) as usize } else { 31 };
+        let cyr = cyr_glyph(ch);
         for col in 0..5 {
-            let bits = FONT5X7[idx * 5 + col];
+            let bits = match cyr {
+                Some(g) => g[col],
+                None => FONT5X7[idx * 5 + col],
+            };
             for row in 0..7 {
                 if bits >> row & 1 == 1 {
                     let (x0, y0) = (cx + col as f64 * scale, y + row as f64 * scale);
@@ -462,4 +466,202 @@ pub fn draw_text(text: &str, x: f64, y: f64, px: f64, mut put: impl FnMut(i64, i
 
 pub fn text_width(text: &str, px: f64) -> f64 {
     text.chars().take(512).count() as f64 * 6.0 * (px / 7.0).max(1.0)
+}
+
+/// Кириллица для шрифта 5x7: заглавные формы, строчные рисуются так же.
+/// Буквы, похожие на латинские, берутся из латинской таблицы.
+fn cyr_glyph(ch: char) -> Option<[u8; 5]> {
+    let c = ch as u32;
+    let up = match c {
+        0x430..=0x44f => c - 0x20,
+        0x451 => 0x401,
+        _ => c,
+    };
+    let rows: [&str; 7] = match up {
+        0x410 | 0x412 | 0x415 | 0x41a | 0x41c | 0x41d | 0x41e | 0x420 | 0x421 | 0x422 | 0x423 | 0x425 => {
+            let l = match up {
+                0x410 => 'A',
+                0x412 => 'B',
+                0x415 => 'E',
+                0x41a => 'K',
+                0x41c => 'M',
+                0x41d => 'H',
+                0x41e => 'O',
+                0x420 => 'P',
+                0x421 => 'C',
+                0x422 => 'T',
+                0x423 => 'Y',
+                _ => 'X',
+            };
+            let i = (l as usize - 32) * 5;
+            let mut g = [0u8; 5];
+            g.copy_from_slice(&FONT5X7[i..i + 5]);
+            return Some(g);
+        }
+        0x411 => ["#####", "#....", "####.", "#...#", "#...#", "#...#", "####."],
+        0x413 => ["#####", "#....", "#....", "#....", "#....", "#....", "#...."],
+        0x414 => ["..##.", ".#.#.", "#..#.", "#..#.", "#####", "#...#", "#...#"],
+        0x416 => ["#.#.#", "#.#.#", ".###.", "..#..", ".###.", "#.#.#", "#.#.#"],
+        0x417 => ["####.", "....#", "...#.", "..##.", "....#", "#...#", ".###."],
+        0x418 => ["#...#", "#...#", "#..##", "#.#.#", "##..#", "#...#", "#...#"],
+        0x419 => [".#.#.", "#...#", "#..##", "#.#.#", "##..#", "#...#", "#...#"],
+        0x41b => ["..###", ".#..#", ".#..#", ".#..#", ".#..#", "#...#", "#...#"],
+        0x41f => ["#####", "#...#", "#...#", "#...#", "#...#", "#...#", "#...#"],
+        0x424 => ["..#..", ".###.", "#.#.#", "#.#.#", ".###.", "..#..", "..#.."],
+        0x426 => ["#..#.", "#..#.", "#..#.", "#..#.", "#..#.", "#####", "....#"],
+        0x427 => ["#...#", "#...#", "#...#", ".####", "....#", "....#", "....#"],
+        0x428 => ["#.#.#", "#.#.#", "#.#.#", "#.#.#", "#.#.#", "#.#.#", "#####"],
+        0x429 => ["#.#.#", "#.#.#", "#.#.#", "#.#.#", "#.#.#", "#####", "....#"],
+        0x42a => ["##...", ".#...", ".###.", ".#..#", ".#..#", ".#..#", ".###."],
+        0x42b => ["#...#", "#...#", "#...#", "###.#", "#.#.#", "#.#.#", "###.#"],
+        0x42c => ["#....", "#....", "####.", "#...#", "#...#", "#...#", "####."],
+        0x42d => ["####.", "....#", "....#", ".####", "....#", "....#", "####."],
+        0x42e => ["#.##.", "#.#.#", "#.#.#", "###.#", "#.#.#", "#.#.#", "#.##."],
+        0x42f => [".####", "#...#", "#...#", ".####", "..#.#", ".#..#", "#...#"],
+        0x401 => [".#.#.", "#####", "#....", "####.", "#....", "#....", "#####"],
+        _ => return None,
+    };
+    let mut g = [0u8; 5];
+    for (r, row) in rows.iter().enumerate() {
+        for (col, b) in row.bytes().enumerate().take(5) {
+            if b == b'#' {
+                g[col] |= 1 << r;
+            }
+        }
+    }
+    Some(g)
+}
+
+// ---- композиторы: цели и проходы ------------------------------------------------------------
+
+#[derive(Debug, Default, Clone)]
+pub struct CPass {
+    /// clear, render_scene, render_quad (остальные виды игнорируются)
+    pub kind: String,
+    pub material: String,
+    pub inputs: Vec<(usize, String)>,
+    pub clear: [f64; 3],
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct CTarget {
+    pub name: String,
+    pub previous: bool,
+    pub passes: Vec<CPass>,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct CompDef {
+    pub targets: Vec<CTarget>,
+    pub output: CTarget,
+}
+
+fn parse_target(name: &str, b: &[String]) -> CTarget {
+    let mut t = CTarget { name: name.to_ascii_lowercase(), ..Default::default() };
+    let mut i = 0;
+    while i < b.len() {
+        match b[i].as_str() {
+            "input" if b.get(i + 1).is_some_and(|x| x == "previous") => {
+                t.previous = true;
+                i += 2;
+            }
+            "pass" => {
+                let kind = b.get(i + 1).cloned().unwrap_or_default();
+                let mut j = i + 1;
+                while j < b.len() && b[j] != "{" {
+                    j += 1;
+                }
+                let end = skip_block(b, j).min(b.len());
+                let body = if j < end { &b[j + 1..end.saturating_sub(1).max(j + 1)] } else { &b[0..0] };
+                let mut p = CPass { kind: kind.clone(), ..Default::default() };
+                let mut k = 0;
+                while k < body.len() {
+                    match body[k].as_str() {
+                        "material" if k + 1 < body.len() => {
+                            p.material = body[k + 1].clone();
+                            k += 2;
+                        }
+                        "input" if k + 2 < body.len() => {
+                            if let Ok(n) = body[k + 1].parse::<usize>() {
+                                if p.inputs.len() < 16 {
+                                    p.inputs.push((n, body[k + 2].to_ascii_lowercase()));
+                                }
+                            }
+                            k += 3;
+                        }
+                        "colour_value" | "color_value" => {
+                            for c in 0..3 {
+                                p.clear[c] = body.get(k + 1 + c).and_then(|x| x.parse().ok()).unwrap_or(0.0);
+                            }
+                            k += 5;
+                        }
+                        _ => k += 1,
+                    }
+                }
+                if t.passes.len() < 32 {
+                    t.passes.push(p);
+                }
+                i = end.max(i + 1);
+            }
+            _ => i += 1,
+        }
+    }
+    t
+}
+
+/// Разбирает все `compositor` из скрипта (берётся первая техника).
+pub fn parse_compositors(t: &[String], out: &mut BTreeMap<String, Arc<CompDef>>) {
+    let mut i = 0;
+    while i < t.len() {
+        if t[i] == "compositor" && i + 1 < t.len() {
+            let mut j = i + 2;
+            while j < t.len() && t[j] != "{" {
+                j += 1;
+            }
+            if j >= t.len() {
+                break;
+            }
+            let end = skip_block(t, j);
+            let body = &t[j + 1..end.saturating_sub(1).max(j + 1)];
+            let name = t[i + 1].to_ascii_lowercase();
+            if out.len() < 256 && !out.contains_key(&name) {
+                let mut def = CompDef::default();
+                if let Some(tp) = body.iter().position(|w| w == "technique") {
+                    let mut k = tp + 1;
+                    while k < body.len() && body[k] != "{" {
+                        k += 1;
+                    }
+                    let tend = skip_block(body, k).min(body.len());
+                    let tb = if k < tend { &body[k + 1..tend.saturating_sub(1).max(k + 1)] } else { &body[0..0] };
+                    let mut m = 0;
+                    while m < tb.len() {
+                        match tb[m].as_str() {
+                            "target" | "target_output" => {
+                                let out_t = tb[m] == "target_output";
+                                let nm = if out_t { String::new() } else { tb.get(m + 1).cloned().unwrap_or_default() };
+                                let mut b = m + 1;
+                                while b < tb.len() && tb[b] != "{" {
+                                    b += 1;
+                                }
+                                let e = skip_block(tb, b).min(tb.len());
+                                let inner = if b < e { &tb[b + 1..e.saturating_sub(1).max(b + 1)] } else { &tb[0..0] };
+                                let t2 = parse_target(&nm, inner);
+                                if out_t {
+                                    def.output = t2;
+                                } else if def.targets.len() < 16 {
+                                    def.targets.push(t2);
+                                }
+                                m = e.max(m + 1);
+                            }
+                            _ => m += 1,
+                        }
+                    }
+                }
+                out.insert(name, Arc::new(def));
+            }
+            i = end;
+        } else {
+            i += 1;
+        }
+    }
 }

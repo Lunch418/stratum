@@ -550,3 +550,150 @@ fn zip_fuzz_does_not_panic() {
         }
     }
 }
+
+fn td(name: &str) -> Vec<u8> {
+    std::fs::read(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/runtime/ogre/testdata").join(name)).unwrap()
+}
+
+#[test]
+fn adam7_png_equals_plain_png() {
+    for (a, b) in [("adam7.png", "plain.png"), ("adam7_p4.png", "plain_p4.png"), ("adam7_1bit.png", "plain_1bit.png")] {
+        let (ta, tb) = (image::decode(a, &td(a)).unwrap_or_else(|| panic!("{a}")), image::decode(b, &td(b)).unwrap());
+        assert_eq!((ta.w, ta.h), (tb.w, tb.h));
+        assert!(ta.rgba == tb.rgba, "{a}");
+    }
+}
+
+#[test]
+fn progressive_jpeg_equals_baseline() {
+    for (a, b) in [("prog.jpg", "base.jpg"), ("prog420.jpg", "base420.jpg"), ("prog_g.jpg", "base_g.jpg")] {
+        let (ta, tb) = (image::decode(a, &td(a)).unwrap_or_else(|| panic!("{a}")), image::decode(b, &td(b)).unwrap());
+        assert_eq!((ta.w, ta.h), (tb.w, tb.h));
+        let diff = ta.rgba.iter().zip(&tb.rgba).filter(|(x, y)| x != y).count();
+        assert!(diff * 100 < ta.rgba.len(), "{a}: {diff} differing bytes");
+    }
+}
+
+#[test]
+fn progressive_and_interlaced_fuzz() {
+    let mut x = 7u64;
+    for n in ["prog.jpg", "prog420.jpg", "prog_g.jpg", "adam7.png", "adam7_p4.png"] {
+        let base = td(n);
+        for _ in 0..300 {
+            let mut d = base.clone();
+            for _ in 0..6 {
+                x = x.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                let i = (x >> 33) as usize % d.len();
+                d[i] = (x >> 20) as u8;
+            }
+            let _ = image::decode(n, &d);
+            let _ = image::decode(n, &d[..d.len() * 2 / 3]);
+        }
+    }
+}
+
+fn quad(fx: &mut Effects, sc: &Value, name: &str, z: f64, h: f64) -> Value {
+    let mo = c(fx, "ManualObject_Create", &[hv(sc), st(name)]);
+    c(fx, "ManualObject_Begin", &[hv(&mo), st(""), f(4.0)]);
+    for p in [[-h, -h, z], [h, -h, z], [h, h, z], [-h, h, z]] {
+        c(fx, "ManualObject_Position", &[hv(&mo), f(p[0]), f(p[1]), f(p[2])]);
+    }
+    for i in [0.0, 1.0, 2.0, 0.0, 2.0, 3.0] {
+        c(fx, "ManualObject_Index", &[hv(&mo), f(i)]);
+    }
+    c(fx, "ManualObject_End", &[hv(&mo)]);
+    let n = c(fx, "SceneNode_Create", &[hv(sc), st(&format!("n_{name}"))]);
+    c(fx, "SceneNode_AttachObject", &[hv(&n), hv(&mo)]);
+    mo
+}
+
+fn view(fx: &mut Effects, sc: &Value) -> Value {
+    let cam = c(fx, "Camera_Create", &[hv(sc), st("c")]);
+    let cn = c(fx, "SceneNode_Create", &[hv(sc), st("cn")]);
+    c(fx, "Node_SetPosition", &[hv(&cn), f(0.0), f(0.0), f(20.0)]);
+    c(fx, "SceneNode_AttachObject", &[hv(&cn), hv(&cam)]);
+    c(fx, "Camera_SetNearClipDistance", &[hv(&cam), f(1.0)]);
+    let win = c(fx, "RenderWindow_GetPrimary", &[]);
+    c(fx, "Viewport_Create", &[hv(&win), hv(&cam), f(0.0)])
+}
+
+#[test]
+fn compositor_passes_and_shader_log() {
+    let mut fx = Effects::default();
+    let sc = boot(&mut fx);
+    quad(&mut fx, &sc, "q", 0.0, 5.0);
+    let vp = view(&mut fx, &sc);
+    c(&mut fx, "Scene_SetAmbientLight", &[hv(&sc), f(1.0), f(0.0), f(0.0)]);
+    fx.ogre.ingest_script(
+        "material",
+        "material Ogre/Compositor/BlackAndWhite { technique { pass { fragment_program_ref BW_ps { } } } }",
+    );
+    assert!(fx.ogre.pending_log.iter().any(|m| m.contains("шейдер")), "{:?}", fx.ogre.pending_log);
+    fx.ogre.ingest_script(
+        "compositor",
+        "compositor BW { technique { texture rt0 target_width target_height PF_A8R8G8B8 target rt0 { input previous } \\
+         target_output { input none pass render_quad { material Ogre/Compositor/BlackAndWhite input 0 rt0 } } } }
+         compositor Blue { technique { target_output { input none pass clear { colour_value 0 0 1 1 } } } }",
+    );
+    let mid = |fx: &Effects| {
+        let fr = fx.ogre.render(None).unwrap();
+        let i = (fr.height / 2 * fr.width + fr.width / 2) * 3;
+        [fr.rgb[i], fr.rgb[i + 1], fr.rgb[i + 2]]
+    };
+    let plain = mid(&fx);
+    assert!(plain[0] > 200 && plain[1] == 0, "{plain:?}");
+    let bw = c(&mut fx, "Viewport_AddCompositor", &[hv(&vp), st("BW"), f(-1.0)]);
+    assert!(bw.as_float() >= 1.0, "{:?}", fx.log);
+    // выключен: картинка не меняется
+    assert_eq!(mid(&fx), plain);
+    c(&mut fx, "Compositor_SetEnabled", &[hv(&bw), f(1.0)]);
+    let g = mid(&fx);
+    assert!(g[0] == g[1] && g[1] == g[2] && g[0] > 20, "{g:?}");
+    c(&mut fx, "Compositor_SetEnabled", &[hv(&bw), f(0.0)]);
+    let blue = c(&mut fx, "Viewport_AddCompositor", &[hv(&vp), st("Blue"), f(-1.0)]);
+    c(&mut fx, "Compositor_SetEnabled", &[hv(&blue), f(1.0)]);
+    assert_eq!(mid(&fx), [0, 0, 255]);
+}
+
+#[test]
+fn shadows_darken_receivers_deterministically() {
+    let mut fx = Effects::default();
+    let sc = boot(&mut fx);
+    quad(&mut fx, &sc, "floor", 0.0, 8.0);
+    quad(&mut fx, &sc, "caster", 3.0, 2.0);
+    view(&mut fx, &sc);
+    c(&mut fx, "Scene_SetAmbientLight", &[hv(&sc), f(0.2), f(0.2), f(0.2)]);
+    let lt = c(&mut fx, "Light_Create", &[hv(&sc), st("l")]);
+    c(&mut fx, "Light_SetType", &[hv(&lt), f(1.0)]);
+    let ln = c(&mut fx, "SceneNode_Create", &[hv(&sc), st("ln")]);
+    c(&mut fx, "Node_SetRotationEulerXYZ", &[hv(&ln), f(0.0), f(0.5), f(0.0)]);
+    c(&mut fx, "SceneNode_AttachObject", &[hv(&ln), hv(&lt)]);
+    let off = fx.ogre.render(None).unwrap();
+    c(&mut fx, "Scene_SetShadowTechnique", &[hv(&sc), f(18.0)]);
+    let on = fx.ogre.render(None).unwrap();
+    let on2 = fx.ogre.render(None).unwrap();
+    assert!(on.rgb == on2.rgb, "not deterministic");
+    let darker = on.rgb.chunks_exact(3).zip(off.rgb.chunks_exact(3)).filter(|(a, b)| a[0] < b[0]).count();
+    let brighter = on.rgb.chunks_exact(3).zip(off.rgb.chunks_exact(3)).filter(|(a, b)| a[0] > b[0]).count();
+    assert!(darker > 50, "darker {darker}");
+    assert_eq!(brighter, 0);
+}
+
+#[test]
+fn cyrillic_glyphs_are_drawn() {
+    let set = |s: &str| {
+        let mut v = std::collections::BTreeSet::new();
+        fx::draw_text(s, 0.0, 0.0, 7.0, |x, y| {
+            v.insert((x, y));
+        });
+        v
+    };
+    let q = set("?");
+    for ch in ["Ж", "ж", "Б", "ю", "Я", "Ё", "щ"] {
+        let g = set(ch);
+        assert!(g.len() > 8 && g != q, "{ch}");
+    }
+    assert_eq!(set("ж"), set("Ж"));
+    assert_eq!(set("а"), set("A"));
+    assert_ne!(set("Привет"), set("??????"));
+}
