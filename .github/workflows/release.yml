@@ -3,7 +3,7 @@
 # - вручную (Actions → release → Run workflow): установщики появляются
 #   артефактами запуска, релиз не создаётся;
 # - по метке `v*` (например, v0.2.0): то же, плюс черновик релиза GitHub с
-#   приложенными .deb, .AppImage, .msi, .exe и .dmg. Черновик публикует
+#   приложенными .deb, .AppImage, .msi, .exe и .dmg (из вложенных папок). Черновик публикует
 #   владелец вручную. Метка должна совпадать с версией в tauri.conf.json.
 #
 # Установщики не подписаны: Windows SmartScreen и macOS Gatekeeper при
@@ -108,4 +108,4 @@ jobs:
         with:
           draft: true
           generate_release_notes: true
-          files: installers/*
+          files: installers/**
